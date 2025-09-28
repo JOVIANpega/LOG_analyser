@@ -34,20 +34,28 @@ def build_left_panel(app, parent):
     btn_folder.pack(fill=tk.X, pady=2)
     app.font_scaler.register(btn_folder)
     
+    # 壓縮檔選擇
+    btn_compressed = tk.Button(file_frame, text="📦 讀取壓縮檔LOG", 
+                              command=app._select_compressed_file, bg='#FF9800', fg='white')
+    btn_compressed.pack(fill=tk.X, pady=2)
+    app.font_scaler.register(btn_compressed)
+    
     # 清除結果按鈕
     btn_clear = tk.Button(file_frame, text="🗑️ 清除結果", 
                          command=app._clear_enhanced_results, bg='#F44336', fg='white')
     btn_clear.pack(fill=tk.X, pady=2)
     app.font_scaler.register(btn_clear)
     
-    # 左三個按鈕：加粗與hover
+    # 左四個按鈕：加粗與hover
     try:
         from ui_components import make_bold, apply_button_hover
         make_bold(btn_single)
         make_bold(btn_folder)
+        make_bold(btn_compressed)
         make_bold(btn_clear)
         apply_button_hover(btn_single, hover_bg="#66BB6A", hover_fg='white', normal_bg='#4CAF50', normal_fg='white')
         apply_button_hover(btn_folder, hover_bg="#64B5F6", hover_fg='white', normal_bg='#2196F3', normal_fg='white')
+        apply_button_hover(btn_compressed, hover_bg="#FFB74D", hover_fg='white', normal_bg='#FF9800', normal_fg='white')
         apply_button_hover(btn_clear,  hover_bg="#EF5350", hover_fg='white', normal_bg='#F44336', normal_fg='white')
     except Exception:
         pass

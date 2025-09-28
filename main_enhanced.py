@@ -354,6 +354,129 @@ class EnhancedLogAnalyzerApp:
             # 自動開始分析（enhanced）
             self._analyze_enhanced_log()
     
+    def _select_compressed_file(self):
+        """選擇並處理壓縮檔案"""
+        import tempfile
+        import shutil
+        
+        # 獲取預設目錄
+        if self.settings.get('last_compressed_path') and os.path.exists(self.settings.get('last_compressed_path')):
+            default_dir = os.path.dirname(self.settings.get('last_compressed_path'))
+        else:
+            default_dir = self._get_default_directory()
+        
+        file_path = filedialog.askopenfilename(
+            title="選擇壓縮檔案", 
+            filetypes=[
+                ("壓縮檔案", "*.zip;*.7z;*.rar"),
+                ("ZIP檔案", "*.zip"),
+                ("7Z檔案", "*.7z"), 
+                ("RAR檔案", "*.rar"),
+                ("所有檔案", "*.*")
+            ],
+            initialdir=default_dir
+        )
+        
+        if file_path:
+            # 先清除現有結果
+            self._clear_enhanced_results()
+            
+            # 處理壓縮檔案
+            self._process_compressed_file(file_path)
+
+    def _process_compressed_file(self, compressed_path):
+        """處理壓縮檔案"""
+        import tempfile
+        import shutil
+        
+        try:
+            # 建立暫存目錄
+            temp_dir = tempfile.mkdtemp(prefix="log_analyzer_")
+            
+            # 解壓縮
+            file_ext = os.path.splitext(compressed_path)[1].lower()
+            
+            if file_ext == '.zip':
+                self._extract_zip(compressed_path, temp_dir)
+            elif file_ext == '.7z':
+                self._extract_7z(compressed_path, temp_dir)
+            elif file_ext == '.rar':
+                self._extract_rar(compressed_path, temp_dir)
+            else:
+                messagebox.showerror("錯誤", "不支援的壓縮格式")
+                return
+            
+            # 搜尋 LOG 檔案
+            log_files = self._find_log_files(temp_dir)
+            
+            if not log_files:
+                messagebox.showwarning("警告", "壓縮檔中未找到 .log 檔案")
+                return
+            
+            # 根據檔案數量決定處理模式
+            if len(log_files) == 1:
+                # 單檔模式
+                self.current_mode = 'single'
+                self.current_log_path = log_files[0]
+                filename = os.path.basename(log_files[0])
+                self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮檔)", fg='orange')
+            else:
+                # 資料夾模式
+                self.current_mode = 'multi'
+                self.current_log_path = temp_dir
+                self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮檔)", fg='orange')
+            
+            # 儲存選擇的路徑到設定
+            self.settings['last_compressed_path'] = compressed_path
+            self._save_settings_silent()
+            
+            # 開始分析
+            self._analyze_enhanced_log()
+            
+            # 註冊清理函數（分析完成後清理暫存檔案）
+            self.temp_cleanup_path = temp_dir
+            
+        except Exception as e:
+            messagebox.showerror("錯誤", f"處理壓縮檔案時發生錯誤：\n{str(e)}")
+            # 清理暫存目錄
+            if 'temp_dir' in locals() and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def _extract_zip(self, zip_path, extract_to):
+        """解壓縮 ZIP 檔案"""
+        import zipfile
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_to)
+
+    def _extract_7z(self, sevenz_path, extract_to):
+        """解壓縮 7Z 檔案"""
+        try:
+            import py7zr
+            with py7zr.SevenZipFile(sevenz_path, mode='r') as archive:
+                archive.extractall(path=extract_to)
+        except ImportError:
+            messagebox.showerror("錯誤", "需要安裝 py7zr 套件來支援 7Z 格式\n請執行：pip install py7zr")
+            raise
+
+    def _extract_rar(self, rar_path, extract_to):
+        """解壓縮 RAR 檔案"""
+        try:
+            import rarfile
+            with rarfile.RarFile(rar_path) as rf:
+                rf.extractall(extract_to)
+        except ImportError:
+            messagebox.showerror("錯誤", "需要安裝 rarfile 套件來支援 RAR 格式\n請執行：pip install rarfile")
+            raise
+
+    def _find_log_files(self, directory):
+        """搜尋目錄中的 LOG 檔案"""
+        log_files = []
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if file.lower().endswith('.log'):
+                    log_files.append(os.path.join(root, file))
+        return log_files
+    
     def _analyze_enhanced_log(self):
         """分析log檔案並更新增強版GUI顯示"""
         if not self.current_log_path:

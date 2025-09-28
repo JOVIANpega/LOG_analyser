@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo PEGA Log Analyzer V1.7.1 打包工具
+echo PEGA Log Analyzer V1.7.8 打包工具
 echo ========================================
 echo.
 
@@ -35,8 +35,8 @@ if exist *.spec del *.spec
 REM 使用PyInstaller打包（包含圖示）
 echo 正在執行PyInstaller...
 pyinstaller --onefile ^
-    --console ^
-    --name="PEGA_Log_Analyzer_V1.7.1_Console" ^
+    --noconsole ^
+    --name="PEGA_Log_Analyzer_V1.7.8" ^
     --icon=assets/icon.ico ^
     --version-file=assets/version_info.txt ^
     --add-data="assets;assets" ^
@@ -65,9 +65,13 @@ pyinstaller --onefile ^
     --hidden-import=enhanced_left_panel ^
     --hidden-import=excel_writer ^
     --hidden-import=generate_documentation ^
+    --hidden-import=py7zr ^
+    --hidden-import=rarfile ^
     --collect-all=pandas ^
     --collect-all=openpyxl ^
     --collect-all=xlrd ^
+    --collect-all=py7zr ^
+    --collect-all=rarfile ^
     main_enhanced.py
 
 if errorlevel 1 (
@@ -82,13 +86,13 @@ echo ========================================
 echo 打包完成！
 echo ========================================
 echo.
-echo EXE檔案位置：dist\PEGA_Log_Analyzer_V1.7.1_Console.exe
+echo EXE檔案位置：dist\PEGA_Log_Analyzer_V1.7.8.exe
 echo.
 
 REM 檢查檔案是否存在
-if exist "dist\PEGA_Log_Analyzer_V1.7.1_Console.exe" (
+if exist "dist\PEGA_Log_Analyzer_V1.7.8.exe" (
     echo 檔案大小：
-    dir "dist\PEGA_Log_Analyzer_V1.7.1_Console.exe" | findstr "PEGA_Log_Analyzer_V1.7.1_Console.exe"
+    dir "dist\PEGA_Log_Analyzer_V1.7.8.exe" | findstr "PEGA_Log_Analyzer_V1.7.8.exe"
     echo.
     echo 是否要開啟dist目錄？
     set /p choice="請輸入 y 或 n: "
