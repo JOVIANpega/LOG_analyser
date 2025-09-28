@@ -34,7 +34,7 @@ class ExcelWriter:
             # 移除顏色碼樣式殘餘 (保險)
             text = re.sub(r'\x1b', '', text)
             # 若首字為會被當作公式的危險字元，前綴 '\''
-            if text and text[0] in ('=', '+', '-', '@'):
+            if text and text[0] in ('=', '+', '-', '@', '>', '<'):
                 text = "'" + text
             # 長度截斷 (32767為Excel上限，保留安全餘量)
             if len(text) > 30000:
@@ -48,89 +48,95 @@ class ExcelWriter:
         匯出分析結果到Excel，分為PASS/FAIL兩個sheet
         pass_items: List[dict]
         fail_items: List[dict]
-        output_path: str
         """
-        # PASS欄位：Step Name | 指令 | 回應 | 結果
-        pass_df = pd.DataFrame(pass_items)
-        if not pass_df.empty:
-            cols = [c for c in ['file_name','step_name','command','response','result'] if c in pass_df.columns]
-            pass_df = pass_df[cols]
-            new_cols = ['檔名','Step Name','指令','回應','結果'] if 'file_name' in cols else ['Step Name','指令','回應','結果']
-            pass_df.columns = new_cols
-            # 清理
-            for col in pass_df.columns:
-                pass_df[col] = pass_df[col].apply(self._sanitize_cell_text)
-        # FAIL欄位：Step Name | 指令 | 錯誤回應 | Retry 次數 | FAIL原因
-        fail_df = pd.DataFrame(fail_items)
-        if not fail_df.empty:
-            cols = [c for c in ['file_name','step_name','command','response','retry','error'] if c in fail_df.columns]
-            fail_df = fail_df[cols]
-            new_cols = ['檔名','Step Name','指令','錯誤回應','Retry 次數','FAIL原因'] if 'file_name' in cols else ['Step Name','指令','錯誤回應','Retry 次數','FAIL原因']
-            fail_df.columns = new_cols
-            # 清理
-            for col in fail_df.columns:
-                fail_df[col] = fail_df[col].apply(self._sanitize_cell_text)
-        with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-            if not pass_df.empty:
-                pass_df.to_excel(writer, sheet_name='PASS', index=False)
-            if not fail_df.empty:
-                fail_df.to_excel(writer, sheet_name='FAIL', index=False)
+        wb = Workbook()
+        # 移除預設工作表
+        wb.remove(wb.active)
+        
+        # PASS工作表
+        ws_pass = wb.create_sheet('PASS')
+        pass_headers = ['測項名稱', '指令', '收到指令', 'PASS/FAIL', '執行時間']
+        ws_pass.append(pass_headers)
+        
+        for item in pass_items:
+            row = [
+                self._sanitize_cell_text(item.get('step_name', '')),
+                self._sanitize_cell_text(item.get('command', '')),
+                self._sanitize_cell_text(item.get('response', '')),
+                'PASS',
+                self._sanitize_cell_text(item.get('execution_time', ''))
+            ]
+            ws_pass.append(row)
+        
+        # FAIL工作表
+        ws_fail = wb.create_sheet('FAIL')
+        fail_headers = ['測項名稱', '指令', '錯誤回應', 'Retry次數', 'FAIL原因', '錯誤碼']
+        ws_fail.append(fail_headers)
+        
+        for item in fail_items:
+            row = [
+                self._sanitize_cell_text(item.get('step_name', '')),
+                self._sanitize_cell_text(item.get('command', '')),
+                self._sanitize_cell_text(item.get('response', '')),
+                item.get('retry', 0),
+                self._sanitize_cell_text(item.get('error', '')),
+                self._sanitize_cell_text(item.get('error_code', ''))
+            ]
+            ws_fail.append(row)
+        
+        # 設定欄寬
+        for ws in [ws_pass, ws_fail]:
+            for col in ws.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                ws.column_dimensions[column].width = adjusted_width
+        
+        # 設定標題樣式
+        for ws in [ws_pass, ws_fail]:
+            for cell in ws[1]:
+                cell.font = Font(bold=True)
+                cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+        
+        # 儲存檔案
+        wb.save(output_path)
+        return output_path
 
-    def export_with_summary(self, pass_items, fail_items, output_path):
-        """
-        產出 Summary/PASS/FAIL 三工作表；Summary 含每檔案一列的總覽與KPI。
-        """
-        pass_df = pd.DataFrame(pass_items)
-        fail_df = pd.DataFrame(fail_items)
-        # 正規化欄位
-        if not pass_df.empty:
-            if 'file_name' not in pass_df.columns:
-                pass_df['file_name'] = ''
-            pass_df = pass_df[['file_name','step_name','command','response','result']]
-            pass_df.columns = ['檔名','Step Name','指令','回應','結果']
-        if not fail_df.empty:
-            if 'file_name' not in fail_df.columns:
-                fail_df['file_name'] = ''
-            fail_df = fail_df[['file_name','step_name','command','response','retry','error']]
-            fail_df.columns = ['檔名','Step Name','指令','錯誤回應','Retry 次數','FAIL原因']
-        # Summary 建立
-        summary_rows = []
-        all_files = set()
-        if not pass_df.empty:
-            all_files.update(pass_df['檔名'].unique())
-        if not fail_df.empty:
-            all_files.update(fail_df['檔名'].unique())
-        for fn in sorted(all_files):
-            p_cnt = 0 if pass_df.empty else (pass_df['檔名'] == fn).sum()
-            f_cnt = 0 if fail_df.empty else (fail_df['檔名'] == fn).sum()
-            result = 'FAIL' if f_cnt > 0 else 'PASS'
-            # 簡要失敗原因（取第一個）
-            fail_reason = ''
-            if f_cnt > 0 and not fail_df.empty:
-                subset = fail_df[fail_df['檔名'] == fn]
-                fail_reason = subset['FAIL原因'].iloc[0] if not subset.empty else ''
-            summary_rows.append({'檔名': fn, '結果': result, 'PASS筆數': p_cnt, 'FAIL筆數': f_cnt, '主要失敗原因': fail_reason})
-        summary_df = pd.DataFrame(summary_rows)
-        # KPI 概覽
-        total_files = len(all_files)
-        fail_files = (summary_df['結果'] == 'FAIL').sum() if not summary_df.empty else 0
-        pass_files = total_files - fail_files
-        kpi_df = pd.DataFrame([
-            {'項目':'總檔案數','數值': total_files},
-            {'項目':'PASS 檔數','數值': pass_files},
-            {'項目':'FAIL 檔數','數值': fail_files},
-            {'項目':'生成時間','數值': datetime.now().strftime('%Y-%m-%d %H:%M:%S')},
-        ])
-        with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-            kpi_df.to_excel(writer, sheet_name='Summary', index=False, startrow=0)
-            if not summary_df.empty:
-                summary_df.to_excel(writer, sheet_name='Summary', index=False, startrow=len(kpi_df)+2)
-            if not pass_df.empty:
-                pass_df.to_excel(writer, sheet_name='PASS', index=False)
-            if not fail_df.empty:
-                fail_df.to_excel(writer, sheet_name='FAIL', index=False)
+    def _extract_total_secs(self, raw_lines: list) -> float | None:
+        """從 raw_lines 嘗試提取測試總時間（秒數）"""
+        try:
+            for line in (raw_lines[-50:] if len(raw_lines) > 50 else raw_lines):
+                if 'testtime' in line.lower() or 'total time' in line.lower():
+                    # 嘗試提取數字
+                    nums = re.findall(r'(\d+\.?\d*)', line)
+                    if nums:
+                        val = float(nums[-1])
+                        if val > 0:
+                            return val
+            return None
+        except Exception:
+            return None
 
-    # 依需求新增：生成 PASS匯總.xlsx 與 FAIL匯總.xlsx，含 Summary 與每檔案工作表
+    def _unique_sheet_name(self, wb, base_name: str) -> str:
+        """確保工作表名稱不重複"""
+        if len(base_name) > 31:
+            base_name = base_name[:28] + '...'
+        existing = [ws.title for ws in wb.worksheets]
+        if base_name not in existing:
+            return base_name
+        counter = 1
+        while f"{base_name}({counter})" in existing:
+            counter += 1
+        suffix = f"({counter})"
+        max_base = 31 - len(suffix)
+        return f"{base_name[:max_base]}{suffix}"
+
     def export_pass_fail_workbooks(self, folder_path: str, pass_logs: list, fail_logs: list):
         """
         輸出兩個活頁簿：
@@ -231,74 +237,64 @@ class ExcelWriter:
             step_labels = [str(i) for i, _ in enumerate(entry.get('pass_items') or [], 1)]
             ws2.cell(row=2, column=1, value=self._sanitize_cell_text('，'.join(step_labels) if step_labels else ''))
             ws2.cell(row=2, column=1).number_format = '@'
-            ws2.cell(row=2, column=1).font = Font(name='Microsoft JhengHei', size=11)
             self._write_raw_log_with_annotations(ws2, start_row=3, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=10), step_marks=entry.get('step_marks'))
             self._auto_fit_columns(ws2)
-        # 以 PASS 項目清單分組
-        def _pass_names(entry):
-            names = []
-            for it in (entry.get('pass_items') or []):
-                nm = self._sanitize_cell_text(it.get('step_name',''))
-                if nm:
-                    names.append(nm)
-            return tuple(names) if names else tuple()
-        groups = {}
-        for entry in logs:
-            groups.setdefault(_pass_names(entry), []).append(entry)
-        # 計算最大欄數（每25項一欄）
-        CHUNK = 25
-        max_chunks = 1
-        for names in groups.keys():
-            n = len(names)
-            chunks = (n + CHUNK - 1) // CHUNK if n > 0 else 1
-            if chunks > max_chunks:
-                max_chunks = chunks
-        # 標題列：檔名 + PASS項目 + PASS項目2..N
-        headers = ['檔名', 'PASS項目'] + [f'PASS項目{i+1}' for i in range(1, max_chunks)]
-        ws.append(headers)
-        for c in range(1, len(headers)+1):
-            cell = ws.cell(row=1, column=c)
+        # Summary 表格：
+        headers = ['檔名'] + [f'步驟 {i}' for i in range(1, 11)]
+        for c, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=c, value=header)
             cell.font = header_font
             cell.alignment = center
             cell.fill = deep_green
         ws.freeze_panes = 'A2'
+        max_chunks = 10
         thin = Side(border_style='thin', color='FF888888')
         thick = Side(border_style='thick', color='FF000000')
         start_data_row = ws.max_row + 1
-        # 輸出每組一列
-        for names, entries in groups.items():
-            # 檔名欄：多LOG逐行，白底；加備註清單；不加超連結（避免誤判）
-            lines = []
-            for e in entries:
-                base = self._sanitize_cell_text(e.get('file_name') or '')
-                base_fmt = self._format_filename_with_timestamp(base)
-                sfis = (e.get('summary') or {}).get('SFIS', '')
-                sfis = (sfis or '').upper()
-                secs = self._extract_total_secs(e.get('raw_lines') or [])
-                sec_txt = f"測試總時間:{secs:.1f} Sec." if secs is not None else ''
-                suffix = f"_SFIS_{sfis}" if sfis else ''
-                lines.append(f"{base_fmt}{suffix} {sec_txt}".strip())
-            display_name = '\n'.join(lines)
+        for entry in logs:
+            # 分解steps至10欄
+            base = self._sanitize_cell_text(entry.get('file_name') or '')
+            base_fmt = self._format_filename_with_timestamp(base)
+            sfis = (entry.get('summary') or {}).get('SFIS','')
+            sfis = (sfis or '').upper()
+            secs = self._extract_total_secs(entry.get('raw_lines') or [])
+            sec_txt = f"測試總時間:{secs:.1f} Sec." if secs is not None else ''
+            suffix = f"_SFIS_{sfis}" if sfis else ''
+            display_name = f"{base_fmt}{suffix} {sec_txt}".strip()
             r = ws.max_row + 1
-            name_cell = ws.cell(row=r, column=1, value=self._sanitize_cell_text(display_name))
-            name_cell.number_format='@'
-            name_cell.font = Font(name='Microsoft JhengHei', size=10, color='FF000000')
-            name_cell.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top', shrink_to_fit=True)
-            # 備註預覽對應sheet名
-            sheet_list = [sheet_map.get(e.get('file_name')) for e in entries]
-            preview = '\n- '.join([s for s in sheet_list if s][:8])
-            # Summary 檔名欄不顯示懸停預覽與提示（避免誤判），僅在底部快速連結提供預覽/跳轉
-            # PASS 項目：水平切成多欄
-            numbered_all = [f"{i+1}. {nm}" for i, nm in enumerate(names)] if names else ['']
-            for idx in range(max_chunks):
-                chunk = numbered_all[idx*CHUNK:(idx+1)*CHUNK]
-                txt = '' if not chunk else ('\n'.join(chunk) if idx == 0 else f"(PASS項目{idx+1})\n" + '\n'.join(chunk))
-                c = 2 + idx
-                cell = ws.cell(row=r, column=c, value=self._sanitize_cell_text(txt))
-                cell.number_format='@'
-                cell.font = Font(name='Microsoft JhengHei', size=10)
-                cell.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left', shrink_to_fit=True)
-            # 邊框（整列）
+            # 主檔名
+            cell_name = ws.cell(row=r, column=1, value=self._sanitize_cell_text(display_name))
+            cell_name.number_format='@'
+            cell_name.font = Font(name='Microsoft JhengHei', size=10, color='FF000000')
+            cell_name.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top', shrink_to_fit=True)
+            # 備註與超連結
+            sheet = sheet_map.get(entry.get('file_name'))
+            try:
+                cell_name.comment = Comment(self._build_preview_comment(entry), "LOG Analyzer")
+                cell_name.comment.width = 400
+                cell_name.comment.height = 500
+            except Exception:
+                pass
+            if sheet:
+                cell_name.hyperlink = f"#'{sheet}'!A1"
+                self._add_input_prompt(ws, cell_name, '對應工作表', sheet)
+            # 步驟欄位（最多10欄）
+            pass_steps = entry.get('pass_items') or []
+            for col_idx in range(2, max_chunks + 2):
+                step_idx = col_idx - 2
+                if step_idx < len(pass_steps):
+                    step = pass_steps[step_idx]
+                    step_text = f"{step.get('step_name','')}\n{step.get('command','')}\n{step.get('response','')}"
+                    cell = ws.cell(row=r, column=col_idx, value=self._sanitize_cell_text(step_text))
+                    cell.number_format='@'
+                    cell.font = normal_font
+                    cell.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left', shrink_to_fit=True)
+                else:
+                    cell = ws.cell(row=r, column=col_idx, value='')
+                    cell = ws.cell(row=r, column=col_idx, value='')
+                    cell.number_format='@'
+                    cell.font = normal_font
+                    cell.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left', shrink_to_fit=True)
             last_col = 1 + max_chunks
             for c in range(1, last_col+1):
                 ws.cell(row=r, column=c).border = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -362,7 +358,7 @@ class ExcelWriter:
         normal_font = Font(name='Microsoft JhengHei', size=10)
         center = Alignment(horizontal='center', vertical='center')
         deep_green = PatternFill('solid', fgColor='FF1B5E20')
-        headers = ['檔名', 'FAIL原因']
+        headers = ['檔名', '詳細錯誤原因']
         ws.append(headers)
         for c in range(1, len(headers)+1):
             cell = ws.cell(row=1, column=c)
@@ -381,60 +377,108 @@ class ExcelWriter:
             cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FFFFFF')
             cell.fill = PatternFill('solid', fgColor='FFE74C3C')
             cell.number_format = '@'
-            main_reason = (entry.get('summary') or {}).get('FAIL原因','')
-            ws2.cell(row=2, column=1, value=self._sanitize_cell_text(main_reason)).number_format='@'
-            ws2.cell(row=2, column=1).font = Font(name='Microsoft JhengHei', size=11)
+            # 在最上面添加回到Summary的快速連結
+            back_to_summary_top = ws2.cell(row=2, column=1, value='🔙 回到 Summary 頁面')
+            back_to_summary_top.number_format='@'
+            back_to_summary_top.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF008000', underline='single')
+            back_to_summary_top.alignment = Alignment(horizontal='left')
+            back_to_summary_top.hyperlink = f"#'Summary'!A1"
+            back_to_summary_top.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
+            
+            # 添加分隔線
+            ws2.cell(row=3, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
+            
+            # 顯示完整錯誤原因區塊
+            detailed_error = self._build_detailed_error_summary(entry)
+            error_lines = detailed_error.split('\n')
+            current_row = 4
+            
+            for line in error_lines:
+                if line.strip():
+                    cell = ws2.cell(row=current_row, column=1, value=self._sanitize_cell_text(line))
+                    cell.number_format = '@'
+                    
+                    # 設定不同行的樣式
+                    if "===============錯誤原因====================" in line:
+                        cell.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF0000')
+                    elif "🔴 突出錯誤" in line:
+                        cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FF0000')
+                    elif "=" * 50 in line:
+                        cell.font = Font(name='Microsoft JhengHei', size=10)
+                    elif "執行指令:" in line:
+                        cell.font = Font(name='Microsoft JhengHei', size=11, color='FF0000FF')
+                    elif any(keyword in line.lower() for keyword in ['is fail', 'executes fail', "doesn't match", 'all test aborted']):
+                        cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FF0000')
+                        cell.fill = PatternFill('solid', fgColor='FFFFFF99')  # 淺黃色背景
+                    else:
+                        cell.font = Font(name='Microsoft JhengHei', size=11)
+                    
+                    current_row += 1
+                else:
+                    current_row += 1
+            
+            # 添加分隔線
+            ws2.cell(row=current_row, column=1, value=self._sanitize_cell_text("=" * 60)).number_format='@'
+            ws2.cell(row=current_row, column=1).font = Font(name='Microsoft JhengHei', size=10)
+            current_row += 1
+            
+            # PASS步驟資訊
             pass_steps = [str(i) for i, _ in enumerate(entry.get('pass_items') or [], 1)]
-            ws2.cell(row=3, column=1, value=self._sanitize_cell_text('，'.join(pass_steps) if pass_steps else ''))
-            ws2.cell(row=3, column=1).number_format='@'
-            ws2.cell(row=3, column=1).font = Font(name='Microsoft JhengHei', size=11)
-            self._write_raw_log_with_annotations(ws2, start_row=4, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=10), step_marks=entry.get('step_marks'))
+            ws2.cell(row=current_row, column=1, value=self._sanitize_cell_text('PASS步驟: ' + '，'.join(pass_steps) if pass_steps else 'PASS步驟: 無'))
+            ws2.cell(row=current_row, column=1).number_format='@'
+            ws2.cell(row=current_row, column=1).font = Font(name='Microsoft JhengHei', size=11, color='FF008000')
+            start_row = current_row + 1
+            
+            # 寫入原始LOG內容，並標記錯誤行
+            self._write_raw_log_with_annotations(ws2, start_row=start_row, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=11), step_marks=entry.get('step_marks'))
             self._auto_fit_columns(ws2)
-        # Summary：以 FAIL 原因分組，每組一行
+        # 在Summary頁面最上面添加錯誤統計
+        self._add_error_statistics(ws, logs)
+        
+        # Summary：每個LOG一行，顯示檔名和詳細錯誤原因
         thin = Side(border_style='thin', color='FF888888')
         thick = Side(border_style='thick', color='FF000000')
-        # 以原因分組
-        def _reason(entry):
-            fails = entry.get('fail_items') or []
-            return self._sanitize_cell_text(fails[0].get('error','')) if fails else ''
-        r_groups = {}
-        for e in logs:
-            r_groups.setdefault(_reason(e), []).append(e)
         start_data_row = ws.max_row + 1
-        for reason, entries in r_groups.items():
-            # 檔名欄：多LOG逐行
-            lines = []
-            for e in entries:
-                base = self._sanitize_cell_text(e.get('file_name') or '')
-                base_fmt = self._format_filename_with_timestamp(base)
-                sfis = (e.get('summary') or {}).get('SFIS','')
-                sfis = (sfis or '').upper()
-                secs = self._extract_total_secs(e.get('raw_lines') or [])
-                sec_txt = f"測試總時間:{secs:.1f} Sec." if secs is not None else ''
-                suffix = f"_SFIS_{sfis}" if sfis else ''
-                lines.append(f"{base_fmt}{suffix} {sec_txt}".strip())
-            display_name = '\n'.join(lines)
+        for entry in logs:
+            # 檔名欄
+            base = self._sanitize_cell_text(entry.get('file_name') or '')
+            base_fmt = self._format_filename_with_timestamp(base)
+            sfis = (entry.get('summary') or {}).get('SFIS','')
+            sfis = (sfis or '').upper()
+            secs = self._extract_total_secs(entry.get('raw_lines') or [])
+            sec_txt = f"測試總時間:{secs:.1f} Sec." if secs is not None else ''
+            suffix = f"_SFIS_{sfis}" if sfis else ''
+            display_name = f"{base_fmt}{suffix} {sec_txt}".strip()
             r = ws.max_row + 1
             cell_name = ws.cell(row=r, column=1, value=self._sanitize_cell_text(display_name))
             cell_name.number_format='@'
             cell_name.font = Font(name='Microsoft JhengHei', size=10, color='FF000000')
             cell_name.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top', shrink_to_fit=True)
             # 備註與超連結
-            sheet_list = [sheet_map.get(e.get('file_name')) for e in entries]
+            sheet = sheet_map.get(entry.get('file_name'))
             try:
-                cell_name.comment = Comment(self._build_preview_comment(entries[0] if entries else {}), "LOG Analyzer")
+                cell_name.comment = Comment(self._build_preview_comment(entry), "LOG Analyzer")
                 cell_name.comment.width = 400
                 cell_name.comment.height = 500
             except Exception:
                 pass
-            if sheet_list and sheet_list[0]:
-                cell_name.hyperlink = f"#'{sheet_list[0]}'!A1"
+            if sheet:
+                cell_name.hyperlink = f"#'{sheet}'!A1"
                 # 白底提示
-                self._add_input_prompt(ws, cell_name, '對應工作表', entries[0].get('file_name') or '')
-            cell_reason = ws.cell(row=r, column=2, value=self._sanitize_cell_text(reason))
+                self._add_input_prompt(ws, cell_name, '對應工作表', entry.get('file_name') or '')
+            
+            # 詳細錯誤原因欄 - 包含主要錯誤和執行指令
+            detailed_error = self._build_detailed_error_summary(entry)
+            cell_reason = ws.cell(row=r, column=2, value=self._sanitize_cell_text(detailed_error))
             cell_reason.number_format='@'
-            cell_reason.font = Font(name='Microsoft JhengHei', size=10)
-            cell_reason.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left', shrink_to_fit=True)
+            cell_reason.font = Font(name='Microsoft JhengHei', size=11)
+            cell_reason.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left', shrink_to_fit=False)
+            
+            # 如果錯誤原因包含 "doesn't match"，用特殊格式突出顯示
+            if "doesn't match" in detailed_error.lower():
+                cell_reason.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FFFF0000')
+                cell_reason.fill = PatternFill('solid', fgColor='FFFFFF99')  # 淺黃色背景
+            
             for c in range(1, 2+1):
                 ws.cell(row=r, column=c).border = Border(left=thin, right=thin, top=thin, bottom=thin)
         end_r = ws.max_row
@@ -450,6 +494,20 @@ class ExcelWriter:
         ws.cell(row=link_title_row, column=1, value='工作表快速連結（點擊跳轉）').font = Font(name='Microsoft JhengHei', size=10, bold=True)
         ws.cell(row=link_title_row, column=1).alignment = Alignment(horizontal='left')
         cur = link_title_row + 1
+        
+        # 添加回到Summary的快速連結
+        back_to_summary = ws.cell(row=cur, column=1, value='🔙 回到 Summary 頁面')
+        back_to_summary.number_format='@'
+        back_to_summary.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF008000', underline='single')
+        back_to_summary.alignment = Alignment(horizontal='left')
+        back_to_summary.hyperlink = f"#'Summary'!A1"
+        back_to_summary.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
+        cur += 1
+        
+        # 添加分隔線
+        ws.cell(row=cur, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
+        cur += 1
+        
         for entry in logs:
             base = self._sanitize_cell_text(entry.get('file_name') or '')
             base_fmt = self._format_filename_with_timestamp(base)
@@ -474,7 +532,7 @@ class ExcelWriter:
                     pass
                 self._add_input_prompt(ws, c, '對應工作表', sheet)
             cur += 1
-        self._auto_fit_columns(ws, min_widths={1: 30, 2: 26})
+        self._auto_fit_columns(ws, min_widths={1: 30, 2: 80})
         wb.save(output_path)
 
     def _write_raw_log_with_annotations(self, ws, start_row: int, raw_lines: list, annotations: list, font: Font, step_marks: dict | None = None):
@@ -486,76 +544,297 @@ class ExcelWriter:
             'purple': 'FF9B59B6',
         }
         marks = step_marks or {}
+        error_line_found = False
+        first_error_row = None
+        
         # 以 annotations 的 color 欄位對應文字顏色；在步驟起始行前加上 1. 2. ... 標號
         for i, raw in enumerate(raw_lines, start=start_row):
             src_idx = i - start_row  # 對應原始 raw_lines 索引
-            # 移除可能導致 openpyxl 錯誤的控制碼（例如 \x1b[0;41m 等ANSI碼或 0x00 字元）
-            line = ILLEGAL_CHARACTERS_RE.sub('', str(raw))
-            line = re.sub(r'\x1b\[[0-9;?]*[A-Za-z]', '', line)
-            line = re.sub(r'\x1b[^A-Za-z]{0,20}[A-Za-z]', '', line)
-            line = re.sub(r'\x1b', '', line)
-            # 文字過長時截斷，避免 Excel 修復（32767 上限，預留安全餘量）
-            if len(line) > 30000:
-                line = line[:30000]
-            mark = marks.get(src_idx)
-            display = f"{mark}. {line}" if mark else line
-            ws.cell(row=i, column=1, value=self._sanitize_cell_text(display))
-            ws.cell(row=i, column=1).font = font
-            ws.cell(row=i, column=1).number_format = '@'
-            # 找到對應 annotation
-            try:
-                ann = annotations[src_idx] if src_idx < len(annotations) else None
-            except Exception:
-                ann = None
-            if ann and ann.get('color'):
-                hex_color = color_map.get(ann['color'], 'FF000000')
-                ws.cell(row=i, column=1).font = Font(name=font.name, size=font.size, color=hex_color)
+            # 使用統一的清理函數
+            line = str(raw)
+            
+            # 檢查是否為錯誤行
+            is_error_line = False
+            line_lower = line.lower()
+            if any(keyword in line_lower for keyword in [
+                'is fail', 'segmentation fault', 'core dumped', 'executes fail', 
+                "doesn't match", 'timeout', 'exception', 'error', 'fail'
+            ]):
+                is_error_line = True
+                if not error_line_found:
+                    first_error_row = i
+                    error_line_found = True
+            
+            # 先檢查是否有步驟標號
+            if src_idx in marks:
+                line = f"{marks[src_idx]}. {line}"
+            
+            # 清理行內容
+            line = self._sanitize_cell_text(line)
+            
+            # 套用樣式：找到對應的 annotation
+            cell = ws.cell(row=i, column=1, value=line)
+            cell.font = font
+            cell.number_format = '@'
+            
+            # 突出顯示錯誤行
+            if is_error_line:
+                cell.font = Font(name=font.name, size=font.size, color='FF0000', bold=True)
+                cell.fill = PatternFill('solid', fgColor='FFFFFF99')  # 淺黃色背景
+            
+            # 預設
+            found_anno = None
+            for anno in annotations:
+                if anno.get('line_idx') == src_idx:
+                    found_anno = anno
+                    break
+            if found_anno and 'color' in found_anno:
+                color_name = found_anno['color']
+                if color_name in color_map:
+                    color_hex = color_map[color_name]
+                    cell.font = Font(name=font.name, size=font.size, color=color_hex, bold=font.bold)
+        
+        # 如果有找到錯誤行，設定超連結到第一個錯誤行
+        if first_error_row:
+            # 在A1儲存格添加超連結到第一個錯誤行
+            ws.cell(row=1, column=1).hyperlink = f"#{ws.title}!A{first_error_row}"
+        
+        # 在每個LOG工作表底部添加回到Summary的快速連結
+        last_row = ws.max_row + 2
+        back_to_summary = ws.cell(row=last_row, column=1, value='🔙 回到 Summary 頁面')
+        back_to_summary.number_format='@'
+        back_to_summary.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF008000', underline='single')
+        back_to_summary.alignment = Alignment(horizontal='left')
+        back_to_summary.hyperlink = f"#'Summary'!A1"
+        back_to_summary.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
+
+    def _build_detailed_error_summary(self, entry: dict) -> str:
+        """建立詳細的錯誤摘要，包含主要錯誤和執行指令"""
+        try:
+            fail_items = entry.get('fail_items', [])
+            raw_lines = entry.get('raw_lines', [])
+            
+            if not fail_items and not raw_lines:
+                return "未知錯誤"
+            
+            # 收集所有錯誤資訊
+            error_details = []
+            commands = []
+            critical_errors = []
+            herr_errors = []
+            
+            # 從 raw_lines 中提取錯誤資訊
+            for line in raw_lines:
+                line_str = str(line).strip()
+                if not line_str:
+                    continue
+                    
+                line_lower = line_str.lower()
+                
+                # 收集 HERR 錯誤
+                if 'herr:' in line_lower:
+                    herr_errors.append(line_str)
+                
+                # 收集嚴重錯誤
+                if any(keyword in line_lower for keyword in [
+                    'segmentation fault', 'core dumped', 'executes fail', 
+                    "doesn't match", 'timeout', 'exception', 'all test aborted'
+                ]):
+                    critical_errors.append(line_str)
+                
+                # 收集一般錯誤
+                if any(keyword in line_lower for keyword in [
+                    'is fail', 'error', 'fail'
+                ]):
+                    if line_str not in error_details:
+                        error_details.append(line_str)
+            
+            # 從 fail_items 中提取資訊
+            for item in fail_items:
+                # 主要錯誤原因
+                error = item.get('error', '')
+                if error and error not in error_details:
+                    error_details.append(error)
+                
+                # 執行的指令
+                command = item.get('command', '')
+                if command and command not in commands:
+                    commands.append(command)
+                
+                # 完整回應中的錯誤資訊
+                full_response = item.get('full_response', '')
+                if full_response:
+                    lines = full_response.split('\n')
+                    for line in lines:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        line_lower = line.lower()
+                        # 尋找關鍵錯誤
+                        if any(keyword in line_lower for keyword in [
+                            'is fail', 'segmentation fault', 'core dumped', 
+                            'executes fail', "doesn't match", 'timeout', 'exception'
+                        ]):
+                            if line not in error_details:
+                                error_details.append(line)
+            
+            # 組合詳細摘要
+            summary_parts = []
+            
+            # 主要錯誤原因
+            main_error = (entry.get('summary') or {}).get('FAIL原因', '')
+            if main_error:
+                summary_parts.append(f"===============錯誤原因====================")
+                summary_parts.append("")
+                
+                # 突出顯示 "doesn't match" 錯誤
+                if "doesn't match" in main_error.lower():
+                    summary_parts.append("🔴 突出錯誤 (doesn't match):")
+                    summary_parts.append(main_error)
+                else:
+                    summary_parts.append(main_error)
+                
+                summary_parts.append("")
+                summary_parts.append("=" * 50)
+                summary_parts.append("")
+            
+            # 嚴重錯誤
+            if critical_errors:
+                for error in critical_errors[:5]:  # 最多顯示5個嚴重錯誤
+                    summary_parts.append(error)
+                summary_parts.append("")
+            
+            # HERR 錯誤
+            if herr_errors:
+                for error in herr_errors[:10]:  # 最多顯示10個HERR錯誤
+                    summary_parts.append(error)
+                summary_parts.append("")
+            
+            # 其他錯誤詳情
+            if error_details:
+                for detail in error_details[:5]:  # 最多顯示5個錯誤詳情
+                    if detail != main_error and detail not in summary_parts:
+                        summary_parts.append(detail)
+                summary_parts.append("")
+            
+            # 執行指令
+            if commands:
+                unique_commands = list(dict.fromkeys(commands))  # 去重
+                for cmd in unique_commands[:3]:  # 最多顯示3個指令
+                    summary_parts.append(f"執行指令: {cmd}")
+            
+            return '\n'.join(summary_parts) if summary_parts else "未知錯誤"
+            
+        except Exception as e:
+            return f"錯誤摘要生成失敗: {str(e)}"
+    
+    def _add_error_statistics(self, ws, logs: list):
+        """在Summary頁面最上面添加錯誤統計"""
+        try:
+            # 收集所有錯誤原因
+            error_counts = {}
+            
+            for entry in logs:
+                main_error = (entry.get('summary') or {}).get('FAIL原因', '')
+                if main_error:
+                    # 清理錯誤原因，提取主要部分
+                    clean_error = self._extract_main_error_type(main_error)
+                    if clean_error:
+                        error_counts[clean_error] = error_counts.get(clean_error, 0) + 1
+            
+            if not error_counts:
+                return
+            
+            # 在現有內容上方插入錯誤統計
+            # 先將現有內容向下移動
+            max_row = ws.max_row
+            for row in range(max_row, 0, -1):
+                for col in range(1, 3):  # 假設有2欄
+                    cell = ws.cell(row=row, column=col)
+                    if cell.value is not None:
+                        ws.cell(row=row + len(error_counts) + 3, column=col, value=cell.value)
+                        # 複製樣式
+                        if cell.font:
+                            ws.cell(row=row + len(error_counts) + 3, column=col).font = cell.font
+                        if cell.fill:
+                            ws.cell(row=row + len(error_counts) + 3, column=col).fill = cell.fill
+                        if cell.alignment:
+                            ws.cell(row=row + len(error_counts) + 3, column=col).alignment = cell.alignment
+                        if cell.border:
+                            ws.cell(row=row + len(error_counts) + 3, column=col).border = cell.border
+                        # 清除原位置
+                        ws.cell(row=row, column=col).value = None
+            
+            # 添加錯誤統計標題
+            title_row = 1
+            ws.cell(row=title_row, column=1, value='📊 錯誤原因統計').font = Font(name='Microsoft JhengHei', size=14, bold=True, color='FF0000')
+            ws.cell(row=title_row, column=1).fill = PatternFill('solid', fgColor='FFFFE6E6')
+            
+            # 添加統計內容
+            current_row = 2
+            for error_type, count in sorted(error_counts.items(), key=lambda x: x[1], reverse=True):
+                ws.cell(row=current_row, column=1, value=f'{error_type} = {count} 筆')
+                ws.cell(row=current_row, column=1).font = Font(name='Microsoft JhengHei', size=11, bold=True)
+                ws.cell(row=current_row, column=1).fill = PatternFill('solid', fgColor='FFFFFF99')  # 淺黃色背景
+                current_row += 1
+            
+            # 添加分隔線
+            ws.cell(row=current_row, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
+            
+        except Exception as e:
+            print(f"添加錯誤統計時發生錯誤: {e}")
+    
+    def _extract_main_error_type(self, error_text: str) -> str:
+        """從錯誤文字中提取主要錯誤類型"""
+        try:
+            if not error_text:
+                return ""
+            
+            # 移除時間戳記和錯誤代碼
+            clean_text = error_text
+            
+            # 移除時間戳記格式 (如 "2025/09/23 10:48:12 [1]")
+            import re
+            clean_text = re.sub(r'\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[\d+\]', '', clean_text)
+            
+            # 移除錯誤代碼 (如 "<ErrorCode: AFFW57>")
+            clean_text = re.sub(r'<ErrorCode: [^>]+>', '', clean_text)
+            
+            # 移除測試時間 (如 "----- 61.019937 Sec.")
+            clean_text = re.sub(r'----- \d+\.\d+ Sec\.', '', clean_text)
+            
+            # 清理多餘空格
+            clean_text = clean_text.strip()
+            
+            # 提取主要錯誤類型
+            if ':' in clean_text:
+                # 格式如 "B7PL011-202:Chec Frimware version is Fail"
+                parts = clean_text.split(':', 1)
+                if len(parts) > 1:
+                    main_part = parts[1].strip()
+                    # 移除測試編號前綴
+                    main_part = re.sub(r'^[A-Z0-9]+-\d+:', '', main_part)
+                    return main_part.strip()
+            
+            # 如果沒有冒號，直接返回清理後的文字
+            return clean_text
+            
+        except Exception:
+            return error_text
 
     def _auto_fit_columns(self, ws, min_widths: dict | None = None):
-        max_width = {}
-        for row in ws.iter_rows(values_only=True):
-            for idx, cell in enumerate(row, 1):
-                if cell is None:
-                    continue
-                # 增加可視 padding
-                width = len(str(cell)) + 4
-                if idx not in max_width or width > max_width[idx]:
-                    max_width[idx] = width
-        # 套用欄寬與下限
-        for idx, width in max_width.items():
-            base = min(120, width)
-            if min_widths and idx in min_widths:
-                base = max(base, min_widths[idx])
-            ws.column_dimensions[get_column_letter(idx)].width = base
-
-    def _safe_sheet_name(self, name: str) -> str:
-        # Excel sheet 名稱限制處理
-        invalid = '\\/*?:[]'
-        safe = ''.join(['_' if ch in invalid else ch for ch in name])
-        safe = safe.strip() or 'LOG'
-        return safe[:31] if len(safe) > 31 else safe
-
-    def _unique_sheet_name(self, wb, name: str) -> str:
-        base = self._safe_sheet_name(name)
-        if base not in wb.sheetnames:
-            return base
-        # 附加遞增後綴，保留31字元限制
-        for i in range(2, 2000):
-            suffix = f" ({i})"
-            max_base_len = 31 - len(suffix)
-            candidate = (base[:max_base_len] + suffix) if len(base) > max_base_len else (base + suffix)
-            if candidate not in wb.sheetnames:
-                return candidate
-        # 極端情況，退回隨機尾碼
-        import random
-        return self._safe_sheet_name(f"{base}_{random.randint(1000,9999)}") 
-
-    def _extract_total_secs(self, raw_lines: list):
-        try:
-            for i in range(len(raw_lines)-1, -1, -1):
-                m = re.search(r'All phase Total Test Time\s*!\s*-+\s*([0-9]+(?:\.[0-9]+)?)\s*Sec', raw_lines[i], re.IGNORECASE)
-                if m:
-                    return float(m.group(1))
-        except Exception:
-            return None
-        return None 
+        """自動調整欄寬"""
+        min_w = min_widths or {}
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter
+            col_num = col[0].column
+            for cell in col:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            adjusted_width = max(max_length + 2, min_w.get(col_num, 10))
+            adjusted_width = min(adjusted_width, 100)  # 最大寬度限制
+            ws.column_dimensions[column].width = adjusted_width

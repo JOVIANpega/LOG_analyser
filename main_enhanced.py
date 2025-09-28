@@ -461,10 +461,16 @@ class EnhancedLogAnalyzerApp:
                 if 'PASS' in fn.upper():
                     pass_logs.append(entry)
                 else:
-                    # 記錄第一個 FAIL 原因到 summary
+                    # 記錄第一個 FAIL 原因到 summary，使用統一的錯誤提取邏輯
                     if res.get('fail_items'):
-                        entry['summary']['FAIL原因'] = res['fail_items'][0].get('error', '')
+                        # 使用統一的錯誤提取邏輯
+                        main_error = self._extract_main_fail_reason_from_items(res['fail_items'])
+                        entry['summary']['FAIL原因'] = main_error
                     fail_logs.append(entry)
+                    
+        # 為左側視窗添加LOG分類顯示
+        self._display_folder_analysis_preview(pass_logs, fail_logs)
+        
         # 將 pass/fail 測項分別展示於 PASS/FAIL 標籤頁（聚合）
         for idx, entry in enumerate(pass_logs, 1):
             for j, item in enumerate(entry['pass_items'], 1):
@@ -481,6 +487,31 @@ class EnhancedLogAnalyzerApp:
                     full_response=item.get('full_response', ''),
                     is_main_fail=item.get('is_main_fail', False)
                 )
+        # 為資料夾分析添加原始LOG顯示功能
+        if fail_logs:
+            # 合併所有FAIL LOG的內容到原始LOG標籤頁
+            all_raw_lines = []
+            all_fail_items = []
+            all_pass_items = []
+            fail_line_idx = None
+            
+            for entry in fail_logs:
+                all_raw_lines.extend(entry.get('raw_lines', []))
+                all_fail_items.extend(entry.get('fail_items', []))
+                all_pass_items.extend(entry.get('pass_items', []))
+            
+            # 在原始LOG標籤頁顯示合併的內容
+            if all_raw_lines:
+                log_content = '\n'.join(all_raw_lines)
+                self.log_text_enhanced.insert_log_with_highlighting(log_content, {
+                    'fail_line_idx': fail_line_idx,
+                    'pass_items': all_pass_items,
+                    'fail_items': all_fail_items
+                })
+            
+            # 自動切換到原始LOG標籤頁
+            self.notebook.select(self.tab_log)
+        
         # 匯出 Excel：PASS匯總/FAIL匯總，放同資料夾
         try:
             # 在 LOG 目錄下建立 LOG集總整理 子目錄
@@ -496,6 +527,121 @@ class EnhancedLogAnalyzerApp:
         # 自動切到匯總報表（取消）
         # self.notebook.select(self.tab_summary)
 
+    def _display_folder_analysis_preview(self, pass_logs, fail_logs):
+        """在左側視窗顯示資料夾分析預覽"""
+        try:
+            preview_text = "=== 資料夾分析預覽 ===\n\n"
+            
+            # 顯示 PASS 檔案
+            if pass_logs:
+                preview_text += "✅ PASS 檔案:\n"
+                for entry in pass_logs:
+                    preview_text += f"  • {entry['file_name']}\n"
+                preview_text += "\n"
+            
+            # 顯示 FAIL 檔案與主要錯誤原因
+            if fail_logs:
+                preview_text += "❌ FAIL 檔案與主要錯誤原因:\n"
+                for entry in fail_logs:
+                    filename = entry['file_name']
+                    main_error = entry['summary'].get('FAIL原因', '未知錯誤')
+                    preview_text += f"  📄 {filename}\n"
+                    
+                    # 突出顯示錯誤原因
+                    if "doesn't match" in main_error.lower():
+                        preview_text += f"     🔴 主要錯誤: {main_error}\n"
+                    else:
+                        preview_text += f"     ⚠️  主要錯誤: {main_error}\n"
+                    preview_text += "\n"
+            
+            # 統計資訊
+            preview_text += f"📊 統計:\n"
+            preview_text += f"  PASS: {len(pass_logs)} 個檔案\n"
+            preview_text += f"  FAIL: {len(fail_logs)} 個檔案\n"
+            preview_text += f"  總計: {len(pass_logs) + len(fail_logs)} 個檔案\n"
+            
+            # 在左側面板顯示
+            if hasattr(self, 'file_info_label'):
+                self.file_info_label.config(text=preview_text, justify='left', wraplength=250)
+            
+        except Exception as e:
+            print(f"顯示資料夾分析預覽失敗: {e}")
+
+    def _extract_main_fail_reason_from_items(self, fail_items):
+        """從FAIL項目列表中提取主要錯誤原因"""
+        if not fail_items:
+            return "未知錯誤"
+        
+        # 優先找到包含 "is Fail" 的項目
+        for item in fail_items:
+            full_response = item.get('full_response', '')
+            if full_response:
+                lines = full_response.split('\n')
+                for line in lines:
+                    # 移除行號前綴（如 "370. "）
+                    clean_line = line
+                    if '. ' in line and line.split('. ', 1)[0].strip().isdigit():
+                        clean_line = line.split('. ', 1)[1]
+                    
+                    # 找到包含 "is Fail" 的行
+                    if "is Fail" in clean_line:
+                        # 處理類似 "VSCH026-043:Chec Frimware version is Fail ! <ErrorCode: BSFR18>" 的格式
+                        if ':' in clean_line and "is Fail" in clean_line:
+                            # 擷取冒號後的部分
+                            after_colon = clean_line.split(":", 1)[1].strip()
+                            # 找到 "is Fail" 的位置
+                            if "is Fail" in after_colon:
+                                fail_pos = after_colon.find("is Fail")
+                                # 擷取到 "is Fail" 結束的部分，去掉後面的 <ErrorCode: xxx> 和時間戳記
+                                test_name_with_fail = after_colon[:fail_pos + 7].strip()  # 7 = len("is Fail")
+                                
+                                # 移除時間戳記（如 "2025/08/07 08:53:36 [1]" 格式）
+                                if '[' in test_name_with_fail and ']' in test_name_with_fail:
+                                    bracket_start = test_name_with_fail.find('[')
+                                    bracket_end = test_name_with_fail.find(']')
+                                    if bracket_start != -1 and bracket_end != -1:
+                                        # 檢查括號前是否有時間戳記格式
+                                        before_bracket = test_name_with_fail[:bracket_start].strip()
+                                        if '/' in before_bracket and ':' in before_bracket:
+                                            # 移除時間戳記部分
+                                            test_name_with_fail = test_name_with_fail[bracket_end + 1:].strip()
+                                
+                                return test_name_with_fail
+                        elif "is Fail" in clean_line:
+                            # 如果沒有冒號但有 "is Fail"，直接擷取到 "is Fail" 結束
+                            fail_pos = clean_line.find("is Fail")
+                            if fail_pos != -1:
+                                # 找到 <ErrorCode: 的位置
+                                error_code_pos = clean_line.find("<ErrorCode:")
+                                if error_code_pos != -1:
+                                    return clean_line[:error_code_pos].strip()
+                                else:
+                                    return clean_line[:fail_pos + 7].strip()
+        
+        # 如果沒有找到 "is Fail"，嘗試找到其他錯誤資訊
+        for item in fail_items:
+            full_response = item.get('full_response', '')
+            if full_response:
+                lines = full_response.split('\n')
+                for line in lines:
+                    clean_line = line
+                    if '. ' in line and line.split('. ', 1)[0].strip().isdigit():
+                        clean_line = line.split('. ', 1)[1]
+                    
+                    # 尋找包含 "All Test Aborted" 的行
+                    if "All Test Aborted" in clean_line:
+                        return clean_line
+                    
+                    # 尋找其他嚴重錯誤
+                    line_lower = clean_line.lower()
+                    if any(critical_error in line_lower for critical_error in [
+                        'segmentation fault', 'core dumped', 'executes fail', 
+                        "doesn't match", 'timeout', 'exception'
+                    ]):
+                        return clean_line
+        
+        # 如果都沒有找到，返回第一個項目的錯誤信息
+        return fail_items[0].get('error', '未知錯誤')
 
     def _extract_file_summary(self, parse_result: dict, file_path: str) -> dict:
         """從檔名或檔案內容提取測試日期時間、SFIS狀態、測試總時間、主要FAIL原因（若有）"""
@@ -1245,7 +1391,23 @@ class EnhancedLogAnalyzerApp:
             self.paned.update_idletasks()
         save_settings(self.settings)
 
-
+    def _show_log_file_preview(self, folder):
+        """顯示將被處理的 .log 檔清單預覽"""
+        try:
+            log_files = []
+            for root, dirs, files in os.walk(folder):
+                for fn in files:
+                    if fn.lower().endswith('.log'):
+                        log_files.append(fn)
+            
+            if log_files:
+                preview_text = f"將處理 {len(log_files)} 個 .log 檔案:\n"
+                preview_text += "\n".join(f"  • {fn}" for fn in sorted(log_files))
+                # 可以在這裡顯示預覽，例如更新左側面板的某個標籤
+                # 但目前先保持簡單
+                print(preview_text)
+        except Exception as e:
+            print(f"顯示LOG檔案預覽失敗: {e}")
 
     def _auto_resize_text_window(self, win, text_widget):
         """根據文字內容自動調整文字視窗大小，確保導航按鈕始終可見"""

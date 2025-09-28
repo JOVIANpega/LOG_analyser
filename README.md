@@ -55,6 +55,19 @@ pyinstaller --onefile --noconsole --icon=assets/icon.ico main.py
 - `docs/`：完整文件（操作指引、專案說明等）
 
 ## 版本資訊
+- V1.7.6
+  - 修復資料夾分析功能：
+    - **原始LOG標籤頁顯示**：資料夾分析時自動合併所有FAIL LOG內容到原始LOG標籤頁，並套用顏色突出顯示
+    - **Excel Summary詳細化**：FAIL匯總.xlsx的Summary頁面現在顯示詳細錯誤原因，包含主要錯誤、錯誤詳情和執行指令
+    - **錯誤資訊完整性**：Excel中每個LOG的錯誤摘要包含多層次資訊，便於快速了解失敗原因
+- V1.7.5
+  - 增強資料夾分析和Excel匯出功能：
+    - **統一錯誤提取邏輯**：左視窗選擇資料夾時使用與單檔案相同的錯誤提取邏輯
+    - **Excel Summary頁面優化**：FAIL匯總.xlsx第一頁標題改為"Summary of Sheet Page"
+    - **主要錯誤原因顯示**：在Excel中顯示每個LOG的主要錯誤原因，使用統一的錯誤識別邏輯
+    - **錯誤原因分組**：Excel中按錯誤原因分組顯示，便於快速識別相同類型的錯誤
+    - **資料夾分析預覽**：左側視窗顯示分析預覽，包含PASS/FAIL檔案分類和主要錯誤原因
+    - **"doesn't match"錯誤突出顯示**：在Excel和GUI中特別標記 "doesn't match" 相關錯誤
 - V1.7.4
   - 全面增強LOG顯示功能：
     - **添加行數顯示**：所有LOG內容現在都顯示行數（1, 2, 3, 4...）
@@ -130,4 +143,4 @@ pyinstaller --onefile --noconsole --icon=assets/icon.ico main.py
   - 改良字體縮放保留粗體樣式
 
 ## 授權
-此專案授權方式若未特別標註，預設為公司/個人內部使用。若需對外開放，請補充授權條款（LICENSE）。 
+此專案授權方式若未特別標註，預設為公司/個人內部使用。若需對外開放，請補充授權條款（LICENSE）。
