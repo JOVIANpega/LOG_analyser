@@ -108,13 +108,91 @@ class ExcelWriter:
         wb.save(output_path)
         return output_path
 
+    def _extract_system_info(self, raw_lines: list) -> dict:
+        """從 raw_lines 擷取系統資訊"""
+        try:
+            system_info = {}
+            for line in raw_lines[:100]:  # 只檢查前100行，系統資訊通常在LOG開頭
+                line_str = str(line).strip()
+                
+                # 擷取各種系統資訊
+                if 'System Version is' in line_str:
+                    match = re.search(r'System Version is ([^.]+)', line_str)
+                    if match:
+                        system_info['System Version'] = match.group(1).strip()
+                
+                elif 'Script File is' in line_str:
+                    match = re.search(r'Script File is ([^.]+)', line_str)
+                    if match:
+                        system_info['Script File'] = match.group(1).strip()
+                
+                elif 'Script Version is' in line_str:
+                    match = re.search(r'Script Version is ([^.]+)', line_str)
+                    if match:
+                        system_info['Script Version'] = match.group(1).strip()
+                
+                elif 'Script Creator is' in line_str:
+                    match = re.search(r'Script Creator is ([^.]+)', line_str)
+                    if match:
+                        system_info['Script Creator'] = match.group(1).strip()
+                
+                elif 'Utility Version is' in line_str:
+                    match = re.search(r'Utility Version is ([^.]+)', line_str)
+                    if match:
+                        system_info['Utility Version'] = match.group(1).strip()
+                
+                elif 'DeviceID is' in line_str:
+                    match = re.search(r'DeviceID is ([^.]+)', line_str)
+                    if match:
+                        system_info['DeviceID'] = match.group(1).strip()
+                
+                elif 'SFIS is' in line_str:
+                    match = re.search(r'SFIS is ([^.]+)', line_str)
+                    if match:
+                        system_info['SFIS'] = match.group(1).strip()
+                
+                elif 'MiniCloud2 is' in line_str:
+                    match = re.search(r'MiniCloud2 is ([^.]+)', line_str)
+                    if match:
+                        system_info['MiniCloud2'] = match.group(1).strip()
+                
+                elif 'FTP is' in line_str:
+                    match = re.search(r'FTP is ([^.]+)', line_str)
+                    if match:
+                        system_info['FTP'] = match.group(1).strip()
+                
+                elif 'Active IPs:' in line_str:
+                    # 擷取下一行的IP資訊
+                    idx = raw_lines.index(line)
+                    if idx + 1 < len(raw_lines):
+                        next_line = str(raw_lines[idx + 1]).strip()
+                        if next_line and not next_line.endswith('.'):
+                            system_info['Active IPs'] = next_line
+            
+            return system_info
+        except Exception:
+            return {}
+
     def _extract_total_secs(self, raw_lines: list) -> float | None:
         """從 raw_lines 嘗試提取測試總時間（秒數）"""
         try:
             for line in (raw_lines[-50:] if len(raw_lines) > 50 else raw_lines):
-                if 'testtime' in line.lower() or 'total time' in line.lower():
+                line_str = str(line).strip()
+                line_lower = line_str.lower()
+                
+                # 優先尋找 "All phase Total Test Time" 格式
+                if 'all phase total test time' in line_lower:
+                    # 尋找 "----- XXX.XXXXXXX Sec." 格式
+                    time_match = re.search(r'----- (\d+\.?\d*) Sec\.', line_str)
+                    if time_match:
+                        val = float(time_match.group(1))
+                        if val > 0:
+                            return val
+                
+                # 備用：尋找其他時間格式
+                elif 'testtime' in line_lower or 'total time' in line_lower:
                     # 嘗試提取數字
-                    nums = re.findall(r'(\d+\.?\d*)', line)
+                    nums = re.findall(r'(\d+\.?\d*)', line_str)
                     if nums:
                         val = float(nums[-1])
                         if val > 0:
@@ -230,21 +308,87 @@ class ExcelWriter:
             sheet_name = self._unique_sheet_name(wb, sheet_name_base)
             sheet_map[entry.get('file_name')] = sheet_name
             ws2 = wb.create_sheet(title=sheet_name)
-            cell = ws2.cell(row=1, column=1, value=self._sanitize_cell_text(entry.get('file_name')))
+            
+            # 在最上面添加回到 Summary 的連結
+            summary_link_cell = ws2.cell(row=1, column=1, value='🔙 回到 Summary 頁面')
+            summary_link_cell.number_format = '@'
+            summary_link_cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FF008000', underline='single')
+            summary_link_cell.alignment = Alignment(horizontal='left', vertical='center')
+            summary_link_cell.hyperlink = f"#'Summary'!A1"
+            summary_link_cell.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
+            ws2.row_dimensions[1].height = 20
+            
+            # 添加分隔線
+            ws2.cell(row=2, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
+            ws2.row_dimensions[2].height = 15
+            
+            # 檔名標題
+            cell = ws2.cell(row=3, column=1, value=self._sanitize_cell_text(entry.get('file_name')))
             cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FFFFFF')
             cell.fill = PatternFill('solid', fgColor='FF2ECC71')
             cell.number_format = '@'
-            step_labels = [str(i) for i, _ in enumerate(entry.get('pass_items') or [], 1)]
-            ws2.cell(row=2, column=1, value=self._sanitize_cell_text('，'.join(step_labels) if step_labels else ''))
-            ws2.cell(row=2, column=1).number_format = '@'
-            ws2.cell(row=2, column=1).font = Font(name='Microsoft JhengHei', size=11)
-            self._write_raw_log_with_annotations(ws2, start_row=3, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=11), step_marks=entry.get('step_marks'))
+            
+            # 在最上面添加 PASS 步驟詳情
+            pass_steps = entry.get('pass_items', [])
+            if pass_steps:
+                pass_steps_text = self._build_pass_steps_summary(pass_steps)
+                pass_lines = pass_steps_text.split('\n')
+                current_row = 4
+                
+                for line in pass_lines:
+                    if line.strip():
+                        cell = ws2.cell(row=current_row, column=1, value=self._sanitize_cell_text(line))
+                        cell.number_format = '@'
+                        
+                        # 設定不同行的樣式
+                        if "===============PASS步驟詳情====================" in line:
+                            cell.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF008000')
+                        elif "✅ 步驟" in line:
+                            cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FF008000')
+                        elif "   執行指令:" in line:
+                            cell.font = Font(name='Microsoft JhengHei', size=11, color='FF0000FF')
+                        elif "   回應:" in line:
+                            cell.font = Font(name='Microsoft JhengHei', size=11, color='FF000000')
+                        elif "   執行時間:" in line:
+                            cell.font = Font(name='Microsoft JhengHei', size=11, color='FF666666')
+                        elif "=" * 50 in line:
+                            cell.font = Font(name='Microsoft JhengHei', size=10)
+                        else:
+                            cell.font = Font(name='Microsoft JhengHei', size=11)
+                        
+                        # 設定行高以顯示更多文字
+                        ws2.row_dimensions[current_row].height = 25
+                        current_row += 1
+                    else:
+                        current_row += 1
+                
+                # 添加分隔線
+                ws2.cell(row=current_row, column=1, value=self._sanitize_cell_text("=" * 60)).number_format='@'
+                ws2.cell(row=current_row, column=1).font = Font(name='Microsoft JhengHei', size=10)
+                current_row += 1
+                
+                # 寫入原始LOG內容
+                self._write_raw_log_with_annotations(ws2, start_row=current_row, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=11), step_marks=entry.get('step_marks'))
+            else:
+                # 沒有 PASS 步驟時，直接寫入原始LOG
+                self._write_raw_log_with_annotations(ws2, start_row=4, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=11), step_marks=entry.get('step_marks'))
+            
+            # 在最下面添加回到 Summary 的連結（只添加一個）
+            bottom_link_row = ws2.max_row + 2
+            bottom_summary_link_cell = ws2.cell(row=bottom_link_row, column=1, value='🔙 回到 Summary 頁面')
+            bottom_summary_link_cell.number_format = '@'
+            bottom_summary_link_cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FF008000', underline='single')
+            bottom_summary_link_cell.alignment = Alignment(horizontal='left', vertical='center')
+            bottom_summary_link_cell.hyperlink = f"#'Summary'!A1"
+            bottom_summary_link_cell.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
+            ws2.row_dimensions[bottom_link_row].height = 20
             
             # 設定所有行的行高以顯示更多文字
             for row_num in range(1, ws2.max_row + 1):
                 if ws2.row_dimensions[row_num].height == 15:  # 預設行高
                     ws2.row_dimensions[row_num].height = 20
-            self._auto_fit_columns(ws2)
+            # 調整欄寬以顯示所有文字
+            self._auto_fit_columns(ws2, min_widths={1: 150})
         # Summary 表格：
         headers = ['檔名', 'PASS步驟數', '測試總時間', 'SFIS']
         for c, header in enumerate(headers, 1):
@@ -260,12 +404,42 @@ class ExcelWriter:
             # 檔名欄
             base = self._sanitize_cell_text(entry.get('file_name') or '')
             base_fmt = self._format_filename_with_timestamp(base)
-            sfis = (entry.get('summary') or {}).get('SFIS','')
-            sfis = (sfis or '').upper()
+            
+            # 擷取系統資訊
+            system_info = self._extract_system_info(entry.get('raw_lines') or [])
+            
+            # 組合顯示名稱，使用多行格式讓使用者容易看懂
+            display_lines = [base_fmt]
+            
+            # 添加系統資訊，分行顯示
+            if system_info.get('System Version'):
+                display_lines.append(f"系統版本: {system_info['System Version']}")
+            if system_info.get('Script File'):
+                display_lines.append(f"腳本檔案: {system_info['Script File']}")
+            if system_info.get('Script Version'):
+                display_lines.append(f"腳本版本: {system_info['Script Version']}")
+            if system_info.get('Script Creator'):
+                display_lines.append(f"建立者: {system_info['Script Creator']}")
+            if system_info.get('Utility Version'):
+                display_lines.append(f"工具版本: {system_info['Utility Version']}")
+            if system_info.get('DeviceID'):
+                display_lines.append(f"設備ID: {system_info['DeviceID']}")
+            if system_info.get('SFIS'):
+                display_lines.append(f"SFIS: {system_info['SFIS']}")
+            if system_info.get('MiniCloud2'):
+                display_lines.append(f"MiniCloud2: {system_info['MiniCloud2']}")
+            if system_info.get('FTP'):
+                display_lines.append(f"FTP: {system_info['FTP']}")
+            if system_info.get('Active IPs'):
+                display_lines.append(f"IP位址: {system_info['Active IPs']}")
+            
+            # 添加測試時間
             secs = self._extract_total_secs(entry.get('raw_lines') or [])
-            sec_txt = f"測試總時間:{secs:.1f} Sec." if secs is not None else ''
-            suffix = f"_SFIS_{sfis}" if sfis else ''
-            display_name = f"{base_fmt}{suffix} {sec_txt}".strip()
+            if secs is not None:
+                display_lines.append(f"測試時間: {secs:.1f} 秒")
+            
+            display_name = "\n".join(display_lines)
+            
             r = ws.max_row + 1
             cell_name = ws.cell(row=r, column=1, value=self._sanitize_cell_text(display_name))
             cell_name.number_format='@'
@@ -279,20 +453,23 @@ class ExcelWriter:
                 cell_name.comment.height = 500
             except Exception:
                 pass
+            # 移除超連結，只保留提示
             if sheet:
-                cell_name.hyperlink = f"#'{sheet}'!A1"
                 self._add_input_prompt(ws, cell_name, '對應工作表', entry.get('file_name') or '')
             # PASS步驟數欄
             pass_count = len(entry.get('pass_items') or [])
             cell_count = ws.cell(row=r, column=2, value=pass_count)
             cell_count.font = normal_font
             cell_count.alignment = center
+            
             # 測試總時間欄
+            sec_txt = f"{secs:.1f} Sec." if secs is not None else ''
             cell_time = ws.cell(row=r, column=3, value=sec_txt)
             cell_time.font = normal_font
             cell_time.alignment = center
             # SFIS欄
-            cell_sfis = ws.cell(row=r, column=4, value=sfis)
+            sfis_value = system_info.get('SFIS', '')
+            cell_sfis = ws.cell(row=r, column=4, value=sfis_value)
             cell_sfis.font = normal_font
             cell_sfis.alignment = center
             for c in range(1, len(headers)+1):
@@ -338,6 +515,22 @@ class ExcelWriter:
             cur += 1
         # 更緊湊的欄寬
         self._auto_fit_columns(ws, min_widths={1: 30, 2: 12, 3: 15, 4: 8})
+        
+        # 設定 Summary 頁面所有文字字體為 11
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value is not None:
+                    # 保留原有的字體屬性，只修改大小
+                    current_font = cell.font
+                    cell.font = Font(
+                        name='Microsoft JhengHei',
+                        size=11,
+                        bold=current_font.bold,
+                        italic=current_font.italic,
+                        color=current_font.color,
+                        underline=current_font.underline
+                    )
+        
         wb.save(output_path)
 
     def _build_fail_workbook(self, output_path: str, logs: list):
@@ -539,7 +732,23 @@ class ExcelWriter:
                     pass
             self._add_input_prompt(ws, c, '對應工作表', sheet)
             cur += 1
-            self._auto_fit_columns(ws, min_widths={1: 30, 2: 80})
+            self._auto_fit_columns(ws, min_widths={1: 30, 2: 120})
+            
+            # 設定 Summary 頁面所有文字字體為 11
+            for row in ws.iter_rows():
+                for cell in row:
+                    if cell.value is not None:
+                        # 保留原有的字體屬性，只修改大小
+                        current_font = cell.font
+                        cell.font = Font(
+                            name='Microsoft JhengHei',
+                            size=11,
+                            bold=current_font.bold,
+                            italic=current_font.italic,
+                            color=current_font.color,
+                            underline=current_font.underline
+                        )
+            
             wb.save(output_path)
 
     def _write_raw_log_with_annotations(self, ws, start_row: int, raw_lines: list, annotations: list, font: Font, step_marks: dict | None = None):
@@ -606,14 +815,7 @@ class ExcelWriter:
             # 在A1儲存格添加超連結到第一個錯誤行
             ws.cell(row=1, column=1).hyperlink = f"#{ws.title}!A{first_error_row}"
         
-        # 在每個LOG工作表底部添加回到Summary的快速連結
-        last_row = ws.max_row + 2
-        back_to_summary = ws.cell(row=last_row, column=1, value='🔙 回到 Summary 頁面')
-        back_to_summary.number_format='@'
-        back_to_summary.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF008000', underline='single')
-        back_to_summary.alignment = Alignment(horizontal='left')
-        back_to_summary.hyperlink = f"#'Summary'!A1"
-        back_to_summary.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
+        # 移除重複的回到Summary連結，因為已經在_build_pass_workbook中添加了
 
     def _build_detailed_error_summary(self, entry: dict) -> str:
         """建立詳細的錯誤摘要，包含主要錯誤和執行指令"""
@@ -779,6 +981,29 @@ class ExcelWriter:
             import traceback
             traceback.print_exc()
     
+    def _build_pass_steps_summary(self, pass_items: list) -> str:
+        """建立 PASS 步驟摘要，以簡潔格式列出所有完成的步驟"""
+        try:
+            if not pass_items:
+                return "無 PASS 步驟"
+            
+            summary_parts = []
+            summary_parts.append("===============PASS步驟詳情====================")
+            summary_parts.append("")
+            
+            # 只顯示步驟名稱，讓使用者一眼看清楚測了多少項目
+            for i, item in enumerate(pass_items, 1):
+                step_name = item.get('step_name', f'步驟 {i}')
+                summary_parts.append(f"✅ 步驟 {i}: {step_name}")
+            
+            summary_parts.append("")
+            summary_parts.append(f"總共完成 {len(pass_items)} 個測試步驟")
+            summary_parts.append("=" * 50)
+            return '\n'.join(summary_parts)
+            
+        except Exception as e:
+            return f"PASS 步驟摘要生成失敗: {str(e)}"
+
     def _extract_main_error_type(self, error_text: str) -> str:
         """從錯誤文字中提取主要錯誤類型"""
         try:
@@ -843,5 +1068,5 @@ class ExcelWriter:
                 except:
                     pass
             adjusted_width = max(max_length + 2, min_w.get(col_num, 10))
-            adjusted_width = min(adjusted_width, 100)  # 最大寬度限制
+            adjusted_width = min(adjusted_width, 150)  # 最大寬度限制
             ws.column_dimensions[column].width = adjusted_width

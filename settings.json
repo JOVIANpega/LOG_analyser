@@ -1,13 +1,14 @@
 {
   "ui_font_size": 11,
   "content_font_size": 11,
-  "last_log_path": "M:/PYTHON/LOG_analyser-main/MINE/LOG/1+ADB_FWUP-Q9220242200005-20240607210420-PASS.log",
-  "last_folder_path": "M:/PYTHON/LOG_analyser-main/MINE/LOG/old log",
+  "last_log_path": "M:/PYTHON/LOG_analyser-main/MINE/LOG/1+Funtion-WE33-20250708141022-PASS.log",
+  "last_folder_path": "M:/PYTHON/LOG_analyser-main/MINE/LOG/test_log",
   "window_width": 1536,
   "window_height": 801,
   "pane_width": 241,
   "app_title": "PEGA test log Aanlyser",
   "gui_header": "ONLY FOR CENTIMANIA LOG",
   "auto_analyze": true,
-  "remember_path": true
+  "remember_path": true,
+  "version": "V1.8.0"
 }
