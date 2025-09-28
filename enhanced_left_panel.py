@@ -152,6 +152,11 @@ def build_left_panel(parent, app):
     # 添加 tooltip
     _create_tooltip(clear_search_btn, "清除搜尋結果\n移除所有高亮標記")
     
+    # 搜尋結果計數標籤
+    app.search_count_label = tk.Label(search_frame, text="", font=('Arial', 9), fg='#666')
+    app.search_count_label.pack(pady=(5, 0))
+    app.font_scaler.register(app.search_count_label)
+    
     # 說明文件按鈕（HTML操作說明）
     help_btn = tk.Button(parent, text="📖 查看操作說明(HTML)", command=app._open_html_help, bg="#607D8B", fg="white")
     help_btn.pack(fill=tk.X, padx=10, pady=(8, 8))

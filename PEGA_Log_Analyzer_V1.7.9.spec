@@ -37,7 +37,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='PEGA_Log_Analyzer_V1.7.8',
+    name='PEGA_Log_Analyzer_V1.7.9',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -26,6 +26,11 @@ class EnhancedLogAnalyzerApp:
     def __init__(self, root):
         """初始化增強版應用程式"""
         self.root = root
+        
+        # 檢查加密檔案
+        if not self._check_encryption():
+            return
+        
         # 先載入設定再設定標題
         self.settings = load_settings()
         app_title = self.settings.get('app_title', 'PEGA test log Aanlyser')
@@ -36,10 +41,13 @@ class EnhancedLogAnalyzerApp:
         self.ui_font_size = self.settings.get('ui_font_size', 11)
         self.content_font_size = self.settings.get('content_font_size', 11)
         
-        # 設定視窗大小
+        # 設定視窗大小 - 預設最大化
         window_width = self.settings.get('window_width', 1400)
         window_height = self.settings.get('window_height', 900)
         self.root.geometry(f"{window_width}x{window_height}")
+        
+        # 設定視窗最大化
+        self.root.state('zoomed')  # Windows 最大化
         
         # 初始化模組
         self.font_scaler = FontScaler(root, default_size=self.ui_font_size)
@@ -57,6 +65,46 @@ class EnhancedLogAnalyzerApp:
         
         # 綁定視窗關閉事件
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
+    
+    def _check_encryption(self):
+        """檢查加密檔案"""
+        try:
+            # 獲取EXE所在目錄
+            if getattr(sys, 'frozen', False):
+                # 如果是打包的EXE
+                exe_dir = os.path.dirname(sys.executable)
+            else:
+                # 如果是Python腳本
+                exe_dir = os.path.dirname(os.path.abspath(__file__))
+            
+            # 檢查SIGN.txt檔案
+            sign_file = os.path.join(exe_dir, "SIGN.txt")
+            
+            if not os.path.exists(sign_file):
+                self._show_encryption_error()
+                return False
+            
+            # 讀取檔案內容
+            with open(sign_file, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+            
+            # 檢查是否包含jovian字串
+            if 'jovian' not in content.lower():
+                self._show_encryption_error()
+                return False
+            
+            print("加密檔案驗證成功")
+            return True
+            
+        except Exception as e:
+            print(f"檢查加密檔案時發生錯誤: {e}")
+            self._show_encryption_error()
+            return False
+    
+    def _show_encryption_error(self):
+        """顯示加密錯誤訊息"""
+        messagebox.showerror("加密驗證失敗", "請提供運作工具的加密檔案")
+        self.root.destroy()
     
     def _on_closing(self):
         """處理視窗關閉事件"""
@@ -647,6 +695,7 @@ class EnhancedLogAnalyzerApp:
             
             if len(content) <= 1:  # 只有換行符
                 print("Text元件為空，無法搜尋")
+                self._update_search_count(0)
                 return
             
             # 先清除之前的選取
@@ -656,6 +705,21 @@ class EnhancedLogAnalyzerApp:
             # 設定搜尋高亮樣式
             text_widget.tag_configure('search_highlight', background='#FFFF00', foreground='#000000')
             
+            # 計算總匹配數量
+            count = 0
+            pos = '1.0'
+            while True:
+                pos = text_widget.search(search_text, pos, tk.END, nocase=True)
+                if not pos:
+                    break
+                count += 1
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.tag_add('search_highlight', pos, end_pos)
+                pos = end_pos
+            
+            # 更新搜尋計數
+            self._update_search_count(count)
+            
             # 從當前游標位置開始搜尋
             pos = text_widget.search(search_text, tk.INSERT, tk.END, nocase=True)
             if pos:
@@ -664,7 +728,6 @@ class EnhancedLogAnalyzerApp:
                 text_widget.mark_set(tk.INSERT, end_pos)
                 text_widget.see(pos)
                 text_widget.tag_add(tk.SEL, pos, end_pos)
-                text_widget.tag_add('search_highlight', pos, end_pos)
                 print(f"找到下一個匹配項目：{pos}")
             else:
                 # 從頭開始搜尋
@@ -674,7 +737,6 @@ class EnhancedLogAnalyzerApp:
                     text_widget.mark_set(tk.INSERT, end_pos)
                     text_widget.see(pos)
                     text_widget.tag_add(tk.SEL, pos, end_pos)
-                    text_widget.tag_add('search_highlight', pos, end_pos)
                     print(f"從頭找到匹配項目：{pos}")
                 else:
                     print("未找到匹配項目")
@@ -685,7 +747,7 @@ class EnhancedLogAnalyzerApp:
             traceback.print_exc()
     
     def _search_prev_in_text(self, text_widget, search_text):
-        """在Text元件中搜尋上一個 - 使用內建搜尋功能"""
+        """在Text元件中搜尋上一個"""
         try:
             print(f"在Text中搜尋上一個：'{search_text}'")
             
@@ -695,19 +757,52 @@ class EnhancedLogAnalyzerApp:
             
             if len(content) <= 1:  # 只有換行符
                 print("Text元件為空，無法搜尋")
+                self._update_search_count(0)
                 return
             
-            # 使用內建的搜尋功能
-            # 先設定搜尋變數
-            if hasattr(self.log_text_enhanced, 'search_var'):
-                self.log_text_enhanced.search_var.set(search_text)
+            # 先清除之前的選取
+            text_widget.tag_remove(tk.SEL, '1.0', tk.END)
+            text_widget.tag_remove('search_highlight', '1.0', tk.END)
             
-            # 觸發內建搜尋上一個功能
-            if hasattr(self.log_text_enhanced, '_search_prev'):
-                self.log_text_enhanced._search_prev()
+            # 設定搜尋高亮樣式
+            text_widget.tag_configure('search_highlight', background='#FFFF00', foreground='#000000')
+            
+            # 計算總匹配數量
+            count = 0
+            pos = '1.0'
+            while True:
+                pos = text_widget.search(search_text, pos, tk.END, nocase=True)
+                if not pos:
+                    break
+                count += 1
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.tag_add('search_highlight', pos, end_pos)
+                pos = end_pos
+            
+            # 更新搜尋計數
+            self._update_search_count(count)
+            
+            # 從當前游標位置向前搜尋
+            current_pos = text_widget.index(tk.INSERT)
+            print(f"當前游標位置：{current_pos}")
+            
+            # 從當前位置向前搜尋（不包含當前位置）
+            if current_pos != '1.0':
+                prev_pos = text_widget.index(f"{current_pos}-1c")
+                pos = text_widget.search(search_text, '1.0', prev_pos, nocase=True, backwards=True)
             else:
-                # 如果沒有內建方法，使用簡單的搜尋邏輯
-                self._simple_search_prev(text_widget, search_text)
+                # 如果已經在開頭，從末尾開始搜尋
+                pos = text_widget.search(search_text, tk.END, '1.0', nocase=True, backwards=True)
+            
+            if pos:
+                # 找到匹配項目
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.mark_set(tk.INSERT, pos)
+                text_widget.see(pos)
+                text_widget.tag_add(tk.SEL, pos, end_pos)
+                print(f"找到上一個匹配項目：{pos}")
+            else:
+                print("未找到匹配項目")
                     
         except Exception as e:
             print(f"搜尋上一個時發生錯誤: {e}")
@@ -734,8 +829,8 @@ class EnhancedLogAnalyzerApp:
                 prev_pos = text_widget.index(f"{current_pos}-1c")
                 pos = text_widget.search(search_text, '1.0', prev_pos, nocase=True, backwards=True)
             else:
-                # 如果已經在開頭，從尾開始搜尋
-                pos = text_widget.search(search_text, '1.0', tk.END, nocase=True, backwards=True)
+                # 如果已經在開頭，從末尾開始搜尋
+                pos = text_widget.search(search_text, tk.END, '1.0', nocase=True, backwards=True)
             
             if pos:
                 # 找到匹配項目
@@ -747,6 +842,7 @@ class EnhancedLogAnalyzerApp:
                 print(f"找到上一個匹配項目：{pos}")
             else:
                 print("未找到匹配項目")
+                self._update_search_count(0)
                     
         except Exception as e:
             print(f"簡單搜尋上一個時發生錯誤: {e}")
@@ -822,6 +918,9 @@ class EnhancedLogAnalyzerApp:
                         matches.append(item)
                         break
             
+            # 更新搜尋計數
+            self._update_search_count(len(matches))
+            
             if matches:
                 # 選取第一個匹配項目並滾動到該位置
                 tree.selection_set(matches[0])
@@ -850,6 +949,7 @@ class EnhancedLogAnalyzerApp:
             
             if len(content) <= 1:  # 只有換行符
                 print("Text元件為空，無法搜尋")
+                self._update_search_count(0)
                 return
             
             # 先清除之前的搜尋
@@ -859,16 +959,30 @@ class EnhancedLogAnalyzerApp:
             # 設定搜尋高亮樣式
             text_widget.tag_configure('search_highlight', background='#FFFF00', foreground='#000000')
             
-            # 從頭開始搜尋
-            pos = text_widget.search(search_text, '1.0', tk.END, nocase=True)
-            if pos:
-                # 找到匹配項目
+            # 計算總匹配數量
+            count = 0
+            pos = '1.0'
+            while True:
+                pos = text_widget.search(search_text, pos, tk.END, nocase=True)
+                if not pos:
+                    break
+                count += 1
                 end_pos = f"{pos}+{len(search_text)}c"
-                text_widget.mark_set(tk.INSERT, end_pos)
-                text_widget.see(pos)
-                text_widget.tag_add(tk.SEL, pos, end_pos)
                 text_widget.tag_add('search_highlight', pos, end_pos)
-                print(f"找到匹配項目：{pos}")
+                pos = end_pos
+            
+            # 更新搜尋計數
+            self._update_search_count(count)
+            
+            if count > 0:
+                # 找到第一個匹配項目並滾動到該位置
+                first_pos = text_widget.search(search_text, '1.0', tk.END, nocase=True)
+                if first_pos:
+                    end_pos = f"{first_pos}+{len(search_text)}c"
+                    text_widget.mark_set(tk.INSERT, end_pos)
+                    text_widget.see(first_pos)
+                    text_widget.tag_add(tk.SEL, first_pos, end_pos)
+                    print(f"找到 {count} 個匹配項目，第一個在：{first_pos}")
             else:
                 print("未找到匹配項目")
                 
@@ -903,10 +1017,25 @@ class EnhancedLogAnalyzerApp:
                 # 重置游標到開頭
                 self.raw_text.mark_set(tk.INSERT, '1.0')
             
+            # 清除搜尋計數
+            if hasattr(self, 'search_count_label'):
+                self.search_count_label.config(text="")
+            
             print("已清除搜尋結果")
             
         except Exception as e:
             print(f"清除搜尋時發生錯誤: {e}")
+    
+    def _update_search_count(self, count):
+        """更新搜尋結果計數"""
+        try:
+            if hasattr(self, 'search_count_label'):
+                if count > 0:
+                    self.search_count_label.config(text=f"找到 {count} 個匹配項目", fg='#2196F3')
+                else:
+                    self.search_count_label.config(text="未找到匹配項目", fg='#F44336')
+        except Exception as e:
+            print(f"更新搜尋計數時發生錯誤: {e}")
     
     def _analyze_enhanced_log(self):
         """分析log檔案並更新增強版GUI顯示"""
