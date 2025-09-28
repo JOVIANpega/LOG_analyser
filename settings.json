@@ -3,8 +3,13 @@
   "content_font_size": 11,
   "last_log_path": "D:/((Python TOOL/解析LOG2/MINE/FUNCTION_LOG/1+Funtion-WE253100001-20250807092550-IPIO009-0580.log",
   "last_folder_path": "D:/((Python TOOL/解析LOG2/MINE/FUNCTION_LOG",
+<<<<<<< HEAD
   "window_width": 1536,
   "window_height": 801,
+=======
+  "window_width": 1920,
+  "window_height": 1057,
+>>>>>>> c69f11bae8a765f433fe55e2e440788a73db9e57
   "pane_width": 235,
   "app_title": "PEGA test log Aanlyser",
   "gui_header": "ONLY FOR Centimania log",
