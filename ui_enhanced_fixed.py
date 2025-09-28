@@ -270,7 +270,21 @@ class EnhancedTreeview:
             try:
                 self._hover_text.config(state=tk.NORMAL)
                 self._hover_text.delete('1.0', tk.END)
-                self._hover_text.insert('1.0', content)
+                
+                # 檢查是否為FAIL項目，如果是則優先顯示錯誤原因
+                if self._is_fail_content(content):
+                    error_reason = self._extract_error_reason_from_content(content)
+                    if error_reason:
+                        # 顯示錯誤原因標題
+                        self._hover_text.insert('1.0', "🔴 錯誤原因:\n", 'error_title')
+                        self._hover_text.insert(tk.END, error_reason + "\n\n", 'error_content')
+                        self._hover_text.insert(tk.END, "📋 完整內容:\n", 'full_title')
+                        self._hover_text.insert(tk.END, content, 'normal_content')
+                    else:
+                        self._hover_text.insert('1.0', content)
+                else:
+                    self._hover_text.insert('1.0', content)
+                
                 self._hover_text.config(font=('Consolas', self.font_size))
                 
                 # 使用改善後的視窗定位邏輯
@@ -297,6 +311,12 @@ class EnhancedTreeview:
         frame.pack(fill=tk.BOTH, expand=1)
         text = tk.Text(frame, wrap=tk.NONE, font=('Consolas', self.font_size))
         
+        # 設定文字標籤樣式
+        text.tag_configure('error_title', foreground='red', font=('Consolas', self.font_size, 'bold'))
+        text.tag_configure('error_content', foreground='darkred', font=('Consolas', self.font_size, 'bold'))
+        text.tag_configure('full_title', foreground='blue', font=('Consolas', self.font_size, 'bold'))
+        text.tag_configure('normal_content', foreground='black')
+        
         # 垂直滾動條 - 做大一點，靠近文字區
         vs = tk.Scrollbar(frame, orient=tk.VERTICAL, command=text.yview, width=20)
         vs.grid(row=0, column=1, sticky='ns', padx=(5, 0))
@@ -309,7 +329,21 @@ class EnhancedTreeview:
         text.grid(row=0, column=0, sticky='nsew')
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_columnconfigure(0, weight=1)
-        text.insert('1.0', content)
+        
+        # 檢查是否為FAIL項目，如果是則優先顯示錯誤原因
+        if self._is_fail_content(content):
+            error_reason = self._extract_error_reason_from_content(content)
+            if error_reason:
+                # 顯示錯誤原因標題
+                text.insert('1.0', "🔴 錯誤原因:\n", 'error_title')
+                text.insert(tk.END, error_reason + "\n\n", 'error_content')
+                text.insert(tk.END, "📋 完整內容:\n", 'full_title')
+                text.insert(tk.END, content, 'normal_content')
+            else:
+                text.insert('1.0', content)
+        else:
+            text.insert('1.0', content)
+        
         text.config(state=tk.NORMAL)
         # 應用語法高亮
         self._apply_syntax_highlighting(text, content)
@@ -1254,6 +1288,77 @@ class EnhancedTreeview:
         except Exception as e:
             print(f"語法高亮應用失敗: {e}")
     
+    def _is_fail_content(self, content):
+        """檢查內容是否為FAIL項目"""
+        if not content:
+            return False
+        content_lower = content.lower()
+        return any(keyword in content_lower for keyword in [
+            'is fail', 'is failed', 'fail', 'error', 'wrong', 
+            'segmentation fault', 'core dumped', 'executes fail',
+            "doesn't match", 'timeout', 'exception'
+        ])
+    
+    def _extract_error_reason_from_content(self, content):
+        """從內容中提取錯誤原因"""
+        if not content:
+            return ""
+        
+        lines = content.split('\n')
+        
+        # 優先找到包含 "is Fail" 的行
+        for line in lines:
+            if "is Fail" in line:
+                # 處理類似 "VSCH026-043:Chec Frimware version is Fail ! <ErrorCode: BSFR18>" 的格式
+                if ':' in line and "is Fail" in line:
+                    # 擷取冒號後的部分
+                    after_colon = line.split(":", 1)[1].strip()
+                    # 找到 "is Fail" 的位置
+                    if "is Fail" in after_colon:
+                        fail_pos = after_colon.find("is Fail")
+                        # 擷取到 "is Fail" 結束的部分，去掉後面的 <ErrorCode: xxx> 和時間戳記
+                        test_name_with_fail = after_colon[:fail_pos + 7].strip()  # 7 = len("is Fail")
+                        
+                        # 移除時間戳記（如 "2025/08/07 08:53:36 [1]" 格式）
+                        if '[' in test_name_with_fail and ']' in test_name_with_fail:
+                            bracket_start = test_name_with_fail.find('[')
+                            bracket_end = test_name_with_fail.find(']')
+                            if bracket_start != -1 and bracket_end != -1:
+                                # 檢查括號前是否有時間戳記格式
+                                before_bracket = test_name_with_fail[:bracket_start].strip()
+                                if '/' in before_bracket and ':' in before_bracket:
+                                    # 移除時間戳記部分
+                                    test_name_with_fail = test_name_with_fail[bracket_end + 1:].strip()
+                        
+                        return test_name_with_fail
+                elif "is Fail" in line:
+                    # 如果沒有冒號但有 "is Fail"，直接擷取到 "is Fail" 結束
+                    fail_pos = line.find("is Fail")
+                    if fail_pos != -1:
+                        # 找到 <ErrorCode: 的位置
+                        error_code_pos = line.find("<ErrorCode:")
+                        if error_code_pos != -1:
+                            return line[:error_code_pos].strip()
+                        else:
+                            return line[:fail_pos + 7].strip()
+        
+        # 如果沒有找到 "is Fail"，嘗試找到其他錯誤資訊
+        for line in lines:
+            # 尋找包含 "All Test Aborted" 的行
+            if "All Test Aborted" in line:
+                return line
+        
+        # 尋找其他嚴重錯誤
+        for line in lines:
+            line_lower = line.lower()
+            if any(critical_error in line_lower for critical_error in [
+                'segmentation fault', 'core dumped', 'executes fail', 
+                "doesn't match", 'timeout', 'exception'
+            ]):
+                return line
+        
+        return ""
+    
     def _copy_to_clipboard(self, content):
         """複製內容到剪貼板"""
         try:
@@ -1596,6 +1701,9 @@ class EnhancedText:
         self.text.tag_configure('pass_text', foreground='green', font=('Arial', 10, 'bold'))
         self.text.tag_configure('fail_text', foreground='red', font=('Arial', 10, 'bold'))
         
+        # 嚴重錯誤樣式
+        self.text.tag_configure('critical_error', foreground='darkred', font=('Arial', 10, 'bold'), background='#FFE6E6')
+        
         # 指令和回應樣式
         self.text.tag_configure('command', foreground='blue', font=('Arial', 9, 'bold'))
         self.text.tag_configure('response', foreground='purple', font=('Arial', 9))
@@ -1806,6 +1914,17 @@ class EnhancedText:
                 self.text.insert(tk.INSERT, line + '\n')
                 line_end = self.text.index(tk.INSERT)
                 self.text.tag_add('fail_text', line_start, line_end)
+                continue
+            
+            # 檢查其他錯誤關鍵字
+            line_lower = line.lower()
+            if any(error_keyword in line_lower for error_keyword in [
+                'segmentation fault', 'core dumped', 'executes fail', 
+                "doesn't match", 'timeout', 'exception', 'wrong'
+            ]):
+                self.text.insert(tk.INSERT, line + '\n')
+                line_end = self.text.index(tk.INSERT)
+                self.text.tag_add('critical_error', line_start, line_end)
                 continue
             
             # 一般行

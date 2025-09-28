@@ -666,7 +666,7 @@ class EnhancedLogAnalyzerApp:
             print(f"處理FAIL項目選擇失敗: {e}")
     
     def _extract_fail_reason(self, full_content):
-        """提取FAIL原因部分，優先提取包含 'is Fail' 的行"""
+        """提取FAIL原因部分，包含更多錯誤關鍵字"""
         if not full_content:
             return "沒有詳細錯誤內容可顯示"
         
@@ -684,11 +684,13 @@ class EnhancedLogAnalyzerApp:
             # 優先提取包含 "is Fail" 的行
             if "is Fail" in clean_line:
                 is_fail_lines.append(clean_line)
-            # 其他包含重要錯誤資訊的行
+            # 其他包含重要錯誤資訊的行，包含新增的錯誤關鍵字
             elif any(keyword in clean_line for keyword in [
                 'Result:', 'validation:', 'type of', 'TestTime:', 
                 'ErrorCode:', 'Test Completed', 'Test Aborted', 'TotalCount:', 
-                'Report name:', 'Execute Phase', 'FAIL', 'ERROR', 'NACK'
+                'Report name:', 'Execute Phase', 'FAIL', 'ERROR', 'NACK',
+                'fail', 'error', 'Wrong', 'Segmentation fault', 'core dumped',
+                'executes fail', "doesn't match", 'timeout', 'exception'
             ]):
                 fail_reason_lines.append(clean_line)
         
@@ -758,17 +760,46 @@ class EnhancedLogAnalyzerApp:
         return "未知錯誤"
     
     def _insert_formatted_fail_content(self, content):
-        """插入格式化的FAIL內容，特定行顯示紅色"""
+        """插入格式化的FAIL內容，多種錯誤關鍵字用不同顏色標註"""
         lines = content.split('\n')
         for line in lines:
-            # 檢查是否包含 "is Fail" 的行，顯示紅色
+            line_lower = line.lower()
+            
+            # 檢查不同類型的錯誤並用不同顏色標記
             if "is Fail" in line:
+                # 主要錯誤：紅色粗體
                 self.fail_error_text.insert(tk.END, line + '\n', 'fail_red')
+            elif any(critical_error in line_lower for critical_error in [
+                'segmentation fault', 'core dumped', 'executes fail', 
+                "doesn't match", 'timeout', 'exception'
+            ]):
+                # 嚴重錯誤：深紅色粗體
+                self.fail_error_text.insert(tk.END, line + '\n', 'critical_error')
+            elif any(error_keyword in line_lower for error_keyword in [
+                'error', 'fail', 'wrong'
+            ]) and not "is Fail" in line:
+                # 一般錯誤關鍵字：橙紅色
+                self.fail_error_text.insert(tk.END, line + '\n', 'error_keyword')
+            elif any(keyword in line_lower for keyword in [
+                'errorcode:', 'test aborted', 'all test aborted'
+            ]):
+                # 錯誤代碼：橙色
+                self.fail_error_text.insert(tk.END, line + '\n', 'error_code')
+            elif any(keyword in line_lower for keyword in [
+                '(lan) >', '(uart) >', 'run ', 'execute'
+            ]):
+                # 執行的指令：藍色
+                self.fail_error_text.insert(tk.END, line + '\n', 'command')
             else:
+                # 一般內容：黑色
                 self.fail_error_text.insert(tk.END, line + '\n')
         
-        # 設定紅色文字標籤
+        # 設定不同的文字標籤樣式
         self.fail_error_text.tag_configure('fail_red', foreground='red', font=('Consolas', 12, 'bold'))
+        self.fail_error_text.tag_configure('critical_error', foreground='darkred', font=('Consolas', 12, 'bold'))
+        self.fail_error_text.tag_configure('error_keyword', foreground='orangered', font=('Consolas', 11, 'bold'))
+        self.fail_error_text.tag_configure('error_code', foreground='darkorange', font=('Consolas', 11, 'bold'))
+        self.fail_error_text.tag_configure('command', foreground='blue', font=('Consolas', 10))
     
     def _apply_font_size(self):
         """套用字體大小"""

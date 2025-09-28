@@ -1,21 +1,13 @@
 {
-  "ui_font_size": 12,
+  "ui_font_size": 11,
   "content_font_size": 11,
-  "last_log_path": "D:/((Python TOOL/解析LOG2/MINE/FUNCTION_LOG/1+Funtion-WE253100001-20250807092550-IPIO009-0580.log",
-  "last_folder_path": "D:/((Python TOOL/解析LOG2/MINE/FUNCTION_LOG",
-<<<<<<< HEAD
+  "last_log_path": "M:/PYTHON/LOG_analyser-main/MINE/LOG/4cam log/1+4cam stitching1 test-WE253700005-20250924133319-B7PL011-195.log",
+  "last_folder_path": "",
   "window_width": 1536,
   "window_height": 801,
-=======
-  "window_width": 1920,
-  "window_height": 1057,
->>>>>>> c69f11bae8a765f433fe55e2e440788a73db9e57
-  "pane_width": 235,
+  "pane_width": 241,
   "app_title": "PEGA test log Aanlyser",
-  "gui_header": "ONLY FOR Centimania log",
-  "version": "V1.6.5",
-  "font_size": 11,
+  "gui_header": "ONLY FOR CENTIMANIA LOG",
   "auto_analyze": true,
-  "remember_path": true,
-  "fail_pane_position": 201
+  "remember_path": true
 }

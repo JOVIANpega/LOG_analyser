@@ -55,6 +55,31 @@ pyinstaller --onefile --noconsole --icon=assets/icon.ico main.py
 - `docs/`：完整文件（操作指引、專案說明等）
 
 ## 版本資訊
+- V1.6.9
+  - 修復並增強錯誤顯示功能：
+    - **修復滑鼠懸停預覽**：確保FAIL項目懸停時直接顯示錯誤原因
+    - **增強原始LOG標籤頁**：
+      - 新增嚴重錯誤關鍵字識別：`Segmentation fault`, `core dumped`, `executes fail`, `doesn't match`, `timeout`, `exception`, `wrong`
+      - 嚴重錯誤以深紅色粗體和淺紅色背景突出顯示
+      - 與FAIL標籤頁保持一致的錯誤識別邏輯
+- V1.6.8
+  - 全面增強GUI視覺化錯誤顯示：
+    - **滑鼠懸停預覽優化**：
+      - 自動識別FAIL項目並優先顯示錯誤原因
+      - 錯誤原因以紅色粗體突出顯示
+      - 完整內容以藍色標題分隔顯示
+      - 支援多種錯誤關鍵字識別和提取
+    - **修復標籤頁樣式兼容性問題**：移除不支援的樣式設定，確保程式正常運行
+- V1.6.7
+  - 增強錯誤顯示功能：
+    - 擴展錯誤關鍵字識別：新增 `fail`, `error`, `Wrong`, `Segmentation fault`, `core dumped`, `executes fail`, `doesn't match`, `timeout`, `exception` 等
+    - 多層次顏色標註系統：
+      - 🔴 **紅色粗體**：主要錯誤 ("is Fail")
+      - 🔴 **深紅色粗體**：嚴重錯誤 (Segmentation fault, executes fail, doesn't match 等)
+      - 🟠 **橙紅色粗體**：一般錯誤關鍵字 (ERROR, error, fail, FAIL, Wrong)
+      - 🟠 **橙色粗體**：錯誤代碼 (ErrorCode, Test Aborted)
+      - 🔵 **藍色**：執行的指令 ((LAN) >, Run 等)
+    - 改善錯誤上下文提取，讓用戶能一眼看到完整的錯誤原因和相關指令
 - V1.5.6
   - FAIL測試標籤優化：
     - 錯誤原因自動顯示，切換到FAIL標籤即可看到內容，無需點擊
