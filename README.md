@@ -34,12 +34,15 @@ python main.py --classic
 ## 打包為 EXE（單一檔）
 建議將圖示等資源置於 `assets/`。
 
+### 圖示資源
+- `assets/icon.png` - PNG 格式圖示（256x256 像素）
+- `assets/icon.ico` - ICO 格式圖示（Windows 應用程式專用）
+- 圖示規格：綠色背景，白色 "LOG" 文字
+
 ### 快速打包
 使用提供的BAT檔案：
 ```bash
-build_exe_fixed.bat    # 修復版（推薦）
-build_exe.bat          # 標準版
-build_exe_advanced.bat # 進階版
+build_exe.bat          # 標準版（已包含圖示設定）
 ```
 
 ### 手動打包
@@ -56,8 +59,16 @@ pyinstaller --onefile --noconsole --icon=assets/icon.ico --name="PEGA_Log_Analyz
 
 ### 打包檔案清單
 - **核心檔案**：`main_enhanced.py` 及所有自定義模組
-- **資源檔案**：`assets/`、`docs/`、`settings.json`
+- **資源檔案**：`assets/`（包含圖示）、`docs/`、`settings.json`
+- **圖示檔案**：`assets/icon.ico`（256x256 綠色背景 LOG 圖示）
 - **依賴套件**：`tkinter`、`pandas`、`openpyxl`、`xlrd` 等
+
+### 打包指令說明
+`build_exe.bat` 已包含以下設定：
+- `--icon=assets/icon.ico` - 設定應用程式圖示
+- `--version-file=assets/version_info.txt` - 設定版本資訊
+- `--add-data="assets;assets"` - 包含資源檔案
+- 完整的隱藏匯入設定
 
 詳細說明請參考 `EXE_打包說明.md`。
 
@@ -76,6 +87,12 @@ pyinstaller --onefile --noconsole --icon=assets/icon.ico --name="PEGA_Log_Analyz
 - `docs/`：完整文件（操作指引、專案說明等）
 
 ## 版本資訊
+- V1.7.7
+  - 新增圖示支援：
+    - **自訂圖示**：建立 256x256 像素的綠色背景 LOG 圖示
+    - **打包整合**：更新 `build_exe.bat` 包含圖示設定
+    - **圖示格式**：提供 PNG 和 ICO 兩種格式
+    - **文件更新**：README.md 新增圖示相關說明
 - V1.7.1
   - 優化Excel顯示效果：
     - **調整行高**：增加Excel行高以顯示更多文字內容

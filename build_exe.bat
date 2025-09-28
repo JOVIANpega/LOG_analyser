@@ -32,11 +32,12 @@ if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 if exist *.spec del *.spec
 
-REM 使用PyInstaller打包（移除圖示參數）
+REM 使用PyInstaller打包（包含圖示）
 echo 正在執行PyInstaller...
 pyinstaller --onefile ^
     --console ^
     --name="PEGA_Log_Analyzer_V1.7.1_Console" ^
+    --icon=assets/icon.ico ^
     --version-file=assets/version_info.txt ^
     --add-data="assets;assets" ^
     --add-data="docs;docs" ^
