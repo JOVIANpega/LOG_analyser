@@ -144,10 +144,19 @@ class EnhancedLogAnalyzerApp:
     
     def _build_enhanced_left_panel(self, parent):
         """建立增強版左側面板（抽離至模組）"""
-        build_left_panel(self, parent)
+        build_left_panel(parent, self)
     
     def _build_enhanced_right_panel(self, parent):
         """建立增強版右側面板"""
+        # 建立頂部檔案資訊框架
+        top_frame = tk.Frame(parent)
+        top_frame.pack(fill=tk.X, padx=5, pady=2)
+        
+        # 檔案資訊標籤
+        self.file_info_label = tk.Label(top_frame, text="尚未選擇檔案", fg='gray', anchor='w')
+        self.file_info_label.pack(fill=tk.X)
+        self.font_scaler.register(self.file_info_label)
+        
         # 建立標籤頁
         self.notebook = ttk.Notebook(parent)
         self.notebook.pack(fill=tk.BOTH, expand=1)
@@ -164,9 +173,23 @@ class EnhancedLogAnalyzerApp:
     def _setup_tab_styles(self):
         """設定標籤頁樣式"""
         style = ttk.Style()
-        style.configure('TNotebook.Tab', font=('Arial', self.ui_font_size))
-        # 鼠標靠近標籤頁時顯示綠色背景，黑色文字
-        style.map('TNotebook.Tab', background=[('active', '#00FF00')], foreground=[('active', 'black')])
+        
+        # 設定主題
+        style.theme_use('clam')  # 使用clam主題，支援更多自訂樣式
+        
+        # 設定標籤頁基本樣式
+        style.configure('TNotebook.Tab', 
+                       font=('Arial', self.ui_font_size),
+                       padding=[10, 5])
+        
+        # 設定標籤頁顏色映射
+        style.map('TNotebook.Tab',
+                 background=[('selected', '#2E7D32'),    # 選中：深綠底
+                            ('active', '#2E7D32'),       # hover：深綠底
+                            ('!selected', '#1565C0')],   # 未選中：深藍底
+                 foreground=[('selected', 'white'),      # 選中：白字
+                            ('active', 'white'),         # hover：白字
+                            ('!selected', 'white')])     # 未選中：白字
     
     def _build_enhanced_pass_tab(self):
         """建立PASS標籤頁"""
@@ -522,6 +545,368 @@ class EnhancedLogAnalyzerApp:
             print("已清除所有結果")
         except Exception as e:
             print(f"清除結果時發生錯誤: {e}")
+    
+    def _on_search_change(self, event):
+        """搜尋內容改變時的即時搜尋"""
+        try:
+            print("搜尋內容改變事件觸發")
+            # 如果輸入超過2個字元就開始搜尋
+            search_text = self.search_var.get().strip()
+            print(f"搜尋文字：'{search_text}'")
+            if len(search_text) >= 2:
+                self._search_next()
+            elif len(search_text) == 0:
+                self._clear_search()
+        except Exception as e:
+            print(f"搜尋改變事件錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_search_enter(self, event):
+        """按下Enter鍵時執行搜尋"""
+        try:
+            print("Enter鍵搜尋事件觸發")
+            self._search_next()
+        except Exception as e:
+            print(f"Enter搜尋事件錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_next(self):
+        """搜尋下一個匹配項目"""
+        try:
+            search_text = self.search_var.get().strip()
+            if not search_text:
+                return
+            
+            # 檢查當前選中的標籤頁
+            current_tab = self.notebook.select()
+            print(f"搜尋下一個 - 當前標籤頁：{current_tab}")
+            
+            # 獲取當前選中的標籤頁索引
+            current_tab_index = self.notebook.index(current_tab)
+            print(f"搜尋下一個 - 當前標籤頁索引：{current_tab_index}")
+            
+            if current_tab_index == 2:  # 原始LOG標籤頁
+                # 在原始LOG標籤頁中搜尋
+                if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                    self._search_next_in_text(self.log_text_enhanced.text, search_text)
+                elif hasattr(self, 'raw_text'):
+                    self._search_next_in_text(self.raw_text, search_text)
+                else:
+                    print("未找到原始LOG Text元件")
+            else:
+                # 在其他標籤頁中搜尋
+                self._perform_search()
+                
+        except Exception as e:
+            print(f"搜尋下一個時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_prev(self):
+        """搜尋上一個匹配項目"""
+        try:
+            search_text = self.search_var.get().strip()
+            if not search_text:
+                return
+            
+            # 檢查當前選中的標籤頁
+            current_tab = self.notebook.select()
+            print(f"搜尋上一個 - 當前標籤頁：{current_tab}")
+            
+            # 獲取當前選中的標籤頁索引
+            current_tab_index = self.notebook.index(current_tab)
+            print(f"搜尋上一個 - 當前標籤頁索引：{current_tab_index}")
+            
+            if current_tab_index == 2:  # 原始LOG標籤頁
+                # 在原始LOG標籤頁中搜尋
+                if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                    self._search_prev_in_text(self.log_text_enhanced.text, search_text)
+                elif hasattr(self, 'raw_text'):
+                    self._search_prev_in_text(self.raw_text, search_text)
+                else:
+                    print("未找到原始LOG Text元件")
+            else:
+                # 在其他標籤頁中搜尋
+                self._perform_search()
+                
+        except Exception as e:
+            print(f"搜尋上一個時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_next_in_text(self, text_widget, search_text):
+        """在Text元件中搜尋下一個"""
+        try:
+            print(f"在Text中搜尋下一個：'{search_text}'")
+            
+            # 檢查Text元件是否有內容
+            content = text_widget.get('1.0', tk.END)
+            print(f"Text內容長度：{len(content)}")
+            
+            if len(content) <= 1:  # 只有換行符
+                print("Text元件為空，無法搜尋")
+                return
+            
+            # 先清除之前的選取
+            text_widget.tag_remove(tk.SEL, '1.0', tk.END)
+            text_widget.tag_remove('search_highlight', '1.0', tk.END)
+            
+            # 設定搜尋高亮樣式
+            text_widget.tag_configure('search_highlight', background='#FFFF00', foreground='#000000')
+            
+            # 從當前游標位置開始搜尋
+            pos = text_widget.search(search_text, tk.INSERT, tk.END, nocase=True)
+            if pos:
+                # 找到匹配項目
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.mark_set(tk.INSERT, end_pos)
+                text_widget.see(pos)
+                text_widget.tag_add(tk.SEL, pos, end_pos)
+                text_widget.tag_add('search_highlight', pos, end_pos)
+                print(f"找到下一個匹配項目：{pos}")
+            else:
+                # 從頭開始搜尋
+                pos = text_widget.search(search_text, '1.0', tk.END, nocase=True)
+                if pos:
+                    end_pos = f"{pos}+{len(search_text)}c"
+                    text_widget.mark_set(tk.INSERT, end_pos)
+                    text_widget.see(pos)
+                    text_widget.tag_add(tk.SEL, pos, end_pos)
+                    text_widget.tag_add('search_highlight', pos, end_pos)
+                    print(f"從頭找到匹配項目：{pos}")
+                else:
+                    print("未找到匹配項目")
+                    
+        except Exception as e:
+            print(f"搜尋下一個時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_prev_in_text(self, text_widget, search_text):
+        """在Text元件中搜尋上一個 - 使用內建搜尋功能"""
+        try:
+            print(f"在Text中搜尋上一個：'{search_text}'")
+            
+            # 檢查Text元件是否有內容
+            content = text_widget.get('1.0', tk.END)
+            print(f"Text內容長度：{len(content)}")
+            
+            if len(content) <= 1:  # 只有換行符
+                print("Text元件為空，無法搜尋")
+                return
+            
+            # 使用內建的搜尋功能
+            # 先設定搜尋變數
+            if hasattr(self.log_text_enhanced, 'search_var'):
+                self.log_text_enhanced.search_var.set(search_text)
+            
+            # 觸發內建搜尋上一個功能
+            if hasattr(self.log_text_enhanced, '_search_prev'):
+                self.log_text_enhanced._search_prev()
+            else:
+                # 如果沒有內建方法，使用簡單的搜尋邏輯
+                self._simple_search_prev(text_widget, search_text)
+                    
+        except Exception as e:
+            print(f"搜尋上一個時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _simple_search_prev(self, text_widget, search_text):
+        """簡單的向前搜尋邏輯"""
+        try:
+            # 先清除之前的選取
+            text_widget.tag_remove(tk.SEL, '1.0', tk.END)
+            text_widget.tag_remove('search_highlight', '1.0', tk.END)
+            
+            # 設定搜尋高亮樣式
+            text_widget.tag_configure('search_highlight', background='#FFFF00', foreground='#000000')
+            
+            # 獲取當前游標位置
+            current_pos = text_widget.index(tk.INSERT)
+            print(f"當前游標位置：{current_pos}")
+            
+            # 從當前位置向前搜尋（不包含當前位置）
+            # 先將游標向前移動一個字符
+            if current_pos != '1.0':
+                prev_pos = text_widget.index(f"{current_pos}-1c")
+                pos = text_widget.search(search_text, '1.0', prev_pos, nocase=True, backwards=True)
+            else:
+                # 如果已經在開頭，從尾開始搜尋
+                pos = text_widget.search(search_text, '1.0', tk.END, nocase=True, backwards=True)
+            
+            if pos:
+                # 找到匹配項目
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.mark_set(tk.INSERT, pos)
+                text_widget.see(pos)
+                text_widget.tag_add(tk.SEL, pos, end_pos)
+                text_widget.tag_add('search_highlight', pos, end_pos)
+                print(f"找到上一個匹配項目：{pos}")
+            else:
+                print("未找到匹配項目")
+                    
+        except Exception as e:
+            print(f"簡單搜尋上一個時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _perform_search(self):
+        """執行搜尋功能"""
+        try:
+            search_text = self.search_var.get().strip().lower()
+            print(f"開始搜尋：'{search_text}'")
+            
+            if not search_text:
+                self._clear_search()
+                return
+            
+            # 檢查當前選中的標籤頁
+            current_tab = self.notebook.select()
+            print(f"當前標籤頁：{current_tab}")
+            
+            # 根據當前標籤頁決定搜尋範圍
+            # 獲取當前選中的標籤頁索引
+            current_tab_index = self.notebook.index(current_tab)
+            print(f"當前標籤頁索引：{current_tab_index}")
+            
+            # 根據索引判斷標籤頁類型
+            if current_tab_index == 0:  # PASS標籤頁
+                print("在PASS標籤頁中搜尋...")
+                if hasattr(self, 'pass_tree_enhanced'):
+                    self._search_in_tree(self.pass_tree_enhanced, search_text)
+                else:
+                    print("未找到PASS tree")
+            elif current_tab_index == 1:  # FAIL標籤頁
+                print("在FAIL標籤頁中搜尋...")
+                if hasattr(self, 'fail_tree_enhanced'):
+                    self._search_in_tree(self.fail_tree_enhanced, search_text)
+                else:
+                    print("未找到FAIL tree")
+            elif current_tab_index == 2:  # 原始LOG標籤頁
+                print("在原始LOG標籤頁中搜尋...")
+                if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                    self._search_in_text(self.log_text_enhanced.text, search_text)
+                elif hasattr(self, 'raw_text'):
+                    self._search_in_text(self.raw_text, search_text)
+                else:
+                    print("未找到原始LOG Text元件")
+            else:
+                print(f"未知標籤頁索引：{current_tab_index}，嘗試搜尋原始LOG...")
+                if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                    self._search_in_text(self.log_text_enhanced.text, search_text)
+                elif hasattr(self, 'raw_text'):
+                    self._search_in_text(self.raw_text, search_text)
+                
+        except Exception as e:
+            print(f"搜尋時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_in_tree(self, tree_enhanced, search_text):
+        """在TreeView中搜尋"""
+        try:
+            tree = tree_enhanced.tree
+            # 清除之前的選取
+            tree.selection_remove(tree.selection())
+            
+            # 搜尋匹配的項目
+            matches = []
+            for item in tree.get_children():
+                values = tree.item(item, 'values')
+                # 檢查所有欄位是否包含搜尋文字
+                for value in values:
+                    if search_text in str(value).lower():
+                        matches.append(item)
+                        break
+            
+            if matches:
+                # 選取第一個匹配項目並滾動到該位置
+                tree.selection_set(matches[0])
+                tree.focus(matches[0])
+                tree.see(matches[0])
+                
+                # 高亮顯示所有匹配項目
+                for match in matches:
+                    tree.selection_add(match)
+                
+                print(f"找到 {len(matches)} 個匹配項目")
+            else:
+                print("未找到匹配項目")
+                
+        except Exception as e:
+            print(f"TreeView搜尋時發生錯誤: {e}")
+    
+    def _search_in_text(self, text_widget, search_text):
+        """在Text元件中搜尋 - 使用內建搜尋功能"""
+        try:
+            print(f"在Text元件中搜尋：'{search_text}'")
+            
+            # 檢查Text元件是否有內容
+            content = text_widget.get('1.0', tk.END)
+            print(f"Text內容長度：{len(content)}")
+            
+            if len(content) <= 1:  # 只有換行符
+                print("Text元件為空，無法搜尋")
+                return
+            
+            # 先清除之前的搜尋
+            text_widget.tag_remove(tk.SEL, '1.0', tk.END)
+            text_widget.tag_remove('search_highlight', '1.0', tk.END)
+            
+            # 設定搜尋高亮樣式
+            text_widget.tag_configure('search_highlight', background='#FFFF00', foreground='#000000')
+            
+            # 從頭開始搜尋
+            pos = text_widget.search(search_text, '1.0', tk.END, nocase=True)
+            if pos:
+                # 找到匹配項目
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.mark_set(tk.INSERT, end_pos)
+                text_widget.see(pos)
+                text_widget.tag_add(tk.SEL, pos, end_pos)
+                text_widget.tag_add('search_highlight', pos, end_pos)
+                print(f"找到匹配項目：{pos}")
+            else:
+                print("未找到匹配項目")
+                
+        except Exception as e:
+            print(f"Text搜尋時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _clear_search(self):
+        """清除搜尋結果"""
+        try:
+            # 清除搜尋框
+            self.search_var.set("")
+            
+            # 清除PASS樹狀檢視的選取
+            if hasattr(self, 'pass_tree_enhanced'):
+                self.pass_tree_enhanced.tree.selection_remove(self.pass_tree_enhanced.tree.selection())
+            
+            # 清除FAIL樹狀檢視的選取
+            if hasattr(self, 'fail_tree_enhanced'):
+                self.fail_tree_enhanced.tree.selection_remove(self.fail_tree_enhanced.tree.selection())
+            
+            # 清除原始LOG的選取和高亮
+            if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                self.log_text_enhanced.text.tag_remove(tk.SEL, '1.0', tk.END)
+                self.log_text_enhanced.text.tag_remove('search_highlight', '1.0', tk.END)
+                # 重置游標到開頭
+                self.log_text_enhanced.text.mark_set(tk.INSERT, '1.0')
+            elif hasattr(self, 'raw_text'):
+                self.raw_text.tag_remove(tk.SEL, '1.0', tk.END)
+                self.raw_text.tag_remove('search_highlight', '1.0', tk.END)
+                # 重置游標到開頭
+                self.raw_text.mark_set(tk.INSERT, '1.0')
+            
+            print("已清除搜尋結果")
+            
+        except Exception as e:
+            print(f"清除搜尋時發生錯誤: {e}")
     
     def _analyze_enhanced_log(self):
         """分析log檔案並更新增強版GUI顯示"""

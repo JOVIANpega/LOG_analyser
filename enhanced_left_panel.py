@@ -6,13 +6,13 @@ enhanced_left_panel.py
 """
 import tkinter as tk
 
-def build_left_panel(app, parent):
-    # 標題 - 使用大方塊淺藍色背景
-    title_frame = tk.Frame(parent, bg='#E6F3FF', relief=tk.RAISED, bd=2)
+def build_left_panel(parent, app):
+    # 標題 - 使用綠色背景
+    title_frame = tk.Frame(parent, bg='#4CAF50', relief=tk.RAISED, bd=2)
     title_frame.pack(fill=tk.X, padx=10, pady=(10, 20))
     
-    title_label = tk.Label(title_frame, text=app.settings.get('gui_header', 'ONLY FOR CENTIMANIA LOG'), 
-                          font=('Arial', 26, 'bold'), fg='#2E86AB', bg='#E6F3FF')
+    title_label = tk.Label(title_frame, text=app.settings.get('gui_header', 'PEGA LOG ANALYZER'), 
+                          font=('Arial', 24, 'bold'), fg='white', bg='#4CAF50')
     title_label.pack(pady=10)
     app.font_scaler.register(title_label)
     # 讓設定頁面可即時更新此標題
@@ -60,6 +60,39 @@ def build_left_panel(app, parent):
     except Exception:
         pass
     
+    # 搜尋功能區域
+    search_frame = tk.LabelFrame(parent, text="🔍 搜尋功能", padx=10, pady=10)
+    search_frame.pack(fill=tk.X, padx=10, pady=5)
+    
+    search_label = tk.Label(search_frame, text="搜尋關鍵字:", font=('Arial', 10))
+    search_label.pack(anchor='w')
+    app.font_scaler.register(search_label)
+    
+    app.search_var = tk.StringVar()
+    app.search_entry = tk.Entry(search_frame, textvariable=app.search_var, width=25, font=('Arial', 10))
+    app.search_entry.pack(fill=tk.X, pady=2)
+    app.search_entry.bind('<KeyRelease>', app._on_search_change)
+    app.search_entry.bind('<Return>', app._on_search_enter)
+    app.font_scaler.register(app.search_entry)
+    
+    search_btn_frame = tk.Frame(search_frame)
+    search_btn_frame.pack(fill=tk.X, pady=2)
+    
+    search_btn = tk.Button(search_btn_frame, text="下一個", command=app._search_next, 
+                          bg='#2196F3', fg='white', font=('Arial', 9))
+    search_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0,2))
+    app.font_scaler.register(search_btn)
+    
+    prev_btn = tk.Button(search_btn_frame, text="上一個", command=app._search_prev, 
+                        bg='#4CAF50', fg='white', font=('Arial', 9))
+    prev_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2,2))
+    app.font_scaler.register(prev_btn)
+    
+    clear_search_btn = tk.Button(search_btn_frame, text="清除", command=app._clear_search, 
+                                bg='#FF9800', fg='white', font=('Arial', 9))
+    clear_search_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2,0))
+    app.font_scaler.register(clear_search_btn)
+    
     # 說明文件按鈕（HTML操作說明）
     help_btn = tk.Button(parent, text="📖 查看操作說明(HTML)", command=app._open_html_help, bg="#607D8B", fg="white")
     help_btn.pack(fill=tk.X, padx=10, pady=(8, 8))
@@ -76,46 +109,3 @@ def build_left_panel(app, parent):
     app.file_info_label.pack(pady=(5, 0))
     app.font_scaler.register(app.file_info_label)
     
-    # 介面設定
-    font_frame = tk.LabelFrame(parent, text="介面設定", padx=10, pady=10)
-    font_frame.pack(fill=tk.X, padx=10, pady=5)
-    
-    # 介面文字大小控制
-    ui_font_frame = tk.Frame(font_frame)
-    ui_font_frame.pack(fill=tk.X, pady=2)
-    
-    tk.Label(ui_font_frame, text="介面文字：").pack(side=tk.LEFT)
-    
-    btn_ui_minus = tk.Button(ui_font_frame, text="－", width=3, 
-                            command=app._decrease_ui_font)
-    btn_ui_minus.pack(side=tk.LEFT, padx=2)
-    app.font_scaler.register(btn_ui_minus)
-    
-    app.ui_font_size_label = tk.Label(ui_font_frame, text=str(app.ui_font_size), 
-                                      width=3, relief=tk.SUNKEN, font=('Arial', app.ui_font_size))
-    app.ui_font_size_label.pack(side=tk.LEFT, padx=2)
-    
-    btn_ui_plus = tk.Button(ui_font_frame, text="＋", width=3, 
-                          command=app._increase_ui_font)
-    btn_ui_plus.pack(side=tk.LEFT, padx=2)
-    app.font_scaler.register(btn_ui_plus)
-    
-    # 內容字體大小控制
-    content_font_frame = tk.Frame(font_frame)
-    content_font_frame.pack(fill=tk.X, pady=2)
-    
-    tk.Label(content_font_frame, text="內容字體：").pack(side=tk.LEFT)
-    
-    btn_content_minus = tk.Button(content_font_frame, text="－", width=3, 
-                                command=app._decrease_content_font)
-    btn_content_minus.pack(side=tk.LEFT, padx=2)
-    app.font_scaler.register(btn_content_minus)
-    
-    app.content_font_size_label = tk.Label(content_font_frame, text=str(app.content_font_size), 
-                                          width=3, relief=tk.SUNKEN, font=('Arial', app.content_font_size))
-    app.content_font_size_label.pack(side=tk.LEFT, padx=2)
-    
-    btn_content_plus = tk.Button(content_font_frame, text="＋", width=3, 
-                                 command=app._increase_content_font)
-    btn_content_plus.pack(side=tk.LEFT, padx=2)
-    app.font_scaler.register(btn_content_plus) 
