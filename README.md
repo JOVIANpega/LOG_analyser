@@ -34,11 +34,32 @@ python main.py --classic
 ## 打包為 EXE（單一檔）
 建議將圖示等資源置於 `assets/`。
 
-範例指令（請依照實際需求調整）：
+### 快速打包
+使用提供的BAT檔案：
+```bash
+build_exe_fixed.bat    # 修復版（推薦）
+build_exe.bat          # 標準版
+build_exe_advanced.bat # 進階版
 ```
-pyinstaller --onefile --noconsole --icon=assets/icon.ico main.py
+
+### 手動打包
+```bash
+pyinstaller --onefile --noconsole --icon=assets/icon.ico --name="PEGA_Log_Analyzer_V1.7.1" main_enhanced.py
 ```
+
+### 完整打包指令
+```bash
+pyinstaller --onefile --noconsole --icon=assets/icon.ico --name="PEGA_Log_Analyzer_V1.7.1" --version-file=assets/version_info.txt --add-data="assets;assets" --add-data="docs;docs" --add-data="settings.json;." --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.messagebox --hidden-import=tkinter.filedialog --hidden-import=tkinter.scrolledtext --hidden-import=openpyxl --hidden-import=pandas --hidden-import=xlrd --hidden-import=re --hidden-import=json --hidden-import=os --hidden-import=sys --hidden-import=datetime --hidden-import=threading --hidden-import=webbrowser --hidden-import=settings_loader --hidden-import=log_parser --hidden-import=ui_components --hidden-import=ui_enhanced_fixed --hidden-import=enhanced_settings --hidden-import=enhanced_left_panel --hidden-import=excel_writer --hidden-import=generate_documentation --collect-all=pandas --collect-all=openpyxl --collect-all=xlrd main_enhanced.py
+```
+
 程式內已提供 `get_resource_path()` 以支援打包後資源路徑（`sys._MEIPASS`）。
+
+### 打包檔案清單
+- **核心檔案**：`main_enhanced.py` 及所有自定義模組
+- **資源檔案**：`assets/`、`docs/`、`settings.json`
+- **依賴套件**：`tkinter`、`pandas`、`openpyxl`、`xlrd` 等
+
+詳細說明請參考 `EXE_打包說明.md`。
 
 ## 設定檔
 - `settings.json`：記錄字體大小、視窗大小、左側面板寬度 `pane_width` 等。
@@ -55,6 +76,11 @@ pyinstaller --onefile --noconsole --icon=assets/icon.ico main.py
 - `docs/`：完整文件（操作指引、專案說明等）
 
 ## 版本資訊
+- V1.7.1
+  - 優化Excel顯示效果：
+    - **調整行高**：增加Excel行高以顯示更多文字內容
+    - **統一字體大小**：所有Excel內容字體統一設為11號
+    - **改善文字顯示**：Summary頁面和LOG工作表的文字內容更清晰易讀
 - V1.7.6
   - 修復資料夾分析功能：
     - **原始LOG標籤頁顯示**：資料夾分析時自動合併所有FAIL LOG內容到原始LOG標籤頁，並套用顏色突出顯示

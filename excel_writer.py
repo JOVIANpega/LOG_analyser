@@ -237,22 +237,27 @@ class ExcelWriter:
             step_labels = [str(i) for i, _ in enumerate(entry.get('pass_items') or [], 1)]
             ws2.cell(row=2, column=1, value=self._sanitize_cell_text('，'.join(step_labels) if step_labels else ''))
             ws2.cell(row=2, column=1).number_format = '@'
-            self._write_raw_log_with_annotations(ws2, start_row=3, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=10), step_marks=entry.get('step_marks'))
+            ws2.cell(row=2, column=1).font = Font(name='Microsoft JhengHei', size=11)
+            self._write_raw_log_with_annotations(ws2, start_row=3, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=11), step_marks=entry.get('step_marks'))
+            
+            # 設定所有行的行高以顯示更多文字
+            for row_num in range(1, ws2.max_row + 1):
+                if ws2.row_dimensions[row_num].height == 15:  # 預設行高
+                    ws2.row_dimensions[row_num].height = 20
             self._auto_fit_columns(ws2)
         # Summary 表格：
-        headers = ['檔名'] + [f'步驟 {i}' for i in range(1, 11)]
+        headers = ['檔名', 'PASS步驟數', '測試總時間', 'SFIS']
         for c, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=c, value=header)
             cell.font = header_font
             cell.alignment = center
             cell.fill = deep_green
         ws.freeze_panes = 'A2'
-        max_chunks = 10
         thin = Side(border_style='thin', color='FF888888')
         thick = Side(border_style='thick', color='FF000000')
         start_data_row = ws.max_row + 1
         for entry in logs:
-            # 分解steps至10欄
+            # 檔名欄
             base = self._sanitize_cell_text(entry.get('file_name') or '')
             base_fmt = self._format_filename_with_timestamp(base)
             sfis = (entry.get('summary') or {}).get('SFIS','')
@@ -262,7 +267,6 @@ class ExcelWriter:
             suffix = f"_SFIS_{sfis}" if sfis else ''
             display_name = f"{base_fmt}{suffix} {sec_txt}".strip()
             r = ws.max_row + 1
-            # 主檔名
             cell_name = ws.cell(row=r, column=1, value=self._sanitize_cell_text(display_name))
             cell_name.number_format='@'
             cell_name.font = Font(name='Microsoft JhengHei', size=10, color='FF000000')
@@ -277,37 +281,31 @@ class ExcelWriter:
                 pass
             if sheet:
                 cell_name.hyperlink = f"#'{sheet}'!A1"
-                self._add_input_prompt(ws, cell_name, '對應工作表', sheet)
-            # 步驟欄位（最多10欄）
-            pass_steps = entry.get('pass_items') or []
-            for col_idx in range(2, max_chunks + 2):
-                step_idx = col_idx - 2
-                if step_idx < len(pass_steps):
-                    step = pass_steps[step_idx]
-                    step_text = f"{step.get('step_name','')}\n{step.get('command','')}\n{step.get('response','')}"
-                    cell = ws.cell(row=r, column=col_idx, value=self._sanitize_cell_text(step_text))
-                    cell.number_format='@'
-                    cell.font = normal_font
-                    cell.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left', shrink_to_fit=True)
-                else:
-                    cell = ws.cell(row=r, column=col_idx, value='')
-                    cell = ws.cell(row=r, column=col_idx, value='')
-                    cell.number_format='@'
-                    cell.font = normal_font
-                    cell.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left', shrink_to_fit=True)
-            last_col = 1 + max_chunks
-            for c in range(1, last_col+1):
+                self._add_input_prompt(ws, cell_name, '對應工作表', entry.get('file_name') or '')
+            # PASS步驟數欄
+            pass_count = len(entry.get('pass_items') or [])
+            cell_count = ws.cell(row=r, column=2, value=pass_count)
+            cell_count.font = normal_font
+            cell_count.alignment = center
+            # 測試總時間欄
+            cell_time = ws.cell(row=r, column=3, value=sec_txt)
+            cell_time.font = normal_font
+            cell_time.alignment = center
+            # SFIS欄
+            cell_sfis = ws.cell(row=r, column=4, value=sfis)
+            cell_sfis.font = normal_font
+            cell_sfis.alignment = center
+            for c in range(1, len(headers)+1):
                 ws.cell(row=r, column=c).border = Border(left=thin, right=thin, top=thin, bottom=thin)
         # 外框粗線
         end_r = ws.max_row
-        last_col = 1 + max_chunks
         if end_r >= start_data_row:
-            for c in range(1, last_col+1):
+            for c in range(1, len(headers)+1):
                 ws.cell(row=start_data_row, column=c).border = ws.cell(row=start_data_row, column=c).border.copy(top=thick)
                 ws.cell(row=end_r, column=c).border = ws.cell(row=end_r, column=c).border.copy(bottom=thick)
             for r in range(start_data_row, end_r+1):
                 ws.cell(row=r, column=1).border = ws.cell(row=r, column=1).border.copy(left=thick)
-                ws.cell(row=r, column=last_col).border = ws.cell(row=r, column=last_col).border.copy(right=thick)
+                ws.cell(row=r, column=len(headers)).border = ws.cell(row=r, column=len(headers)).border.copy(right=thick)
         # 表格底部：SHEET 快速連結（點擊跳轉）
         link_title_row = ws.max_row + 2
         ws.cell(row=link_title_row, column=1, value='工作表快速連結（點擊跳轉）').font = Font(name='Microsoft JhengHei', size=11, bold=True)
@@ -339,10 +337,7 @@ class ExcelWriter:
                 self._add_input_prompt(ws, c, '對應工作表', sheet)
             cur += 1
         # 更緊湊的欄寬
-        min_widths = {1: 30}
-        for i in range(2, last_col+1):
-            min_widths[i] = 22
-        self._auto_fit_columns(ws, min_widths=min_widths)
+        self._auto_fit_columns(ws, min_widths={1: 30, 2: 12, 3: 15, 4: 8})
         wb.save(output_path)
 
     def _build_fail_workbook(self, output_path: str, logs: list):
@@ -413,6 +408,8 @@ class ExcelWriter:
                     else:
                         cell.font = Font(name='Microsoft JhengHei', size=11)
                     
+                    # 設定行高以顯示更多文字
+                    ws2.row_dimensions[current_row].height = 25
                     current_row += 1
                 else:
                     current_row += 1
@@ -431,9 +428,17 @@ class ExcelWriter:
             
             # 寫入原始LOG內容，並標記錯誤行
             self._write_raw_log_with_annotations(ws2, start_row=start_row, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=11), step_marks=entry.get('step_marks'))
+            
+            # 設定所有行的行高以顯示更多文字
+            for row_num in range(1, ws2.max_row + 1):
+                if ws2.row_dimensions[row_num].height == 15:  # 預設行高
+                    ws2.row_dimensions[row_num].height = 20
             self._auto_fit_columns(ws2)
         # 在Summary頁面最上面添加錯誤統計
-        self._add_error_statistics(ws, logs)
+        try:
+            self._add_error_statistics(ws, logs)
+        except Exception as e:
+            print(f"添加錯誤統計時發生錯誤: {e}")
         
         # Summary：每個LOG一行，顯示檔名和詳細錯誤原因
         thin = Side(border_style='thin', color='FF888888')
@@ -464,8 +469,8 @@ class ExcelWriter:
                 pass
             if sheet:
                 cell_name.hyperlink = f"#'{sheet}'!A1"
-                # 白底提示
-                self._add_input_prompt(ws, cell_name, '對應工作表', entry.get('file_name') or '')
+            # 白底提示
+            self._add_input_prompt(ws, cell_name, '對應工作表', entry.get('file_name') or '')
             
             # 詳細錯誤原因欄 - 包含主要錯誤和執行指令
             detailed_error = self._build_detailed_error_summary(entry)
@@ -473,6 +478,8 @@ class ExcelWriter:
             cell_reason.number_format='@'
             cell_reason.font = Font(name='Microsoft JhengHei', size=11)
             cell_reason.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left', shrink_to_fit=False)
+            # 設定行高以顯示更多文字
+            ws.row_dimensions[r].height = 120
             
             # 如果錯誤原因包含 "doesn't match"，用特殊格式突出顯示
             if "doesn't match" in detailed_error.lower():
@@ -481,32 +488,32 @@ class ExcelWriter:
             
             for c in range(1, 2+1):
                 ws.cell(row=r, column=c).border = Border(left=thin, right=thin, top=thin, bottom=thin)
-        end_r = ws.max_row
-        if end_r >= start_data_row:
-            for c in range(1, 2+1):
-                ws.cell(row=start_data_row, column=c).border = ws.cell(row=start_data_row, column=c).border.copy(top=thick)
-                ws.cell(row=end_r, column=c).border = ws.cell(row=end_r, column=c).border.copy(bottom=thick)
-            for r in range(start_data_row, end_r+1):
-                ws.cell(row=r, column=1).border = ws.cell(row=r, column=1).border.copy(left=thick)
-                ws.cell(row=r, column=2).border = ws.cell(row=r, column=2).border.copy(right=thick)
-        # 表格底部：SHEET 快速連結
-        link_title_row = ws.max_row + 2
-        ws.cell(row=link_title_row, column=1, value='工作表快速連結（點擊跳轉）').font = Font(name='Microsoft JhengHei', size=10, bold=True)
-        ws.cell(row=link_title_row, column=1).alignment = Alignment(horizontal='left')
-        cur = link_title_row + 1
+            end_r = ws.max_row
+            if end_r >= start_data_row:
+                for c in range(1, 2+1):
+                    ws.cell(row=start_data_row, column=c).border = ws.cell(row=start_data_row, column=c).border.copy(top=thick)
+                    ws.cell(row=end_r, column=c).border = ws.cell(row=end_r, column=c).border.copy(bottom=thick)
+                for r in range(start_data_row, end_r+1):
+                    ws.cell(row=r, column=1).border = ws.cell(row=r, column=1).border.copy(left=thick)
+                    ws.cell(row=r, column=2).border = ws.cell(row=r, column=2).border.copy(right=thick)
+            # 表格底部：SHEET 快速連結
+            link_title_row = ws.max_row + 2
+            ws.cell(row=link_title_row, column=1, value='工作表快速連結（點擊跳轉）').font = Font(name='Microsoft JhengHei', size=10, bold=True)
+            ws.cell(row=link_title_row, column=1).alignment = Alignment(horizontal='left')
+            cur = link_title_row + 1
         
-        # 添加回到Summary的快速連結
-        back_to_summary = ws.cell(row=cur, column=1, value='🔙 回到 Summary 頁面')
-        back_to_summary.number_format='@'
-        back_to_summary.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF008000', underline='single')
-        back_to_summary.alignment = Alignment(horizontal='left')
-        back_to_summary.hyperlink = f"#'Summary'!A1"
-        back_to_summary.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
-        cur += 1
+            # 添加回到Summary的快速連結
+            back_to_summary = ws.cell(row=cur, column=1, value='🔙 回到 Summary 頁面')
+            back_to_summary.number_format='@'
+            back_to_summary.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF008000', underline='single')
+            back_to_summary.alignment = Alignment(horizontal='left')
+            back_to_summary.hyperlink = f"#'Summary'!A1"
+            back_to_summary.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
+            cur += 1
         
-        # 添加分隔線
-        ws.cell(row=cur, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
-        cur += 1
+            # 添加分隔線
+            ws.cell(row=cur, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
+            cur += 1
         
         for entry in logs:
             base = self._sanitize_cell_text(entry.get('file_name') or '')
@@ -530,10 +537,10 @@ class ExcelWriter:
                     c.comment.height = 500
                 except Exception:
                     pass
-                self._add_input_prompt(ws, c, '對應工作表', sheet)
+            self._add_input_prompt(ws, c, '對應工作表', sheet)
             cur += 1
-        self._auto_fit_columns(ws, min_widths={1: 30, 2: 80})
-        wb.save(output_path)
+            self._auto_fit_columns(ws, min_widths={1: 30, 2: 80})
+            wb.save(output_path)
 
     def _write_raw_log_with_annotations(self, ws, start_row: int, raw_lines: list, annotations: list, font: Font, step_marks: dict | None = None):
         color_map = {
@@ -743,28 +750,12 @@ class ExcelWriter:
                         error_counts[clean_error] = error_counts.get(clean_error, 0) + 1
             
             if not error_counts:
+                print("沒有找到錯誤原因，跳過統計")
                 return
             
-            # 在現有內容上方插入錯誤統計
-            # 先將現有內容向下移動
-            max_row = ws.max_row
-            for row in range(max_row, 0, -1):
-                for col in range(1, 3):  # 假設有2欄
-                    cell = ws.cell(row=row, column=col)
-                    if cell.value is not None:
-                        ws.cell(row=row + len(error_counts) + 3, column=col, value=cell.value)
-                        # 複製樣式
-                        if cell.font:
-                            ws.cell(row=row + len(error_counts) + 3, column=col).font = cell.font
-                        if cell.fill:
-                            ws.cell(row=row + len(error_counts) + 3, column=col).fill = cell.fill
-                        if cell.alignment:
-                            ws.cell(row=row + len(error_counts) + 3, column=col).alignment = cell.alignment
-                        if cell.border:
-                            ws.cell(row=row + len(error_counts) + 3, column=col).border = cell.border
-                        # 清除原位置
-                        ws.cell(row=row, column=col).value = None
+            print(f"找到 {len(error_counts)} 種錯誤類型: {list(error_counts.keys())}")
             
+            # 直接在現有內容上方添加錯誤統計，不移動現有內容
             # 添加錯誤統計標題
             title_row = 1
             ws.cell(row=title_row, column=1, value='📊 錯誤原因統計').font = Font(name='Microsoft JhengHei', size=14, bold=True, color='FF0000')
@@ -781,8 +772,12 @@ class ExcelWriter:
             # 添加分隔線
             ws.cell(row=current_row, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
             
+            print(f"錯誤統計已添加到第 {title_row} 到 {current_row} 行")
+            
         except Exception as e:
             print(f"添加錯誤統計時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _extract_main_error_type(self, error_text: str) -> str:
         """從錯誤文字中提取主要錯誤類型"""
@@ -806,6 +801,16 @@ class ExcelWriter:
             # 清理多餘空格
             clean_text = clean_text.strip()
             
+            # 優先提取 "doesn't match" 相關錯誤
+            if "doesn't match" in clean_text.lower():
+                # 尋找 "doesn't match" 後面的內容
+                match_pattern = r"doesn't match\s+([^@\n]+)"
+                match_result = re.search(match_pattern, clean_text, re.IGNORECASE)
+                if match_result:
+                    return f"doesn't match {match_result.group(1).strip()}"
+                else:
+                    return "doesn't match"
+            
             # 提取主要錯誤類型
             if ':' in clean_text:
                 # 格式如 "B7PL011-202:Chec Frimware version is Fail"
@@ -814,6 +819,8 @@ class ExcelWriter:
                     main_part = parts[1].strip()
                     # 移除測試編號前綴
                     main_part = re.sub(r'^[A-Z0-9]+-\d+:', '', main_part)
+                    # 移除行號前綴 (如 "45 [1]" 或 "27 [1]")
+                    main_part = re.sub(r'^\d+\s*\[\d+\]', '', main_part)
                     return main_part.strip()
             
             # 如果沒有冒號，直接返回清理後的文字
