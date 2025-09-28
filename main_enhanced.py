@@ -423,6 +423,8 @@ class EnhancedLogAnalyzerApp:
         # 自動切換到相關Tab
         if fail_items:
             self.notebook.select(self.tab_fail)
+            # 延遲切換到原始LOG標籤頁並聚焦錯誤位置
+            self.root.after(2000, self._switch_to_log_and_focus_error)
         else:
             self.notebook.select(self.tab_pass)
     
@@ -684,14 +686,8 @@ class EnhancedLogAnalyzerApp:
             # 優先提取包含 "is Fail" 的行
             if "is Fail" in clean_line:
                 is_fail_lines.append(clean_line)
-            # 其他包含重要錯誤資訊的行，包含新增的錯誤關鍵字
-            elif any(keyword in clean_line for keyword in [
-                'Result:', 'validation:', 'type of', 'TestTime:', 
-                'ErrorCode:', 'Test Completed', 'Test Aborted', 'TotalCount:', 
-                'Report name:', 'Execute Phase', 'FAIL', 'ERROR', 'NACK',
-                'fail', 'error', 'Wrong', 'Segmentation fault', 'core dumped',
-                'executes fail', "doesn't match", 'timeout', 'exception'
-            ]):
+            # 其他包含重要錯誤資訊的行，使用統一的錯誤關鍵字
+            elif self._is_error_line(clean_line):
                 fail_reason_lines.append(clean_line)
         
         # 優先顯示包含 "is Fail" 的行，然後是其他錯誤資訊
@@ -759,47 +755,111 @@ class EnhancedLogAnalyzerApp:
         
         return "未知錯誤"
     
+    def _is_error_line(self, line):
+        """統一的錯誤行識別邏輯"""
+        if not line:
+            return False
+        
+        line_lower = line.lower()
+        # 統一的錯誤關鍵字列表
+        error_keywords = [
+            'Result:', 'validation:', 'type of', 'TestTime:', 
+            'ErrorCode:', 'Test Completed', 'Test Aborted', 'TotalCount:', 
+            'Report name:', 'Execute Phase', 'FAIL', 'ERROR', 'NACK',
+            'fail', 'error', 'wrong', 'segmentation fault', 'core dumped',
+            'executes fail', "doesn't match", 'timeout', 'exception'
+        ]
+        
+        return any(keyword in line_lower for keyword in error_keywords)
+    
+    def _switch_to_log_and_focus_error(self):
+        """切換到原始LOG標籤頁並聚焦到錯誤位置"""
+        try:
+            # 切換到原始LOG標籤頁
+            self.notebook.select(self.tab_log)
+            
+            # 尋找第一個錯誤行並聚焦
+            if hasattr(self, 'log_text_enhanced') and self.log_text_enhanced:
+                self.log_text_enhanced.focus_first_error_line()
+        except Exception as e:
+            print(f"切換到LOG標籤頁並聚焦錯誤失敗: {e}")
+    
     def _insert_formatted_fail_content(self, content):
-        """插入格式化的FAIL內容，多種錯誤關鍵字用不同顏色標註"""
+        """插入格式化的FAIL內容，顯示所有錯誤"""
+        # 先插入標題
+        self.fail_error_text.insert(tk.END, "===============錯誤原因====================\n", 'error_title')
+        
         lines = content.split('\n')
+        error_lines = []
+        doesnt_match_lines = []
+        
+        # 收集所有錯誤行，特別標記 "doesn't match"
         for line in lines:
             line_lower = line.lower()
             
-            # 檢查不同類型的錯誤並用不同顏色標記
-            if "is Fail" in line:
-                # 主要錯誤：紅色粗體
-                self.fail_error_text.insert(tk.END, line + '\n', 'fail_red')
-            elif any(critical_error in line_lower for critical_error in [
-                'segmentation fault', 'core dumped', 'executes fail', 
-                "doesn't match", 'timeout', 'exception'
-            ]):
-                # 嚴重錯誤：深紅色粗體
-                self.fail_error_text.insert(tk.END, line + '\n', 'critical_error')
-            elif any(error_keyword in line_lower for error_keyword in [
-                'error', 'fail', 'wrong'
-            ]) and not "is Fail" in line:
-                # 一般錯誤關鍵字：橙紅色
-                self.fail_error_text.insert(tk.END, line + '\n', 'error_keyword')
-            elif any(keyword in line_lower for keyword in [
-                'errorcode:', 'test aborted', 'all test aborted'
-            ]):
-                # 錯誤代碼：橙色
-                self.fail_error_text.insert(tk.END, line + '\n', 'error_code')
-            elif any(keyword in line_lower for keyword in [
-                '(lan) >', '(uart) >', 'run ', 'execute'
-            ]):
-                # 執行的指令：藍色
-                self.fail_error_text.insert(tk.END, line + '\n', 'command')
-            else:
-                # 一般內容：黑色
-                self.fail_error_text.insert(tk.END, line + '\n')
+            # 檢查不同類型的錯誤
+            if ("is Fail" in line or 
+                any(critical_error in line_lower for critical_error in [
+                    'segmentation fault', 'core dumped', 'executes fail', 
+                    "doesn't match", 'timeout', 'exception'
+                ]) or
+                any(error_keyword in line_lower for error_keyword in [
+                    'error', 'fail', 'wrong'
+                ]) or
+                any(keyword in line_lower for keyword in [
+                    'errorcode:', 'test aborted', 'all test aborted'
+                ])):
+                error_lines.append(line)
+                
+                # 特別標記 "doesn't match" 相關行
+                if "doesn't match" in line_lower:
+                    doesnt_match_lines.append(line)
+        
+        # 優先顯示 "doesn't match" 錯誤
+        if doesnt_match_lines:
+            self.fail_error_text.insert(tk.END, "\n🔴 突出錯誤 (doesn't match):\n", 'highlight_title')
+            for line in doesnt_match_lines:
+                self.fail_error_text.insert(tk.END, line + '\n', 'doesnt_match_error')
+            self.fail_error_text.insert(tk.END, "\n" + "=" * 50 + "\n\n", 'separator')
+        
+        # 顯示所有其他錯誤行
+        for line in error_lines:
+            if line not in doesnt_match_lines:  # 避免重複顯示
+                line_lower = line.lower()
+                
+                # 檢查不同類型的錯誤並用不同顏色標記
+                if "is Fail" in line:
+                    # 主要錯誤：紅色粗體
+                    self.fail_error_text.insert(tk.END, line + '\n', 'fail_red')
+                elif any(critical_error in line_lower for critical_error in [
+                    'segmentation fault', 'core dumped', 'executes fail', 
+                    'timeout', 'exception'
+                ]):
+                    # 嚴重錯誤：深紅色粗體
+                    self.fail_error_text.insert(tk.END, line + '\n', 'critical_error')
+                elif any(error_keyword in line_lower for error_keyword in [
+                    'error', 'fail', 'wrong'
+                ]) and not "is Fail" in line:
+                    # 一般錯誤關鍵字：橙紅色
+                    self.fail_error_text.insert(tk.END, line + '\n', 'error_keyword')
+                elif any(keyword in line_lower for keyword in [
+                    'errorcode:', 'test aborted', 'all test aborted'
+                ]):
+                    # 錯誤代碼：橙色
+                    self.fail_error_text.insert(tk.END, line + '\n', 'error_code')
+                else:
+                    # 其他錯誤：紅色
+                    self.fail_error_text.insert(tk.END, line + '\n', 'fail_red')
         
         # 設定不同的文字標籤樣式
+        self.fail_error_text.tag_configure('error_title', foreground='red', font=('Arial', 14, 'bold'))
+        self.fail_error_text.tag_configure('highlight_title', foreground='darkred', font=('Arial', 12, 'bold'))
+        self.fail_error_text.tag_configure('doesnt_match_error', foreground='darkred', font=('Consolas', 12, 'bold'), background='#FFE6E6')
+        self.fail_error_text.tag_configure('separator', foreground='gray', font=('Consolas', 10))
         self.fail_error_text.tag_configure('fail_red', foreground='red', font=('Consolas', 12, 'bold'))
         self.fail_error_text.tag_configure('critical_error', foreground='darkred', font=('Consolas', 12, 'bold'))
         self.fail_error_text.tag_configure('error_keyword', foreground='orangered', font=('Consolas', 11, 'bold'))
         self.fail_error_text.tag_configure('error_code', foreground='darkorange', font=('Consolas', 11, 'bold'))
-        self.fail_error_text.tag_configure('command', foreground='blue', font=('Consolas', 10))
     
     def _apply_font_size(self):
         """套用字體大小"""

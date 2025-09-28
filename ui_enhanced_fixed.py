@@ -279,7 +279,9 @@ class EnhancedTreeview:
                         self._hover_text.insert('1.0', "🔴 錯誤原因:\n", 'error_title')
                         self._hover_text.insert(tk.END, error_reason + "\n\n", 'error_content')
                         self._hover_text.insert(tk.END, "📋 完整內容:\n", 'full_title')
-                        self._hover_text.insert(tk.END, content, 'normal_content')
+                        # 為完整內容中的錯誤行添加背景色
+                        formatted_content = self._format_content_with_error_highlighting(content)
+                        self._hover_text.insert(tk.END, formatted_content, 'normal_content')
                     else:
                         self._hover_text.insert('1.0', content)
                 else:
@@ -312,9 +314,9 @@ class EnhancedTreeview:
         text = tk.Text(frame, wrap=tk.NONE, font=('Consolas', self.font_size))
         
         # 設定文字標籤樣式
-        text.tag_configure('error_title', foreground='red', font=('Consolas', self.font_size, 'bold'))
-        text.tag_configure('error_content', foreground='darkred', font=('Consolas', self.font_size, 'bold'))
-        text.tag_configure('full_title', foreground='blue', font=('Consolas', self.font_size, 'bold'))
+        text.tag_configure('error_title', foreground='red', font=('Consolas', self.font_size, 'bold'), background='#FFFF99')
+        text.tag_configure('error_content', foreground='darkred', font=('Consolas', self.font_size, 'bold'), background='#FFFF99')
+        text.tag_configure('full_title', foreground='blue', font=('Consolas', self.font_size, 'bold'), background='#FFFF99')
         text.tag_configure('normal_content', foreground='black')
         
         # 垂直滾動條 - 做大一點，靠近文字區
@@ -1359,6 +1361,40 @@ class EnhancedTreeview:
         
         return ""
     
+    def _format_content_with_error_highlighting(self, content):
+        """為內容中的錯誤行添加背景色標記"""
+        if not content:
+            return content
+        
+        lines = content.split('\n')
+        formatted_lines = []
+        
+        for line in lines:
+            line_lower = line.lower()
+            # 檢查是否包含錯誤關鍵字
+            if self._is_error_line(line) or 'is fail' in line_lower or 'is failed' in line_lower:
+                # 為錯誤行添加背景色標記
+                formatted_lines.append(f"🔴 {line}")
+            else:
+                formatted_lines.append(line)
+        
+        return '\n'.join(formatted_lines)
+    
+    def _is_error_line(self, line):
+        """統一的錯誤行識別邏輯"""
+        if not line:
+            return False
+        
+        line_lower = line.lower()
+        # 統一的錯誤關鍵字列表
+        error_keywords = [
+            'segmentation fault', 'core dumped', 'executes fail', 
+            "doesn't match", 'timeout', 'exception', 'wrong',
+            'fail', 'error', 'nack'
+        ]
+        
+        return any(keyword in line_lower for keyword in error_keywords)
+    
     def _copy_to_clipboard(self, content):
         """複製內容到剪貼板"""
         try:
@@ -1693,6 +1729,9 @@ class EnhancedText:
     
     def setup_tags(self):
         """設定文字標籤樣式"""
+        # 行號樣式
+        self.text.tag_configure('line_number', foreground='gray', font=('Consolas', 9))
+        
         # Step區段背景色
         self.text.tag_configure('step_bg_1', background='#E8F4FD')  # 淺藍
         self.text.tag_configure('step_bg_2', background='#F0E8FF')  # 淺紫
@@ -1782,7 +1821,18 @@ class EnhancedText:
         else:
             # 從頭開始搜尋
             self.search_index = '1.0'
-            self._find_next()
+            # 避免遞歸調用，直接搜尋
+            search_text = self.search_var.get()
+            if search_text:
+                pos = self.text.search(search_text, '1.0', stopindex=tk.END)
+                if pos:
+                    end_pos = f"{pos}+{len(search_text)}c"
+                    self.text.tag_add('search_highlight', pos, end_pos)
+                    self.text.see(pos)
+                    self.text.mark_set(tk.INSERT, pos)
+                    self.search_index = end_pos
+                else:
+                    messagebox.showinfo("搜尋結果", f"未找到 '{search_text}'")
     
     def _find_prev(self):
         """尋找上一個"""
@@ -1857,6 +1907,9 @@ class EnhancedText:
         self.text.delete('1.0', tk.END)
         self.step_positions.clear()
         
+        if not log_content:
+            return
+            
         lines = log_content.split('\n')
         current_step = None
         step_counter = 0
@@ -1864,6 +1917,11 @@ class EnhancedText:
         
         for i, line in enumerate(lines):
             line_start = self.text.index(tk.INSERT)
+            line_number = i + 1
+            
+            # 插入行號
+            self.text.insert(tk.INSERT, f"{line_number:4d} ")
+            self.text.tag_add('line_number', line_start, self.text.index(tk.INSERT))
             
             # 檢查是否為新的step
             step_match = re.search(r'Do @STEP\d+@([^@\n]+)', line)
@@ -1918,7 +1976,7 @@ class EnhancedText:
             
             # 檢查其他錯誤關鍵字
             line_lower = line.lower()
-            if any(error_keyword in line_lower for error_keyword in [
+            if any(critical_error in line_lower for critical_error in [
                 'segmentation fault', 'core dumped', 'executes fail', 
                 "doesn't match", 'timeout', 'exception', 'wrong'
             ]):
@@ -1943,6 +2001,28 @@ class EnhancedText:
         end_pos = f"{end_line}.end"
         self.text.tag_add('error_block', start_pos, end_pos)
         self.text.see(start_pos)
+    
+    def focus_first_error_line(self):
+        """聚焦到第一個錯誤行"""
+        try:
+            # 獲取所有文字內容
+            content = self.text.get('1.0', tk.END)
+            lines = content.split('\n')
+            
+            # 尋找第一個包含錯誤關鍵字的行
+            for i, line in enumerate(lines):
+                line_lower = line.lower()
+                if (any(critical_error in line_lower for critical_error in [
+                    'segmentation fault', 'core dumped', 'executes fail', 
+                    "doesn't match", 'timeout', 'exception', 'wrong'
+                ]) or 'is fail' in line_lower or 'is failed' in line_lower):
+                    # 跳轉到該行
+                    line_num = i + 1
+                    self.text.see(f"{line_num}.0")
+                    self.text.mark_set(tk.INSERT, f"{line_num}.0")
+                    break
+        except Exception as e:
+            print(f"聚焦錯誤行失敗: {e}")
 
 class FailDetailsPanel:
     """FAIL詳細資訊面板"""
