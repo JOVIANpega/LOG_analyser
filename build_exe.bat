@@ -36,7 +36,7 @@ REM 使用PyInstaller打包（包含圖示）
 echo 正在執行PyInstaller...
 pyinstaller --onefile ^
     --noconsole ^
-    --name="PEGA_Log_Analyzer_V1.7.8" ^
+    --name="PEGA_Log_Analyzer_V1.7.9" ^
     --icon=assets/icon.ico ^
     --version-file=assets/version_info.txt ^
     --add-data="assets;assets" ^
