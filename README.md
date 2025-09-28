@@ -213,5 +213,49 @@ pyinstaller --onefile --noconsole --icon=assets/icon.ico --name="PEGA_Log_Analyz
   - 新增「查看說明 (README)」按鈕，內嵌顯示 `docs/README.md`
   - 改良字體縮放保留粗體樣式
 
+## 專案結構
+
+### 核心檔案
+- `main.py` - 主程式入口
+- `main_enhanced.py` - 增強版 GUI
+- `log_parser.py` - LOG 解析器
+- `excel_writer.py` - Excel 匯出
+- `ui_components.py` - UI 元件
+- `ui_enhanced_fixed.py` - 增強版 UI 元件
+- `enhanced_left_panel.py` - 左側面板
+- `enhanced_settings.py` - 設定頁面
+- `settings_loader.py` - 設定載入器
+
+### 配置檔案
+- `build_exe.bat` - 打包腳本
+- `requirements.txt` - 依賴套件
+- `settings.json` - 設定檔
+- `SIGN.txt` - 加密驗證檔案
+
+### 資源檔案
+- `assets/` - 圖示與版本資訊
+- `docs/` - 使用者文件
+- `dist/` - 打包輸出目錄
+
+### 備份目錄
+- `BACKUP_DEL/` - 所有用不到的檔案（開發測試檔案、舊版文件、建置目錄等）
+
+## 檔案清理記錄
+
+### V1.7.9 檔案整理
+- 將用不到的檔案集中移到 `BACKUP_DEL/` 資料夾
+- 清理專案結構，保留核心檔案
+- 移除開發測試檔案和快取目錄
+- 統一備份檔案管理
+
+### 已移動到 BACKUP_DEL 的檔案
+- `main_enhanced_fixed.py` - 測試版本
+- `generate_documentation.py` - 文件生成工具
+- `PEGA_Log_Analyzer_V1.7.9.spec` - PyInstaller 規格檔
+- `build/` - PyInstaller 建置目錄
+- `MINE/` - 測試檔案與資料
+- `dioc/` - 舊版文件目錄
+- `__pycache__/` - Python 快取目錄（已刪除）
+
 ## 授權
 此專案授權方式若未特別標註，預設為公司/個人內部使用。若需對外開放，請補充授權條款（LICENSE）。
