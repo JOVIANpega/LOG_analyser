@@ -49,6 +49,7 @@ class EnhancedLogAnalyzerApp:
         # 狀態變數
         self.current_mode = 'single'
         self.current_log_path = ''
+        self.temp_cleanup_path = None  # 壓縮檔解壓縮的暫存路徑
         
         # 建立UI
         self._build_enhanced_ui()
@@ -84,6 +85,9 @@ class EnhancedLogAnalyzerApp:
             print("設定已保存")
         except Exception as e:
             print(f"保存設定失敗: {e}")
+        
+        # 清理壓縮檔解壓縮的暫存檔案
+        self._cleanup_temp_files()
         
         self.root.destroy()
     
@@ -476,6 +480,48 @@ class EnhancedLogAnalyzerApp:
                 if file.lower().endswith('.log'):
                     log_files.append(os.path.join(root, file))
         return log_files
+    
+    def _cleanup_temp_files(self):
+        """清理壓縮檔解壓縮的暫存檔案"""
+        import shutil
+        try:
+            if hasattr(self, 'temp_cleanup_path') and self.temp_cleanup_path:
+                if os.path.exists(self.temp_cleanup_path):
+                    shutil.rmtree(self.temp_cleanup_path, ignore_errors=True)
+                    print(f"已清理暫存目錄: {self.temp_cleanup_path}")
+                self.temp_cleanup_path = None
+        except Exception as e:
+            print(f"清理暫存檔案時發生錯誤: {e}")
+    
+    def _clear_enhanced_results(self):
+        """清除分析結果並清理暫存檔案"""
+        try:
+            # 清理壓縮檔解壓縮的暫存檔案
+            self._cleanup_temp_files()
+            
+            # 清除當前選擇的路徑
+            self.current_log_path = ''
+            self.current_mode = 'single'
+            
+            # 清除 UI 顯示
+            if hasattr(self, 'file_info_label'):
+                self.file_info_label.config(text="尚未選擇檔案", fg='gray')
+            
+            # 清除分頁內容
+            if hasattr(self, 'pass_tree'):
+                for item in self.pass_tree.get_children():
+                    self.pass_tree.delete(item)
+            
+            if hasattr(self, 'fail_tree'):
+                for item in self.fail_tree.get_children():
+                    self.fail_tree.delete(item)
+            
+            if hasattr(self, 'raw_text'):
+                self.raw_text.delete(1.0, tk.END)
+            
+            print("已清除所有結果")
+        except Exception as e:
+            print(f"清除結果時發生錯誤: {e}")
     
     def _analyze_enhanced_log(self):
         """分析log檔案並更新增強版GUI顯示"""

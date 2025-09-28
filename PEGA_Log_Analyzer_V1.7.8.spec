@@ -3,12 +3,16 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('assets', 'assets'), ('docs', 'docs'), ('settings.json', '.')]
 binaries = []
-hiddenimports = ['tkinter', 'tkinter.ttk', 'tkinter.messagebox', 'tkinter.filedialog', 'tkinter.scrolledtext', 'openpyxl', 'pandas', 'xlrd', 're', 'json', 'os', 'sys', 'datetime', 'threading', 'webbrowser', 'settings_loader', 'log_parser', 'ui_components', 'ui_enhanced_fixed', 'enhanced_settings', 'enhanced_left_panel', 'excel_writer', 'generate_documentation']
+hiddenimports = ['tkinter', 'tkinter.ttk', 'tkinter.messagebox', 'tkinter.filedialog', 'tkinter.scrolledtext', 'openpyxl', 'pandas', 'xlrd', 're', 'json', 'os', 'sys', 'datetime', 'threading', 'webbrowser', 'settings_loader', 'log_parser', 'ui_components', 'ui_enhanced_fixed', 'enhanced_settings', 'enhanced_left_panel', 'excel_writer', 'generate_documentation', 'py7zr', 'rarfile']
 tmp_ret = collect_all('pandas')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('openpyxl')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('xlrd')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('py7zr')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('rarfile')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
@@ -33,7 +37,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='PEGA_Log_Analyzer_V1.7.1',
+    name='PEGA_Log_Analyzer_V1.7.8',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
