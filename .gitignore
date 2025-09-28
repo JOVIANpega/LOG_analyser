@@ -1,0 +1,26 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# PyInstaller build directories
+build/
+build_*/
+
+dist/
+dist_*/
+
+# Virtual env
+venv/
+.env/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and large local data
+MINE/FUNCTION_LOG/
+MINE/LOG/
+
+# Notebook checkpoints
+.ipynb_checkpoints/ 
