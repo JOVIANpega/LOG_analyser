@@ -986,10 +986,10 @@ class ExcelWriter:
             for entry in logs:
                 main_error = (entry.get('summary') or {}).get('FAIL原因', '')
                 if main_error:
-                    # 清理錯誤原因，提取主要部分
-                    clean_error = self._extract_main_error_type(main_error)
-                    if clean_error:
-                        error_counts[clean_error] = error_counts.get(clean_error, 0) + 1
+                    # 清理錯誤原因，提取主要部分（標準化群組鍵）
+                    group_key = self._normalize_error_group(main_error)
+                    if group_key:
+                        error_counts[group_key] = error_counts.get(group_key, 0) + 1
             
             if not error_counts:
                 print("沒有找到錯誤原因，跳過統計")
@@ -1020,6 +1020,36 @@ class ExcelWriter:
             print(f"添加錯誤統計時發生錯誤: {e}")
             import traceback
             traceback.print_exc()
+
+    def _normalize_error_group(self, error_text: str) -> str:
+        """將錯誤字串標準化為群組鍵，用於彙總相似錯誤。
+        規則：
+        - 先抽出主要錯誤片段（沿用 _extract_main_error_type）
+        - 若包含冒號（如 B7PL011-202:TRY_TEXT is Fail），去除編號僅保留冒號後文本
+        - 若包含 "is Fail"，統一裁切為『... is Fail』
+        - 全部忽略多餘空白與大小寫（但回傳時維持原始大小寫格式）
+        """
+        try:
+            base = self._extract_main_error_type(error_text) or error_text or ''
+            s = str(base).strip()
+            # 去除前置代碼（XXXX-123: 或 XXXX:）
+            import re
+            if ':' in s:
+                parts = s.split(':', 1)
+                # 若冒號後為主要內容，採用它
+                s = parts[1].strip() or s
+            # 對 "is Fail" 做標準化，只取到 is Fail 結尾
+            m = re.search(r'(.+?\bis\s*Fail)\b', s, flags=re.IGNORECASE)
+            if m:
+                s = m.group(1)
+            # 移除多餘空白
+            s = re.sub(r'\s+', ' ', s).strip()
+            # 標準化大小寫（回傳人類可讀格式）
+            # 盡量保留原樣，僅確保 Fail 大寫
+            s = re.sub(r'\bis\s*fail\b', 'is Fail', s, flags=re.IGNORECASE)
+            return s
+        except Exception:
+            return (error_text or '').strip()
     
     def _build_pass_steps_summary(self, pass_items: list) -> str:
         """建立 PASS 步驟摘要，以簡潔格式列出所有完成的步驟"""

@@ -58,6 +58,9 @@ class EnhancedLogAnalyzerApp:
         self.current_mode = 'single'
         self.current_log_path = ''
         self.temp_cleanup_path = None  # 壓縮檔解壓縮的暫存路徑
+        self._progress_win = None      # 背景處理進度窗
+        self._cancel_flag = False      # 取消旗標
+        self._search_cache = {'text': '', 'count': 0}
         
         # 建立UI
         self._build_enhanced_ui()
@@ -134,8 +137,9 @@ class EnhancedLogAnalyzerApp:
         except Exception as e:
             print(f"保存設定失敗: {e}")
         
-        # 清理壓縮檔解壓縮的暫存檔案
-        self._cleanup_temp_files()
+        # 設定取消旗標並背景清理暫存檔案，避免關閉卡頓
+        self._cancel_flag = True
+        self._cleanup_temp_files_async()
         
         self.root.destroy()
     
@@ -456,8 +460,18 @@ class EnhancedLogAnalyzerApp:
             # 先清除現有結果
             self._clear_enhanced_results()
             
-            # 處理壓縮檔案
-            self._process_compressed_file(file_path)
+            # 背景處理壓縮檔案
+            self._show_progress("正在處理壓縮檔", os.path.basename(file_path))
+            def _bg():
+                try:
+                    if self._cancel_flag:
+                        return
+                    # 先用不顯示百分比的解壓（大小未知）
+                    self._process_compressed_file(file_path)
+                finally:
+                    self.root.after(0, self._close_progress)
+            import threading
+            threading.Thread(target=_bg, daemon=True).start()
 
     def _select_compressed_folder(self):
         """選擇並處理含多個壓縮檔的資料夾（支援多層與內嵌壓縮）"""
@@ -477,70 +491,146 @@ class EnhancedLogAnalyzerApp:
         # 先清除現有結果
         self._clear_enhanced_results()
         
-        temp_dir = None
-        try:
-            # 建立總暫存目錄
-            temp_dir = tempfile.mkdtemp(prefix="log_archives_")
-            extracted_root = os.path.join(temp_dir, "extracted")
-            os.makedirs(extracted_root, exist_ok=True)
-            
-            archives = []
-            for root, dirs, files in os.walk(folder_path):
-                for fn in files:
-                    if self._is_archive_file(fn):
-                        archives.append(os.path.join(root, fn))
-            
-            if not archives:
-                messagebox.showwarning("提示", "資料夾中未找到支援的壓縮檔 (.zip/.7z/.rar)")
-                return
-            
-            # 逐一解壓到各自子目錄
-            for idx, apath in enumerate(archives, 1):
-                base = os.path.splitext(os.path.basename(apath))[0]
-                target = os.path.join(extracted_root, f"{idx:03d}_{base}")
-                os.makedirs(target, exist_ok=True)
-                try:
-                    self._extract_archive(apath, target)
-                except Exception as e:
-                    print(f"解壓失敗（略過）：{apath} -> {e}")
-                    continue
+        # 讓使用者挑選要處理的壓縮檔
+        archives = []
+        for root, dirs, files in os.walk(folder_path):
+            for fn in files:
+                if self._is_archive_file(fn):
+                    archives.append(os.path.join(root, fn))
+        if not archives:
+            messagebox.showwarning("提示", "資料夾中未找到支援的壓縮檔 (.zip/.7z/.rar)")
+            return
+        self._show_archive_preview(archives)
+        selected_archives = self._choose_archives_dialog(archives)
+        if not selected_archives:
+            return
+
+        # 背景處理整個壓縮資料夾
+        self._show_progress("正在處理壓縮資料夾 (多選)", folder_path)
+        def _bg():
+            import tempfile, shutil
+            temp_dir = None
+            try:
+                if self._cancel_flag:
+                    return
+                # 建立總暫存目錄
+                temp_dir = tempfile.mkdtemp(prefix="log_archives_")
+                extracted_root = os.path.join(temp_dir, "extracted")
+                os.makedirs(extracted_root, exist_ok=True)
                 
-                # 展開內嵌壓縮
-                try:
-                    self._extract_all_archives(target, max_depth=5)
-                except Exception as e:
-                    print(f"內嵌解壓失敗（略過）：{apath} -> {e}")
-            
-            # 搜尋所有 .log
-            log_files = self._find_log_files(extracted_root)
-            if not log_files:
-                messagebox.showwarning("警告", "壓縮資料夾展開後未找到 .log 檔案")
-                return
-            
-            # 多於1個一律走多檔整理
-            if len(log_files) == 1:
-                self.current_mode = 'single'
-                self.current_log_path = log_files[0]
-                filename = os.path.basename(log_files[0])
-                self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮資料夾)", fg='orange')
-            else:
-                self.current_mode = 'multi'
-                self.current_log_path = extracted_root
-                self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮資料夾)", fg='orange')
-            
-            # 記錄路徑
-            self.settings['last_compressed_folder'] = folder_path
-            self._save_settings_silent()
-            
-            # 分析
-            self._analyze_enhanced_log()
-            
-            # 註冊清理
-            self.temp_cleanup_path = temp_dir
+                # 逐一解壓到各自子目錄（顯示百分比）
+                total = len(selected_archives)
+                self.root.after(0, lambda: self._progress_set_determinate(total))
+                for idx, apath in enumerate(selected_archives, 1):
+                    if self._cancel_flag:
+                        return
+                    base = os.path.splitext(os.path.basename(apath))[0]
+                    target = os.path.join(extracted_root, f"{idx:03d}_{base}")
+                    os.makedirs(target, exist_ok=True)
+                    try:
+                        self._update_progress(f"解壓中 {idx}/{total}: {os.path.basename(apath)}")
+                        self._extract_archive(apath, target)
+                        self._extract_all_archives(target, max_depth=5)
+                    except Exception as e:
+                        print(f"解壓失敗（略過）：{apath} -> {e}")
+                        continue
+                    # 更新進度百分比
+                    self.root.after(0, lambda i=idx, n=total: self._progress_set_value(i, n))
+                
+                # 搜尋所有 .log
+                log_files = self._find_log_files(extracted_root)
+                if not log_files:
+                    self.root.after(0, lambda: messagebox.showwarning("警告", "壓縮資料夾展開後未找到 .log 檔案"))
+                    return
+                
+                def _apply_result():
+                    if len(log_files) == 1:
+                        self.current_mode = 'single'
+                        self.current_log_path = log_files[0]
+                        filename = os.path.basename(log_files[0])
+                        self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮資料夾)", fg='orange')
+                    else:
+                        self.current_mode = 'multi'
+                        self.current_log_path = extracted_root
+                        self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮資料夾)", fg='orange')
+                    self.settings['last_compressed_folder'] = folder_path
+                    self._save_settings_silent()
+                    self._analyze_enhanced_log()
+                self.temp_cleanup_path = temp_dir
+                self.root.after(0, _apply_result)
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\n{e}"))
+                if temp_dir and os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+            finally:
+                self.root.after(0, self._close_progress)
+        import threading
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _show_archive_preview(self, archives: list):
+        """在頂部資訊區顯示即將處理的壓縮檔清單（僅預覽）"""
+        try:
+            lines = ["將處理以下壓縮檔：", ""]
+            max_show = 30
+            for i, p in enumerate(sorted(archives)[:max_show], 1):
+                lines.append(f"  • {os.path.basename(p)}")
+            if len(archives) > max_show:
+                lines.append(f"... 其餘 {len(archives) - max_show} 個未列出")
+            text = "\n".join(lines)
+            if hasattr(self, 'file_info_label'):
+                self.file_info_label.config(text=text, justify='left', wraplength=420, fg='#333')
         except Exception as e:
-            messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\n{e}")
-            if temp_dir and os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir, ignore_errors=True)
+            print(f"顯示壓縮檔預覽失敗: {e}")
+
+    def _choose_archives_dialog(self, archives: list) -> list:
+        """彈出多選對話框，讓使用者挑選要處理的壓縮檔。回傳選中的清單。"""
+        try:
+            win = tk.Toplevel(self.root)
+            win.title("選擇要處理的壓縮檔")
+            win.geometry("520x420")
+            win.transient(self.root)
+            win.grab_set()
+            frm = tk.Frame(win)
+            frm.pack(fill=tk.BOTH, expand=1, padx=10, pady=10)
+            lbl = tk.Label(frm, text="請勾選要處理的壓縮檔：")
+            lbl.pack(anchor='w')
+            lb_frame = tk.Frame(frm)
+            lb_frame.pack(fill=tk.BOTH, expand=1)
+            canvas = tk.Canvas(lb_frame)
+            vsb = tk.Scrollbar(lb_frame, orient="vertical", command=canvas.yview)
+            inner = tk.Frame(canvas)
+            inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+            canvas.create_window((0,0), window=inner, anchor='nw')
+            canvas.configure(yscrollcommand=vsb.set)
+            canvas.pack(side="left", fill="both", expand=True)
+            vsb.pack(side="right", fill="y")
+
+            vars_ = []
+            for p in sorted(archives):
+                var = tk.BooleanVar(value=True)
+                cb = tk.Checkbutton(inner, text=os.path.basename(p), variable=var, anchor='w', justify='left')
+                cb.pack(fill=tk.X, anchor='w')
+                vars_.append((var, p))
+
+            btns = tk.Frame(frm)
+            btns.pack(fill=tk.X, pady=8)
+            selected = []
+            def on_ok():
+                nonlocal selected
+                selected = [p for (v,p) in vars_ if v.get()]
+                win.destroy()
+            def on_cancel():
+                selected.clear()
+                win.destroy()
+            tk.Button(btns, text="全選", command=lambda: [v.set(True) for v,_ in vars_]).pack(side=tk.LEFT)
+            tk.Button(btns, text="全不選", command=lambda: [v.set(False) for v,_ in vars_]).pack(side=tk.LEFT, padx=6)
+            tk.Button(btns, text="確定", command=on_ok).pack(side=tk.RIGHT)
+            tk.Button(btns, text="取消", command=on_cancel).pack(side=tk.RIGHT, padx=6)
+            win.wait_window()
+            return selected
+        except Exception as e:
+            print(f"選擇壓縮檔對話框失敗: {e}")
+            return archives
 
     def _process_compressed_file(self, compressed_path):
         """處理壓縮檔案"""
@@ -697,6 +787,95 @@ class EnhancedLogAnalyzerApp:
                 self.temp_cleanup_path = None
         except Exception as e:
             print(f"清理暫存檔案時發生錯誤: {e}")
+
+    def _cleanup_temp_files_async(self):
+        """在背景執行暫存清理，避免關閉視窗時卡頓"""
+        try:
+            import threading, os
+            path = getattr(self, 'temp_cleanup_path', None)
+            if not path or not os.path.exists(path):
+                return
+            def _bg():
+                try:
+                    self._cleanup_temp_files()
+                except Exception as e:
+                    print(f"背景清理失敗: {e}")
+            threading.Thread(target=_bg, daemon=True).start()
+        except Exception as e:
+            print(f"啟動背景清理失敗: {e}")
+
+    # ===== 背景處理與進度 =====
+    def _show_progress(self, title: str, message: str = ""):
+        try:
+            if self._progress_win and self._progress_win.winfo_exists():
+                return
+            win = tk.Toplevel(self.root)
+            win.title(title)
+            win.geometry("420x140")
+            win.transient(self.root)
+            win.grab_set()
+            frame = tk.Frame(win)
+            frame.pack(fill=tk.BOTH, expand=1, padx=12, pady=12)
+            lbl = tk.Label(frame, text=message or title, anchor='w', justify='left')
+            lbl.pack(fill=tk.X)
+            from tkinter import ttk as _ttk
+            bar = _ttk.Progressbar(frame, mode='indeterminate')
+            bar.pack(fill=tk.X, pady=10)
+            bar.start(12)
+            def on_cancel():
+                self._cancel_flag = True
+                lbl.config(text="正在取消，請稍候…")
+            btn = tk.Button(frame, text="取消", command=on_cancel)
+            btn.pack(pady=(4,0))
+            self._progress_win = win
+            self._progress_label = lbl
+            self._progress_bar = bar
+        except Exception as e:
+            print(f"顯示進度窗失敗: {e}")
+
+    def _update_progress(self, text: str):
+        try:
+            if self._progress_win and self._progress_win.winfo_exists():
+                self._progress_label.config(text=text)
+        except Exception:
+            pass
+
+    def _close_progress(self):
+        try:
+            if self._progress_win and self._progress_win.winfo_exists():
+                self._progress_win.destroy()
+        except Exception:
+            pass
+        self._progress_win = None
+        self._cancel_flag = False
+
+    def _progress_set_determinate(self, maximum: int):
+        """將進度條切換為可顯示百分比的 determinate 模式"""
+        try:
+            from tkinter import ttk as _ttk
+            if not (self._progress_win and self._progress_win.winfo_exists()):
+                return
+            try:
+                self._progress_bar.stop()
+            except Exception:
+                pass
+            self._progress_bar.configure(mode='determinate', maximum=max(1, int(maximum)))
+            self._progress_bar['value'] = 0
+        except Exception as e:
+            print(f"設定 determinate 進度失敗: {e}")
+
+    def _progress_set_value(self, current: int, total: int):
+        try:
+            if not (self._progress_win and self._progress_win.winfo_exists()):
+                return
+            total = max(1, int(total))
+            current = min(max(0, int(current)), total)
+            self._progress_bar['value'] = current
+            percent = int(current * 100 / total)
+            self._progress_label.config(text=f"正在分析... {percent}%")
+            self._progress_win.update_idletasks()
+        except Exception:
+            pass
     
     def _clear_enhanced_results(self):
         """清除分析結果並清理暫存檔案"""

@@ -1,7 +1,7 @@
 {
   "ui_font_size": 11,
   "content_font_size": 10,
-  "last_log_path": "M:/PYTHON/LOG_analyser-main/MINE/LOG/1+Funtion-WE253100001-20250807091554-IPIO009-0580.log",
+  "last_log_path": "M:/PYTHON/LOG_analyser-main/MINE/LOG/1+Funtion-WE253100002-20250807091001-PASS.log",
   "last_folder_path": "M:/PYTHON/LOG_analyser-main/MINE/LOG/test_log",
   "window_width": 1536,
   "window_height": 801,
@@ -11,6 +11,6 @@
   "auto_analyze": true,
   "remember_path": true,
   "version": "V1.8.0",
-  "last_compressed_path": "M:/PYTHON/LOG_analyser-main/MINE/蒐集LOG/ZIP LOG/ZIP LOG.7z",
+  "last_compressed_path": "M:/PYTHON/LOG_analyser-main/MINE/蒐集LOG/ZIP LOG/20250926082833_iPLAS_TEMP_WE253600014.zip",
   "last_compressed_folder": "M:/PYTHON/LOG_analyser-main/MINE/蒐集LOG/ZIP LOG"
 }

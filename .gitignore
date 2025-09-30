@@ -3,10 +3,16 @@ __pycache__/
 *.pyc
 *.pyo
 
+__pycache__/
+MINE/
+*.exe
+*.7z
+
+
+
 # PyInstaller build directories
 build/
 build_*/
-
 dist/
 dist_*/
 
