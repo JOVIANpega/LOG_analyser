@@ -85,7 +85,7 @@ def build_left_panel(parent, app):
 
     # 壓縮資料夾選擇（批次遞迴展開）
     btn_compressed_folder = tk.Button(file_frame, text="🗃️ 讀取多個壓縮檔", 
-                                     command=app._select_compressed_folder, bg='#FB8C00', fg='white')
+                                     command=app._select_compressed_folder, bg='#9C27B0', fg='white')
     btn_compressed_folder.pack(fill=tk.X, pady=2)
     app.font_scaler.register(btn_compressed_folder)
     _create_tooltip(btn_compressed_folder, "選擇含多個壓縮檔的資料夾\n可勾選要處理的壓縮檔，支援多層嵌套")

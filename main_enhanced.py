@@ -2444,23 +2444,25 @@ class EnhancedLogAnalyzerApp:
             print(f"自動調整文字視窗大小失敗: {e}")
 
     def _show_open_folder_prompt(self, out_dir: str, total_files: int, pass_count: int, fail_count: int, pass_path: str, fail_path: str):
-        """白底視窗，僅問題段落以黃底黑字反白"""
+        """白底視窗，加入打勾選項選擇要開啟的檔案"""
         win = tk.Toplevel(self.root)
         win.title("匯出完成")
-        win.geometry("700x300")
+        win.geometry("700x400")
         
         # 讓視窗居中顯示
         win.transient(self.root)
         win.grab_set()
         win.update_idletasks()
         x = (win.winfo_screenwidth() // 2) - (700 // 2)
-        y = (win.winfo_screenheight() // 2) - (300 // 2)
-        win.geometry(f"700x300+{x}+{y}")
+        y = (win.winfo_screenheight() // 2) - (400 // 2)
+        win.geometry(f"700x400+{x}+{y}")
         
         try:
             win.configure(bg='white')
         except Exception:
             pass
+        
+        # 主要資訊
         info = (
             f"匯出完成 / 共 {total_files} 個檔案\n\n"
             f"PASS: {pass_count}\nFAIL: {fail_count}\n\n"
@@ -2468,22 +2470,62 @@ class EnhancedLogAnalyzerApp:
         )
         lbl_info = tk.Label(win, text=info, bg='white', fg='black', font=('Microsoft JhengHei', 11))
         lbl_info.pack(fill=tk.BOTH, expand=1, padx=16, pady=(16, 6))
-        lbl_ask = tk.Label(win, text="是否要開啟輸出資料夾？", bg='#FFF176', fg='black', font=('Microsoft JhengHei', 11, 'bold'))
+        
+        # 選擇要開啟的檔案
+        lbl_ask = tk.Label(win, text="選擇要開啟的檔案：", bg='#FFF176', fg='black', font=('Microsoft JhengHei', 11, 'bold'))
         lbl_ask.pack(fill=tk.X, padx=16, pady=(0, 8))
+        
+        # 打勾選項框架
+        check_frame = tk.Frame(win, bg='white')
+        check_frame.pack(fill=tk.X, padx=16, pady=(0, 16))
+        
+        # 建立打勾變數（預設都打勾）
+        open_folder_var = tk.BooleanVar(value=True)
+        open_pass_var = tk.BooleanVar(value=True)
+        open_fail_var = tk.BooleanVar(value=True)
+        
+        # 打勾選項
+        cb_folder = tk.Checkbutton(check_frame, text="開啟輸出資料夾", variable=open_folder_var, 
+                                  bg='white', fg='black', font=('Microsoft JhengHei', 10))
+        cb_folder.pack(anchor='w', pady=2)
+        
+        cb_pass = tk.Checkbutton(check_frame, text="開啟 PASS匯總.xlsx", variable=open_pass_var, 
+                                bg='white', fg='black', font=('Microsoft JhengHei', 10))
+        cb_pass.pack(anchor='w', pady=2)
+        
+        cb_fail = tk.Checkbutton(check_frame, text="開啟 FAIL匯總.xlsx", variable=open_fail_var, 
+                                bg='white', fg='black', font=('Microsoft JhengHei', 10))
+        cb_fail.pack(anchor='w', pady=2)
+        
+        # 按鈕框架
         btns = tk.Frame(win, bg='white')
         btns.pack(pady=8)
-        def on_yes():
+        
+        def on_confirm():
             try:
-                os.startfile(out_dir)
-            except Exception:
-                pass
+                # 開啟資料夾
+                if open_folder_var.get():
+                    os.startfile(out_dir)
+                
+                # 開啟 PASS 檔案
+                if open_pass_var.get() and os.path.exists(pass_path):
+                    os.startfile(pass_path)
+                
+                # 開啟 FAIL 檔案
+                if open_fail_var.get() and os.path.exists(fail_path):
+                    os.startfile(fail_path)
+                    
+            except Exception as e:
+                print(f"開啟檔案時發生錯誤: {e}")
             win.destroy()
-        def on_no():
+            
+        def on_cancel():
             win.destroy()
-        yes = tk.Button(btns, text="開啟資料夾", command=on_yes)
-        no = tk.Button(btns, text="關閉", command=on_no)
-        yes.pack(side=tk.LEFT, padx=10)
-        no.pack(side=tk.LEFT, padx=10)
+            
+        btn_confirm = tk.Button(btns, text="確定", command=on_confirm, bg='#4CAF50', fg='white', font=('Microsoft JhengHei', 10))
+        btn_cancel = tk.Button(btns, text="取消", command=on_cancel, bg='#F44336', fg='white', font=('Microsoft JhengHei', 10))
+        btn_confirm.pack(side=tk.LEFT, padx=10)
+        btn_cancel.pack(side=tk.LEFT, padx=10)
 
 
 def main_enhanced():

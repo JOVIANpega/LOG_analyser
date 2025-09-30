@@ -92,7 +92,7 @@ pyinstaller --onefile --noconsole --icon=assets/icon.ico --name="PEGA_Log_Analyz
 - `docs/`：完整文件（操作指引、專案說明等）
 
 ## 版本資訊
-- V1.7.9
+- V1.8.5
   - 新增搜尋功能：
     - **跨標籤頁搜尋**：支援在 PASS、FAIL、原始LOG 標籤頁中搜尋
     - **內建 Ctrl+F**：使用 Tkinter 內建搜尋功能，支援上下搜尋
