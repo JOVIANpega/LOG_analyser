@@ -84,11 +84,11 @@ def build_left_panel(parent, app):
     _create_tooltip(btn_compressed, "讀取壓縮檔中的 LOG 檔案\n支援 .zip, .7z, .rar 格式")
 
     # 壓縮資料夾選擇（批次遞迴展開）
-    btn_compressed_folder = tk.Button(file_frame, text="🗃️ 讀取壓縮檔資料夾", 
+    btn_compressed_folder = tk.Button(file_frame, text="🗃️ 讀取多個壓縮檔", 
                                      command=app._select_compressed_folder, bg='#FB8C00', fg='white')
     btn_compressed_folder.pack(fill=tk.X, pady=2)
     app.font_scaler.register(btn_compressed_folder)
-    _create_tooltip(btn_compressed_folder, "選擇含多個壓縮檔的資料夾\n自動遞迴展開內嵌壓縮並分析 .log")
+    _create_tooltip(btn_compressed_folder, "選擇含多個壓縮檔的資料夾\n可勾選要處理的壓縮檔，支援多層嵌套")
     
     # 清除結果按鈕
     btn_clear = tk.Button(file_frame, text="🗑️ 清除結果", 

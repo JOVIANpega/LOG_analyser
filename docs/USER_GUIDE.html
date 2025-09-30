@@ -217,6 +217,7 @@
       <li><strong>📂 選擇資料夾</strong>：一次分析資料夾內所有 <code>.log</code> 檔，並自動在該資料夾下建立 <code>LOG集總整理/</code>，輸出
           <code>PASS匯總.xlsx</code> 與 <code>FAIL匯總.xlsx</code>。完成時跳出白底提示窗，可一鍵開啟輸出資料夾。</li>
       <li><strong>📦 讀取壓縮檔LOG</strong>：選擇 ZIP/7Z/RAR 壓縮檔案，自動解壓縮並分析其中的 LOG 檔案。支援多層目錄結構，會自動搜尋所有 <code>.log</code> 檔案。</li>
+      <li><strong>🗃️ 讀取多個壓縮檔</strong>：選擇包含多個壓縮檔的資料夾，會顯示所有壓縮檔清單供您勾選要處理的檔案。支援多層嵌套壓縮檔，可選擇性處理特定壓縮檔。</li>
       <li><strong>🗑️ 清除結果</strong>：清空 PASS/FAIL/原始LOG 的畫面內容。</li>
       <li><strong>🔍 搜尋功能</strong>：在搜尋框中輸入關鍵字，支援在 PASS、FAIL、原始LOG 標籤頁中搜尋。使用「下一個」和「上一個」按鈕導覽搜尋結果，或按 Ctrl+F 使用內建搜尋功能。</li>
       <li><strong>📖 查看操作說明(HTML)</strong>：開啟本頁。</li>
@@ -301,6 +302,15 @@
 
   <div class="section" id="section8">
     <h2>八、V1.7.9 新功能</h2>
+    <h3>🗃️ 多選壓縮檔功能</h3>
+    <ul>
+      <li><strong>批次處理</strong>：選擇包含多個壓縮檔的資料夾</li>
+      <li><strong>選擇性解壓</strong>：顯示所有壓縮檔清單，可勾選要處理的檔案</li>
+      <li><strong>多層嵌套</strong>：支援壓縮檔內還有壓縮檔的複雜結構</li>
+      <li><strong>進度顯示</strong>：顯示解壓縮和分析進度百分比</li>
+      <li><strong>可取消操作</strong>：處理過程中可隨時取消</li>
+    </ul>
+    
     <h3>🔍 搜尋功能</h3>
     <ul>
       <li><strong>跨標籤頁搜尋</strong>：支援在 PASS、FAIL、原始LOG 標籤頁中搜尋關鍵字</li>
