@@ -459,6 +459,89 @@ class EnhancedLogAnalyzerApp:
             # 處理壓縮檔案
             self._process_compressed_file(file_path)
 
+    def _select_compressed_folder(self):
+        """選擇並處理含多個壓縮檔的資料夾（支援多層與內嵌壓縮）"""
+        import tempfile
+        import shutil
+        
+        # 取得預設目錄
+        if self.settings.get('last_compressed_folder') and os.path.exists(self.settings.get('last_compressed_folder')):
+            default_dir = self.settings.get('last_compressed_folder')
+        else:
+            default_dir = self._get_default_directory()
+        
+        folder_path = filedialog.askdirectory(title="選擇壓縮檔資料夾", initialdir=default_dir)
+        if not folder_path:
+            return
+        
+        # 先清除現有結果
+        self._clear_enhanced_results()
+        
+        temp_dir = None
+        try:
+            # 建立總暫存目錄
+            temp_dir = tempfile.mkdtemp(prefix="log_archives_")
+            extracted_root = os.path.join(temp_dir, "extracted")
+            os.makedirs(extracted_root, exist_ok=True)
+            
+            archives = []
+            for root, dirs, files in os.walk(folder_path):
+                for fn in files:
+                    if self._is_archive_file(fn):
+                        archives.append(os.path.join(root, fn))
+            
+            if not archives:
+                messagebox.showwarning("提示", "資料夾中未找到支援的壓縮檔 (.zip/.7z/.rar)")
+                return
+            
+            # 逐一解壓到各自子目錄
+            for idx, apath in enumerate(archives, 1):
+                base = os.path.splitext(os.path.basename(apath))[0]
+                target = os.path.join(extracted_root, f"{idx:03d}_{base}")
+                os.makedirs(target, exist_ok=True)
+                try:
+                    self._extract_archive(apath, target)
+                except Exception as e:
+                    print(f"解壓失敗（略過）：{apath} -> {e}")
+                    continue
+                
+                # 展開內嵌壓縮
+                try:
+                    self._extract_all_archives(target, max_depth=5)
+                except Exception as e:
+                    print(f"內嵌解壓失敗（略過）：{apath} -> {e}")
+            
+            # 搜尋所有 .log
+            log_files = self._find_log_files(extracted_root)
+            if not log_files:
+                messagebox.showwarning("警告", "壓縮資料夾展開後未找到 .log 檔案")
+                return
+            
+            # 多於1個一律走多檔整理
+            if len(log_files) == 1:
+                self.current_mode = 'single'
+                self.current_log_path = log_files[0]
+                filename = os.path.basename(log_files[0])
+                self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮資料夾)", fg='orange')
+            else:
+                self.current_mode = 'multi'
+                self.current_log_path = extracted_root
+                self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮資料夾)", fg='orange')
+            
+            # 記錄路徑
+            self.settings['last_compressed_folder'] = folder_path
+            self._save_settings_silent()
+            
+            # 分析
+            self._analyze_enhanced_log()
+            
+            # 註冊清理
+            self.temp_cleanup_path = temp_dir
+        except Exception as e:
+            messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\n{e}")
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
     def _process_compressed_file(self, compressed_path):
         """處理壓縮檔案"""
         import tempfile
@@ -480,6 +563,13 @@ class EnhancedLogAnalyzerApp:
             else:
                 messagebox.showerror("錯誤", "不支援的壓縮格式")
                 return
+
+            # 遞迴展開內嵌壓縮檔
+            try:
+                self._extract_all_archives(temp_dir, max_depth=5)
+            except Exception as sub_e:
+                # 不阻斷主流程，僅提示
+                print(f"遞迴解壓過程發生問題：{sub_e}")
             
             # 搜尋 LOG 檔案
             log_files = self._find_log_files(temp_dir)
@@ -542,6 +632,50 @@ class EnhancedLogAnalyzerApp:
         except ImportError:
             messagebox.showerror("錯誤", "需要安裝 rarfile 套件來支援 RAR 格式\n請執行：pip install rarfile")
             raise
+
+    def _is_archive_file(self, filename):
+        """判斷是否為支援的壓縮檔案"""
+        lower = filename.lower()
+        return lower.endswith('.zip') or lower.endswith('.7z') or lower.endswith('.rar')
+
+    def _extract_archive(self, archive_path, extract_to):
+        """根據副檔名解壓縮檔案到指定目錄"""
+        ext = os.path.splitext(archive_path)[1].lower()
+        if ext == '.zip':
+            self._extract_zip(archive_path, extract_to)
+        elif ext == '.7z':
+            self._extract_7z(archive_path, extract_to)
+        elif ext == '.rar':
+            self._extract_rar(archive_path, extract_to)
+
+    def _extract_all_archives(self, root_dir, max_depth=5):
+        """遞迴展開 root_dir 底下所有內嵌壓縮檔（限制深度避免無限循環）"""
+        processed = set()
+        depth = 0
+        while depth < max_depth:
+            found_new = False
+            for current_root, dirs, files in os.walk(root_dir):
+                for fname in files:
+                    if not self._is_archive_file(fname):
+                        continue
+                    full_path = os.path.join(current_root, fname)
+                    if full_path in processed:
+                        continue
+                    # 為每個壓縮檔建立對應資料夾（同名去副檔名加 _extracted）
+                    base, _ = os.path.splitext(fname)
+                    target_dir = os.path.join(current_root, f"{base}_extracted")
+                    try:
+                        os.makedirs(target_dir, exist_ok=True)
+                        self._extract_archive(full_path, target_dir)
+                        processed.add(full_path)
+                        found_new = True
+                    except Exception as e:
+                        print(f"展開內嵌壓縮檔失敗：{full_path} -> {e}")
+                        # 繼續嘗試其他檔案
+                        continue
+            if not found_new:
+                break
+            depth += 1
 
     def _find_log_files(self, directory):
         """搜尋目錄中的 LOG 檔案"""

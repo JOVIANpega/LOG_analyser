@@ -82,6 +82,13 @@ def build_left_panel(parent, app):
     app.font_scaler.register(btn_compressed)
     # 添加 tooltip
     _create_tooltip(btn_compressed, "讀取壓縮檔中的 LOG 檔案\n支援 .zip, .7z, .rar 格式")
+
+    # 壓縮資料夾選擇（批次遞迴展開）
+    btn_compressed_folder = tk.Button(file_frame, text="🗃️ 讀取壓縮檔資料夾", 
+                                     command=app._select_compressed_folder, bg='#FB8C00', fg='white')
+    btn_compressed_folder.pack(fill=tk.X, pady=2)
+    app.font_scaler.register(btn_compressed_folder)
+    _create_tooltip(btn_compressed_folder, "選擇含多個壓縮檔的資料夾\n自動遞迴展開內嵌壓縮並分析 .log")
     
     # 清除結果按鈕
     btn_clear = tk.Button(file_frame, text="🗑️ 清除結果", 
@@ -101,12 +108,14 @@ def build_left_panel(parent, app):
         apply_button_hover(btn_single, hover_bg="#66BB6A", hover_fg='white', normal_bg='#4CAF50', normal_fg='white')
         apply_button_hover(btn_folder, hover_bg="#64B5F6", hover_fg='white', normal_bg='#2196F3', normal_fg='white')
         apply_button_hover(btn_compressed, hover_bg="#FFB74D", hover_fg='white', normal_bg='#FF9800', normal_fg='white')
+        apply_button_hover(btn_compressed_folder, hover_bg="#FFB74D", hover_fg='white', normal_bg='#FB8C00', normal_fg='white')
         apply_button_hover(btn_clear,  hover_bg="#EF5350", hover_fg='white', normal_bg='#F44336', normal_fg='white')
         
         # 重新添加 tooltip（因為 hover 效果可能覆蓋了事件綁定）
         _create_tooltip(btn_single, "選擇單一 LOG 檔案進行分析\n支援 .log 格式")
         _create_tooltip(btn_folder, "選擇包含多個 LOG 檔案的資料夾\n自動分析所有 .log 檔案")
         _create_tooltip(btn_compressed, "讀取壓縮檔中的 LOG 檔案\n支援 .zip, .7z, .rar 格式")
+        _create_tooltip(btn_compressed_folder, "選擇含多個壓縮檔的資料夾\n自動遞迴展開內嵌壓縮並分析 .log")
         _create_tooltip(btn_clear, "清除所有分析結果\n重置介面到初始狀態")
     except Exception:
         pass

@@ -105,7 +105,13 @@ class ExcelWriter:
                 cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
         
         # 儲存檔案
-        wb.save(output_path)
+        try:
+            wb.save(output_path)
+        finally:
+            try:
+                wb.close()
+            except Exception:
+                pass
         return output_path
 
     def _extract_system_info(self, raw_lines: list) -> dict:
@@ -203,6 +209,8 @@ class ExcelWriter:
 
     def _unique_sheet_name(self, wb, base_name: str) -> str:
         """確保工作表名稱不重複"""
+        # 先清理名稱中的非法字元與空白
+        base_name = self._sanitize_sheet_title(base_name)
         if len(base_name) > 31:
             base_name = base_name[:28] + '...'
         existing = [ws.title for ws in wb.worksheets]
@@ -214,6 +222,26 @@ class ExcelWriter:
         suffix = f"({counter})"
         max_base = 31 - len(suffix)
         return f"{base_name[:max_base]}{suffix}"
+
+    def _sanitize_sheet_title(self, title: str) -> str:
+        """移除Excel工作表名稱不允許的字元並修剪長度。
+        禁用字元: : \\ / ? * [ ]，且長度<=31，不可為空。
+        """
+        try:
+            s = str(title) if title is not None else 'Sheet'
+            # 移除路徑與副檔名殘留
+            s = s.replace('\\', ' ').replace('/', ' ')
+            # 移除禁止字元
+            import re
+            s = re.sub(r'[:\\/\?\*\[\]]', ' ', s)
+            # 去除前後單引號
+            s = s.strip().strip("'")
+            # 轉為可見字串
+            s = s if s else 'Sheet'
+            # Excel 限制 31 字
+            return s[:31]
+        except Exception:
+            return 'Sheet'
 
     def export_pass_fail_workbooks(self, folder_path: str, pass_logs: list, fail_logs: list):
         """
@@ -304,7 +332,7 @@ class ExcelWriter:
         # 先建立各 LOG 原始工作表，並記錄 sheet 名稱
         sheet_map = {}
         for entry in logs:
-            sheet_name_base = entry.get('file_name', 'LOG')
+            sheet_name_base = self._sanitize_sheet_title(entry.get('file_name', 'LOG'))
             sheet_name = self._unique_sheet_name(wb, sheet_name_base)
             sheet_map[entry.get('file_name')] = sheet_name
             ws2 = wb.create_sheet(title=sheet_name)
@@ -531,7 +559,13 @@ class ExcelWriter:
                         underline=current_font.underline
                     )
         
-        wb.save(output_path)
+        try:
+            wb.save(output_path)
+        finally:
+            try:
+                wb.close()
+            except Exception:
+                pass
 
     def _build_fail_workbook(self, output_path: str, logs: list):
         wb = Workbook()
@@ -557,7 +591,7 @@ class ExcelWriter:
         # 先建立各 LOG 原始工作表
         sheet_map = {}
         for entry in logs:
-            sheet_name_base = entry.get('file_name', 'LOG')
+            sheet_name_base = self._sanitize_sheet_title(entry.get('file_name', 'LOG'))
             sheet_name = self._unique_sheet_name(wb, sheet_name_base)
             sheet_map[entry.get('file_name')] = sheet_name
             ws2 = wb.create_sheet(title=sheet_name)
@@ -749,7 +783,13 @@ class ExcelWriter:
                             underline=current_font.underline
                         )
             
-            wb.save(output_path)
+            try:
+                wb.save(output_path)
+            finally:
+                try:
+                    wb.close()
+                except Exception:
+                    pass
 
     def _write_raw_log_with_annotations(self, ws, start_row: int, raw_lines: list, annotations: list, font: Font, step_marks: dict | None = None):
         color_map = {
