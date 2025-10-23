@@ -1,7 +1,7 @@
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 6, 6, 0),
-    prodvers=(1, 6, 6, 0),
+    filevers=(1, 8, 5, 0),
+    prodvers=(1, 8, 5, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -13,13 +13,13 @@ VSVersionInfo(
     StringFileInfo([
       StringTable('040904B0', [
         StringStruct('CompanyName', 'PEGA'),
-        StringStruct('FileDescription', 'PEGA test log Analyser V1.6.6'),
-        StringStruct('FileVersion', '1.6.6.0'),
+               StringStruct('FileDescription', 'PEGA test log Analyser V1.8.5 - 支援多選壓縮檔與進度顯示'),
+               StringStruct('FileVersion', '1.8.5.0'),
         StringStruct('InternalName', 'main_enhanced'),
         StringStruct('LegalCopyright', '© 2025 PEGA. All rights reserved.'),
         StringStruct('OriginalFilename', 'main_enhanced.exe'),
-        StringStruct('ProductName', 'PEGA test log Analyser V1.6.6'),
-        StringStruct('ProductVersion', '1.6.6.0')
+               StringStruct('ProductName', 'PEGA test log Analyser V1.8.5'),
+               StringStruct('ProductVersion', '1.8.5.0')
       ])
     ]),
     VarFileInfo([

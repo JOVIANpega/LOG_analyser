@@ -11,6 +11,7 @@ from tkinter import ttk, filedialog, messagebox
 import os
 import sys
 import json
+import time
 from settings_loader import load_settings, save_settings
 import webbrowser
 from log_parser import LogParser
@@ -26,6 +27,11 @@ class EnhancedLogAnalyzerApp:
     def __init__(self, root):
         """初始化增強版應用程式"""
         self.root = root
+        
+        # 檢查加密檔案
+        if not self._check_encryption():
+            return
+        
         # 先載入設定再設定標題
         self.settings = load_settings()
         app_title = self.settings.get('app_title', 'PEGA test log Aanlyser')
@@ -36,10 +42,13 @@ class EnhancedLogAnalyzerApp:
         self.ui_font_size = self.settings.get('ui_font_size', 11)
         self.content_font_size = self.settings.get('content_font_size', 11)
         
-        # 設定視窗大小
+        # 設定視窗大小 - 預設最大化
         window_width = self.settings.get('window_width', 1400)
         window_height = self.settings.get('window_height', 900)
         self.root.geometry(f"{window_width}x{window_height}")
+        
+        # 設定視窗最大化
+        self.root.state('zoomed')  # Windows 最大化
         
         # 初始化模組
         self.font_scaler = FontScaler(root, default_size=self.ui_font_size)
@@ -49,6 +58,10 @@ class EnhancedLogAnalyzerApp:
         # 狀態變數
         self.current_mode = 'single'
         self.current_log_path = ''
+        self.temp_cleanup_path = None  # 壓縮檔解壓縮的暫存路徑
+        self._progress_win = None      # 背景處理進度窗
+        self._cancel_flag = False      # 取消旗標
+        self._search_cache = {'text': '', 'count': 0}
         
         # 建立UI
         self._build_enhanced_ui()
@@ -56,6 +69,46 @@ class EnhancedLogAnalyzerApp:
         
         # 綁定視窗關閉事件
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
+    
+    def _check_encryption(self):
+        """檢查加密檔案"""
+        try:
+            # 獲取EXE所在目錄
+            if getattr(sys, 'frozen', False):
+                # 如果是打包的EXE
+                exe_dir = os.path.dirname(sys.executable)
+            else:
+                # 如果是Python腳本
+                exe_dir = os.path.dirname(os.path.abspath(__file__))
+            
+            # 檢查SIGN.txt檔案
+            sign_file = os.path.join(exe_dir, "SIGN.txt")
+            
+            if not os.path.exists(sign_file):
+                self._show_encryption_error()
+                return False
+            
+            # 讀取檔案內容
+            with open(sign_file, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+            
+            # 檢查是否包含jovian字串
+            if 'jovian' not in content.lower():
+                self._show_encryption_error()
+                return False
+            
+            print("加密檔案驗證成功")
+            return True
+            
+        except Exception as e:
+            print(f"檢查加密檔案時發生錯誤: {e}")
+            self._show_encryption_error()
+            return False
+    
+    def _show_encryption_error(self):
+        """顯示加密錯誤訊息"""
+        messagebox.showerror("加密驗證失敗", "請提供運作工具的加密檔案")
+        self.root.destroy()
     
     def _on_closing(self):
         """處理視窗關閉事件"""
@@ -84,6 +137,10 @@ class EnhancedLogAnalyzerApp:
             print("設定已保存")
         except Exception as e:
             print(f"保存設定失敗: {e}")
+        
+        # 設定取消旗標並背景清理暫存檔案，避免關閉卡頓
+        self._cancel_flag = True
+        self._cleanup_temp_files_async()
         
         self.root.destroy()
     
@@ -140,10 +197,19 @@ class EnhancedLogAnalyzerApp:
     
     def _build_enhanced_left_panel(self, parent):
         """建立增強版左側面板（抽離至模組）"""
-        build_left_panel(self, parent)
+        build_left_panel(parent, self)
     
     def _build_enhanced_right_panel(self, parent):
         """建立增強版右側面板"""
+        # 建立頂部檔案資訊框架
+        top_frame = tk.Frame(parent)
+        top_frame.pack(fill=tk.X, padx=5, pady=2)
+        
+        # 檔案資訊標籤
+        self.file_info_label = tk.Label(top_frame, text="尚未選擇檔案", fg='gray', anchor='w')
+        self.file_info_label.pack(fill=tk.X)
+        self.font_scaler.register(self.file_info_label)
+        
         # 建立標籤頁
         self.notebook = ttk.Notebook(parent)
         self.notebook.pack(fill=tk.BOTH, expand=1)
@@ -160,9 +226,23 @@ class EnhancedLogAnalyzerApp:
     def _setup_tab_styles(self):
         """設定標籤頁樣式"""
         style = ttk.Style()
-        style.configure('TNotebook.Tab', font=('Arial', self.ui_font_size))
-        # 鼠標靠近標籤頁時顯示綠色背景，黑色文字
-        style.map('TNotebook.Tab', background=[('active', '#00FF00')], foreground=[('active', 'black')])
+        
+        # 設定主題
+        style.theme_use('clam')  # 使用clam主題，支援更多自訂樣式
+        
+        # 設定標籤頁基本樣式
+        style.configure('TNotebook.Tab', 
+                       font=('Arial', self.ui_font_size),
+                       padding=[10, 5])
+        
+        # 設定標籤頁顏色映射
+        style.map('TNotebook.Tab',
+                 background=[('selected', '#2E7D32'),    # 選中：深綠底
+                            ('active', '#2E7D32'),       # hover：深綠底
+                            ('!selected', '#1565C0')],   # 未選中：深藍底
+                 foreground=[('selected', 'white'),      # 選中：白字
+                            ('active', 'white'),         # hover：白字
+                            ('!selected', 'white')])     # 未選中：白字
     
     def _build_enhanced_pass_tab(self):
         """建立PASS標籤頁"""
@@ -312,6 +392,9 @@ class EnhancedLogAnalyzerApp:
             # 先清除現有結果，避免誤導
             self._clear_enhanced_results()
             
+            # 顯示檔案預覽
+            self._show_file_preview(file_path, 'log')
+            
             self.current_mode = 'single'
             self.current_log_path = file_path
             filename = os.path.basename(file_path)
@@ -354,6 +437,1098 @@ class EnhancedLogAnalyzerApp:
             # 自動開始分析（enhanced）
             self._analyze_enhanced_log()
     
+    def _select_compressed_file(self):
+        """選擇並處理壓縮檔案（支援多選）"""
+        import tempfile
+        import shutil
+        
+        # 獲取預設目錄
+        if self.settings.get('last_compressed_path') and os.path.exists(self.settings.get('last_compressed_path')):
+            default_dir = os.path.dirname(self.settings.get('last_compressed_path'))
+        else:
+            default_dir = self._get_default_directory()
+        
+        file_paths = filedialog.askopenfilenames(
+            title="選擇壓縮檔案（可多選）", 
+            filetypes=[
+                ("壓縮檔案", "*.zip;*.7z;*.rar"),
+                ("ZIP檔案", "*.zip"),
+                ("7Z檔案", "*.7z"), 
+                ("RAR檔案", "*.rar"),
+                ("所有檔案", "*.*")
+            ],
+            initialdir=default_dir
+        )
+        
+        if file_paths:
+            # 先清除現有結果
+            self._clear_enhanced_results()
+            
+            if len(file_paths) == 1:
+                # 單一檔案：顯示預覽後直接處理
+                self._show_file_preview(file_paths[0], 'compressed')
+                self._process_single_compressed_file(file_paths[0])
+            else:
+                # 多個檔案：顯示選擇視窗
+                self._show_compressed_selection_window(file_paths)
+    
+    def _process_single_compressed_file(self, file_path):
+        """處理單一壓縮檔案"""
+        # 背景處理壓縮檔案
+        self._show_progress("正在處理壓縮檔", os.path.basename(file_path))
+        def _bg():
+            try:
+                if self._cancel_flag:
+                    return
+                self._process_compressed_file(file_path)
+            finally:
+                self.root.after(0, self._close_progress)
+        import threading
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _select_compressed_files(self):
+        """整合的壓縮檔選擇功能（支援單一檔案、多個檔案或資料夾）"""
+        # 提供選擇方式
+        choice = messagebox.askyesnocancel(
+            "壓縮檔處理方式", 
+            "請選擇壓縮檔處理方式：\n\n" +
+            "是(Y) - 選擇壓縮檔案（支援多選）\n" +
+            "否(N) - 選擇壓縮檔資料夾（自動搜尋所有壓縮檔）\n" +
+            "取消 - 取消操作\n\n" +
+            "注意：選擇資料夾時會自動搜尋 .zip/.7z/.rar 檔案"
+        )
+        
+        if choice is True:
+            # 選擇壓縮檔案（支援多選）
+            self._select_compressed_file()
+        elif choice is False:
+            # 選擇壓縮檔資料夾
+            self._select_compressed_folder()
+        # choice is None 表示取消
+
+    def _select_compressed_folder(self):
+        """選擇並處理含多個壓縮檔的資料夾（支援多層與內嵌壓縮）"""
+        import tempfile
+        import shutil
+        
+        # 取得預設目錄
+        if self.settings.get('last_compressed_folder') and os.path.exists(self.settings.get('last_compressed_folder')):
+            default_dir = self.settings.get('last_compressed_folder')
+        else:
+            default_dir = self._get_default_directory()
+        
+        folder_path = filedialog.askdirectory(title="選擇壓縮檔資料夾", initialdir=default_dir)
+        if not folder_path:
+            return
+        
+        # 先清除現有結果
+        self._clear_enhanced_results()
+        
+        # 讓使用者挑選要處理的壓縮檔
+        archives = []
+        for root, dirs, files in os.walk(folder_path):
+            for fn in files:
+                if self._is_archive_file(fn):
+                    archives.append(os.path.join(root, fn))
+        
+        if not archives:
+            # 提供更詳細的提示和選項
+            result = messagebox.askyesno(
+                "未找到壓縮檔案", 
+                f"在選擇的資料夾中未找到支援的壓縮檔案 (.zip/.7z/.rar)\n\n" +
+                f"資料夾路徑: {folder_path}\n\n" +
+                "可能的原因：\n" +
+                "• 資料夾中沒有壓縮檔案\n" +
+                "• 壓縮檔案在其他子資料夾中\n" +
+                "• 壓縮檔案格式不支援\n\n" +
+                "是否要重新選擇資料夾？"
+            )
+            if result:
+                # 重新選擇資料夾
+                self._select_compressed_folder()
+            else:
+                # 提供其他選項
+                choice2 = messagebox.askyesno(
+                    "其他選項", 
+                    "是否要改為直接選擇壓縮檔案？"
+                )
+                if choice2:
+                    self._select_compressed_file()
+            return
+        
+        self._show_archive_preview(archives)
+        selected_archives = self._choose_archives_dialog(archives)
+        if not selected_archives:
+            return
+
+        # 背景處理整個壓縮資料夾
+        self._show_progress("正在處理壓縮資料夾 (多選)", folder_path)
+        def _bg():
+            import tempfile, shutil
+            temp_dir = None
+            try:
+                if self._cancel_flag:
+                    return
+                # 建立總暫存目錄
+                temp_dir = tempfile.mkdtemp(prefix="log_archives_")
+                extracted_root = os.path.join(temp_dir, "extracted")
+                os.makedirs(extracted_root, exist_ok=True)
+                
+                # 逐一解壓到各自子目錄（顯示百分比）
+                total = len(selected_archives)
+                self.root.after(0, lambda: self._progress_set_determinate(total))
+                for idx, apath in enumerate(selected_archives, 1):
+                    if self._cancel_flag:
+                        # 取消時清理暫存目錄
+                        try:
+                            shutil.rmtree(temp_dir, ignore_errors=True)
+                        except Exception:
+                            pass
+                        return
+                    base = os.path.splitext(os.path.basename(apath))[0]
+                    target = os.path.join(extracted_root, f"{idx:03d}_{base}")
+                    os.makedirs(target, exist_ok=True)
+                    try:
+                        self._update_progress(f"解壓中 {idx}/{total}: {os.path.basename(apath)}")
+                        self._extract_archive(apath, target)
+                        self._extract_all_archives(target, max_depth=5)
+                    except Exception as e:
+                        print(f"解壓失敗（略過）：{apath} -> {e}")
+                        continue
+                    # 更新進度百分比
+                    self.root.after(0, lambda i=idx, n=total: self._progress_set_value(i, n))
+                
+                # 搜尋所有 .log
+                log_files = self._find_log_files(extracted_root)
+                if not log_files:
+                    self.root.after(0, lambda: messagebox.showwarning("警告", "壓縮資料夾展開後未找到 .log 檔案"))
+                    return
+                
+                def _apply_result():
+                    if len(log_files) == 1:
+                        self.current_mode = 'single'
+                        self.current_log_path = log_files[0]
+                        filename = os.path.basename(log_files[0])
+                        self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮資料夾)", fg='orange')
+                    else:
+                        self.current_mode = 'multi'
+                        self.current_log_path = extracted_root
+                        self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮資料夾)", fg='orange')
+                    self.settings['last_compressed_folder'] = folder_path
+                    self._save_settings_silent()
+                    self._analyze_enhanced_log()
+                self.temp_cleanup_path = temp_dir
+                self.root.after(0, _apply_result)
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\n{e}"))
+                if temp_dir and os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+            finally:
+                self.root.after(0, self._close_progress)
+        import threading
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _show_archive_preview(self, archives: list):
+        """在頂部資訊區顯示即將處理的壓縮檔清單（僅預覽）"""
+        try:
+            lines = ["將處理以下壓縮檔：", ""]
+            max_show = 30
+            for i, p in enumerate(sorted(archives)[:max_show], 1):
+                lines.append(f"  • {os.path.basename(p)}")
+            if len(archives) > max_show:
+                lines.append(f"... 其餘 {len(archives) - max_show} 個未列出")
+            text = "\n".join(lines)
+            if hasattr(self, 'file_info_label'):
+                self.file_info_label.config(text=text, justify='left', wraplength=420, fg='#333')
+        except Exception as e:
+            print(f"顯示壓縮檔預覽失敗: {e}")
+
+    def _choose_archives_dialog(self, archives: list) -> list:
+        """彈出多選對話框，讓使用者挑選要處理的壓縮檔。回傳選中的清單。"""
+        try:
+            win = tk.Toplevel(self.root)
+            win.title("選擇要處理的壓縮檔")
+            win.geometry("520x420")
+            win.transient(self.root)
+            win.grab_set()
+            frm = tk.Frame(win)
+            frm.pack(fill=tk.BOTH, expand=1, padx=10, pady=10)
+            lbl = tk.Label(frm, text="請勾選要處理的壓縮檔：")
+            lbl.pack(anchor='w')
+            lb_frame = tk.Frame(frm)
+            lb_frame.pack(fill=tk.BOTH, expand=1)
+            canvas = tk.Canvas(lb_frame)
+            vsb = tk.Scrollbar(lb_frame, orient="vertical", command=canvas.yview)
+            inner = tk.Frame(canvas)
+            inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+            canvas.create_window((0,0), window=inner, anchor='nw')
+            canvas.configure(yscrollcommand=vsb.set)
+            canvas.pack(side="left", fill="both", expand=True)
+            vsb.pack(side="right", fill="y")
+
+            vars_ = []
+            for p in sorted(archives):
+                var = tk.BooleanVar(value=True)
+                cb = tk.Checkbutton(inner, text=os.path.basename(p), variable=var, anchor='w', justify='left')
+                cb.pack(fill=tk.X, anchor='w')
+                vars_.append((var, p))
+
+            btns = tk.Frame(frm)
+            btns.pack(fill=tk.X, pady=8)
+            selected = []
+            def on_ok():
+                nonlocal selected
+                selected = [p for (v,p) in vars_ if v.get()]
+                win.destroy()
+            def on_cancel():
+                selected.clear()
+                win.destroy()
+            tk.Button(btns, text="全選", command=lambda: [v.set(True) for v,_ in vars_]).pack(side=tk.LEFT)
+            tk.Button(btns, text="全不選", command=lambda: [v.set(False) for v,_ in vars_]).pack(side=tk.LEFT, padx=6)
+            tk.Button(btns, text="確定", command=on_ok).pack(side=tk.RIGHT)
+            tk.Button(btns, text="取消", command=on_cancel).pack(side=tk.RIGHT, padx=6)
+            win.wait_window()
+            return selected
+        except Exception as e:
+            print(f"選擇壓縮檔對話框失敗: {e}")
+            return archives
+
+    def _process_compressed_file(self, compressed_path):
+        """處理壓縮檔案"""
+        import tempfile
+        import shutil
+        
+        try:
+            # 建立暫存目錄
+            temp_dir = tempfile.mkdtemp(prefix="log_analyzer_")
+            
+            # 檢查取消狀態
+            if self._cancel_flag:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return
+            
+            # 解壓縮
+            file_ext = os.path.splitext(compressed_path)[1].lower()
+            
+            if file_ext == '.zip':
+                self._extract_zip(compressed_path, temp_dir)
+            elif file_ext == '.7z':
+                self._extract_7z(compressed_path, temp_dir)
+            elif file_ext == '.rar':
+                self._extract_rar(compressed_path, temp_dir)
+            else:
+                messagebox.showerror("錯誤", "不支援的壓縮格式")
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return
+
+            # 檢查取消狀態
+            if self._cancel_flag:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return
+
+            # 遞迴展開內嵌壓縮檔
+            try:
+                self._extract_all_archives(temp_dir, max_depth=5)
+            except Exception as sub_e:
+                # 不阻斷主流程，僅提示
+                print(f"遞迴解壓過程發生問題：{sub_e}")
+            
+            # 檢查取消狀態
+            if self._cancel_flag:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return
+            
+            # 搜尋 LOG 檔案
+            log_files = self._find_log_files(temp_dir)
+            
+            if not log_files:
+                messagebox.showwarning("警告", "壓縮檔中未找到 .log 檔案")
+                return
+            
+            # 根據檔案數量決定處理模式
+            if len(log_files) == 1:
+                # 單檔模式
+                self.current_mode = 'single'
+                self.current_log_path = log_files[0]
+                filename = os.path.basename(log_files[0])
+                self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮檔)", fg='orange')
+            else:
+                # 資料夾模式
+                self.current_mode = 'multi'
+                self.current_log_path = temp_dir
+                self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮檔)", fg='orange')
+            
+            # 儲存選擇的路徑到設定
+            self.settings['last_compressed_path'] = compressed_path
+            self._save_settings_silent()
+            
+            # 開始分析
+            self._analyze_enhanced_log()
+            
+            # 註冊清理函數（分析完成後清理暫存檔案）
+            self.temp_cleanup_path = temp_dir
+            
+        except Exception as e:
+            messagebox.showerror("錯誤", f"處理壓縮檔案時發生錯誤：\n{str(e)}")
+            # 清理暫存目錄
+            if 'temp_dir' in locals() and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def _extract_zip(self, zip_path, extract_to):
+        """解壓縮 ZIP 檔案"""
+        try:
+            import zipfile
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_to)
+        except Exception as e:
+            error_msg = f"ZIP檔案解壓縮失敗: {str(e)}\n\n檔案: {zip_path}\n\n可能的原因:\n"
+            error_msg += "• 檔案損壞或格式不正確\n"
+            error_msg += "• 檔案被密碼保護\n"
+            error_msg += "• 檔案權限不足\n"
+            error_msg += "• ZIP格式不相容\n\n"
+            error_msg += "建議:\n"
+            error_msg += "• 檢查檔案是否完整\n"
+            error_msg += "• 嘗試使用其他工具解壓\n"
+            error_msg += "• 檢查檔案是否被密碼保護"
+            
+            messagebox.showerror("ZIP解壓縮失敗", error_msg)
+            raise
+
+    def _extract_7z(self, sevenz_path, extract_to):
+        """解壓縮 7Z 檔案（多種方式嘗試）"""
+        try:
+            import py7zr
+            
+            # 方法1：標準解壓縮
+            try:
+                with py7zr.SevenZipFile(sevenz_path, mode='r') as archive:
+                    archive.extractall(path=extract_to)
+                return
+            except Exception as e1:
+                print(f"標準7Z解壓縮失敗: {e1}")
+                
+                # 方法2：嘗試不同的模式
+                try:
+                    with py7zr.SevenZipFile(sevenz_path, mode='r', password=None) as archive:
+                        archive.extractall(path=extract_to)
+                    return
+                except Exception as e2:
+                    print(f"無密碼7Z解壓縮失敗: {e2}")
+                    
+                    # 方法3：嘗試讀取檔案列表
+                    try:
+                        with py7zr.SevenZipFile(sevenz_path, mode='r') as archive:
+                            file_list = archive.getnames()
+                            print(f"7Z檔案包含 {len(file_list)} 個檔案")
+                            # 如果檔案列表可以讀取，但解壓失敗，可能是權限問題
+                            raise Exception(f"無法解壓縮7Z檔案，但檔案列表可讀取。可能的原因：權限不足或檔案損壞")
+                    except Exception as e3:
+                        print(f"7Z檔案列表讀取失敗: {e3}")
+                        raise e1  # 拋出原始錯誤
+                        
+        except ImportError:
+            messagebox.showerror("錯誤", "需要安裝 py7zr 套件來支援 7Z 格式\n請執行：pip install py7zr")
+            raise
+        except Exception as e:
+            error_msg = f"7Z檔案解壓縮失敗: {str(e)}\n\n檔案: {sevenz_path}\n\n可能的原因:\n"
+            error_msg += "• 檔案損壞或格式不正確\n"
+            error_msg += "• 檔案被密碼保護\n"
+            error_msg += "• 檔案權限不足\n"
+            error_msg += "• py7zr版本不相容\n"
+            error_msg += "• 檔案被加密\n\n"
+            error_msg += "建議:\n"
+            error_msg += "• 檢查檔案是否完整\n"
+            error_msg += "• 嘗試使用7-Zip軟體手動解壓\n"
+            error_msg += "• 更新py7zr套件: pip install --upgrade py7zr\n"
+            error_msg += "• 檢查檔案是否被密碼保護"
+            
+            messagebox.showerror("7Z解壓縮失敗", error_msg)
+            raise
+
+    def _extract_rar(self, rar_path, extract_to):
+        """解壓縮 RAR 檔案"""
+        try:
+            import rarfile
+            with rarfile.RarFile(rar_path) as rf:
+                rf.extractall(extract_to)
+        except ImportError:
+            messagebox.showerror("錯誤", "需要安裝 rarfile 套件來支援 RAR 格式\n請執行：pip install rarfile")
+            raise
+        except Exception as e:
+            error_msg = f"RAR檔案解壓縮失敗: {str(e)}\n\n檔案: {rar_path}\n\n可能的原因:\n"
+            error_msg += "• 檔案損壞或格式不正確\n"
+            error_msg += "• 檔案被密碼保護\n"
+            error_msg += "• 檔案權限不足\n"
+            error_msg += "• rarfile版本不相容\n\n"
+            error_msg += "建議:\n"
+            error_msg += "• 檢查檔案是否完整\n"
+            error_msg += "• 嘗試使用其他工具解壓\n"
+            error_msg += "• 更新rarfile套件: pip install --upgrade rarfile"
+            
+            messagebox.showerror("RAR解壓縮失敗", error_msg)
+            raise
+
+    def _is_archive_file(self, filename):
+        """判斷是否為支援的壓縮檔案"""
+        lower = filename.lower()
+        return lower.endswith('.zip') or lower.endswith('.7z') or lower.endswith('.rar')
+
+    def _extract_archive(self, archive_path, extract_to):
+        """根據副檔名解壓縮檔案到指定目錄"""
+        ext = os.path.splitext(archive_path)[1].lower()
+        if ext == '.zip':
+            self._extract_zip(archive_path, extract_to)
+        elif ext == '.7z':
+            self._extract_7z(archive_path, extract_to)
+        elif ext == '.rar':
+            self._extract_rar(archive_path, extract_to)
+
+    def _extract_all_archives(self, root_dir, max_depth=5):
+        """遞迴展開 root_dir 底下所有內嵌壓縮檔（限制深度避免無限循環）"""
+        processed = set()
+        depth = 0
+        while depth < max_depth:
+            found_new = False
+            for current_root, dirs, files in os.walk(root_dir):
+                for fname in files:
+                    if not self._is_archive_file(fname):
+                        continue
+                    full_path = os.path.join(current_root, fname)
+                    if full_path in processed:
+                        continue
+                    # 為每個壓縮檔建立對應資料夾（同名去副檔名加 _extracted）
+                    base, _ = os.path.splitext(fname)
+                    target_dir = os.path.join(current_root, f"{base}_extracted")
+                    try:
+                        os.makedirs(target_dir, exist_ok=True)
+                        self._extract_archive(full_path, target_dir)
+                        processed.add(full_path)
+                        found_new = True
+                    except Exception as e:
+                        print(f"展開內嵌壓縮檔失敗：{full_path} -> {e}")
+                        # 繼續嘗試其他檔案
+                        continue
+            if not found_new:
+                break
+            depth += 1
+
+    def _find_log_files(self, directory):
+        """搜尋目錄中的 LOG 檔案"""
+        log_files = []
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if file.lower().endswith('.log'):
+                    log_files.append(os.path.join(root, file))
+        return log_files
+    
+    def _cleanup_temp_files(self):
+        """清理壓縮檔解壓縮的暫存檔案"""
+        import shutil
+        try:
+            if hasattr(self, 'temp_cleanup_path') and self.temp_cleanup_path:
+                if os.path.exists(self.temp_cleanup_path):
+                    shutil.rmtree(self.temp_cleanup_path, ignore_errors=True)
+                    print(f"已清理暫存目錄: {self.temp_cleanup_path}")
+                self.temp_cleanup_path = None
+        except Exception as e:
+            print(f"清理暫存檔案時發生錯誤: {e}")
+
+    def _cleanup_temp_files_async(self):
+        """在背景執行暫存清理，避免關閉視窗時卡頓"""
+        try:
+            import threading, os
+            path = getattr(self, 'temp_cleanup_path', None)
+            if not path or not os.path.exists(path):
+                return
+            def _bg():
+                try:
+                    self._cleanup_temp_files()
+                except Exception as e:
+                    print(f"背景清理失敗: {e}")
+            threading.Thread(target=_bg, daemon=True).start()
+        except Exception as e:
+            print(f"啟動背景清理失敗: {e}")
+
+    # ===== 背景處理與進度 =====
+    def _show_progress(self, title: str, message: str = ""):
+        try:
+            if self._progress_win and self._progress_win.winfo_exists():
+                return
+            win = tk.Toplevel(self.root)
+            win.title(title)
+            win.geometry("450x160")
+            win.transient(self.root)
+            win.grab_set()
+            frame = tk.Frame(win)
+            frame.pack(fill=tk.BOTH, expand=1, padx=12, pady=12)
+            
+            # 主標籤
+            lbl = tk.Label(frame, text=message or title, anchor='w', justify='left', font=('Arial', 10))
+            lbl.pack(fill=tk.X)
+            
+            # 進度條
+            from tkinter import ttk as _ttk
+            bar = _ttk.Progressbar(frame, mode='indeterminate')
+            bar.pack(fill=tk.X, pady=10)
+            bar.start(12)
+            
+            # 時間估算標籤
+            time_label = tk.Label(frame, text="預估剩餘時間: 計算中...", font=('Arial', 9), fg='gray')
+            time_label.pack(anchor='w')
+            
+            def on_cancel():
+                self._cancel_flag = True
+                lbl.config(text="正在取消，請稍候…")
+            btn = tk.Button(frame, text="取消", command=on_cancel)
+            btn.pack(pady=(4,0))
+            
+            self._progress_win = win
+            self._progress_label = lbl
+            self._progress_bar = bar
+            self._time_label = time_label
+            self._start_time = None
+        except Exception as e:
+            print(f"顯示進度窗失敗: {e}")
+
+    def _update_progress(self, text: str):
+        try:
+            if self._progress_win and self._progress_win.winfo_exists():
+                self._progress_label.config(text=text)
+        except Exception:
+            pass
+
+    def _close_progress(self):
+        try:
+            if self._progress_win and self._progress_win.winfo_exists():
+                self._progress_win.destroy()
+        except Exception:
+            pass
+        self._progress_win = None
+        self._cancel_flag = False
+
+    def _progress_set_determinate(self, maximum: int):
+        """將進度條切換為可顯示百分比的 determinate 模式"""
+        try:
+            from tkinter import ttk as _ttk
+            if not (self._progress_win and self._progress_win.winfo_exists()):
+                return
+            try:
+                self._progress_bar.stop()
+            except Exception:
+                pass
+            self._progress_bar.configure(mode='determinate', maximum=max(1, int(maximum)))
+            self._progress_bar['value'] = 0
+            self._start_time = time.time()  # 記錄開始時間
+        except Exception as e:
+            print(f"設定 determinate 進度失敗: {e}")
+
+    def _progress_set_value(self, current: int, total: int):
+        try:
+            if not (self._progress_win and self._progress_win.winfo_exists()):
+                return
+            total = max(1, int(total))
+            current = min(max(0, int(current)), total)
+            self._progress_bar['value'] = current
+            percent = int(current * 100 / total)
+            self._progress_label.config(text=f"正在分析... {percent}%")
+            
+            # 計算剩餘時間
+            if hasattr(self, '_start_time') and self._start_time and current > 0:
+                elapsed_time = time.time() - self._start_time
+                if current < total:
+                    avg_time_per_item = elapsed_time / current
+                    remaining_items = total - current
+                    estimated_remaining = avg_time_per_item * remaining_items
+                    
+                    if estimated_remaining < 60:
+                        time_text = f"預估剩餘時間: {int(estimated_remaining)} 秒"
+                    else:
+                        minutes = int(estimated_remaining // 60)
+                        seconds = int(estimated_remaining % 60)
+                        time_text = f"預估剩餘時間: {minutes} 分 {seconds} 秒"
+                else:
+                    time_text = "即將完成..."
+                
+                if hasattr(self, '_time_label'):
+                    self._time_label.config(text=time_text)
+            
+            self._progress_win.update_idletasks()
+        except Exception:
+            pass
+    
+    def _clear_enhanced_results(self):
+        """清除分析結果並清理暫存檔案"""
+        try:
+            # 清理壓縮檔解壓縮的暫存檔案
+            self._cleanup_temp_files()
+            
+            # 清除當前選擇的路徑
+            self.current_log_path = ''
+            self.current_mode = 'single'
+            
+            # 清除 UI 顯示
+            if hasattr(self, 'file_info_label'):
+                self.file_info_label.config(text="尚未選擇檔案", fg='gray')
+            
+            # 清除分頁內容
+            if hasattr(self, 'pass_tree'):
+                for item in self.pass_tree.get_children():
+                    self.pass_tree.delete(item)
+            
+            if hasattr(self, 'fail_tree'):
+                for item in self.fail_tree.get_children():
+                    self.fail_tree.delete(item)
+            
+            if hasattr(self, 'raw_text'):
+                self.raw_text.delete(1.0, tk.END)
+            
+            print("已清除所有結果")
+        except Exception as e:
+            print(f"清除結果時發生錯誤: {e}")
+    
+    def _on_search_change(self, event):
+        """搜尋內容改變時的即時搜尋"""
+        try:
+            print("搜尋內容改變事件觸發")
+            # 如果輸入超過2個字元就開始搜尋
+            search_text = self.search_var.get().strip()
+            print(f"搜尋文字：'{search_text}'")
+            if len(search_text) >= 2:
+                self._search_next()
+            elif len(search_text) == 0:
+                self._clear_search()
+        except Exception as e:
+            print(f"搜尋改變事件錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _on_search_enter(self, event):
+        """按下Enter鍵時執行搜尋"""
+        try:
+            print("Enter鍵搜尋事件觸發")
+            self._search_next()
+        except Exception as e:
+            print(f"Enter搜尋事件錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_next(self):
+        """搜尋下一個匹配項目"""
+        try:
+            search_text = self.search_var.get().strip()
+            if not search_text:
+                return
+            
+            # 檢查當前選中的標籤頁
+            current_tab = self.notebook.select()
+            print(f"搜尋下一個 - 當前標籤頁：{current_tab}")
+            
+            # 獲取當前選中的標籤頁索引
+            current_tab_index = self.notebook.index(current_tab)
+            print(f"搜尋下一個 - 當前標籤頁索引：{current_tab_index}")
+            
+            if current_tab_index == 2:  # 原始LOG標籤頁
+                # 在原始LOG標籤頁中搜尋
+                if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                    self._search_next_in_text(self.log_text_enhanced.text, search_text)
+                elif hasattr(self, 'raw_text'):
+                    self._search_next_in_text(self.raw_text, search_text)
+                else:
+                    print("未找到原始LOG Text元件")
+            else:
+                # 在其他標籤頁中搜尋
+                self._perform_search()
+                
+        except Exception as e:
+            print(f"搜尋下一個時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_prev(self):
+        """搜尋上一個匹配項目"""
+        try:
+            search_text = self.search_var.get().strip()
+            if not search_text:
+                return
+            
+            # 檢查當前選中的標籤頁
+            current_tab = self.notebook.select()
+            print(f"搜尋上一個 - 當前標籤頁：{current_tab}")
+            
+            # 獲取當前選中的標籤頁索引
+            current_tab_index = self.notebook.index(current_tab)
+            print(f"搜尋上一個 - 當前標籤頁索引：{current_tab_index}")
+            
+            if current_tab_index == 2:  # 原始LOG標籤頁
+                # 在原始LOG標籤頁中搜尋
+                if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                    self._search_prev_in_text(self.log_text_enhanced.text, search_text)
+                elif hasattr(self, 'raw_text'):
+                    self._search_prev_in_text(self.raw_text, search_text)
+                else:
+                    print("未找到原始LOG Text元件")
+            else:
+                # 在其他標籤頁中搜尋
+                self._perform_search()
+                
+        except Exception as e:
+            print(f"搜尋上一個時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_next_in_text(self, text_widget, search_text):
+        """在Text元件中搜尋下一個"""
+        try:
+            print(f"在Text中搜尋下一個：'{search_text}'")
+            
+            # 檢查Text元件是否有內容
+            content = text_widget.get('1.0', tk.END)
+            print(f"Text內容長度：{len(content)}")
+            
+            if len(content) <= 1:  # 只有換行符
+                print("Text元件為空，無法搜尋")
+                self._update_search_count(0)
+                return
+            
+            # 先清除之前的選取
+            text_widget.tag_remove(tk.SEL, '1.0', tk.END)
+            text_widget.tag_remove('search_highlight', '1.0', tk.END)
+            
+            # 設定搜尋高亮樣式
+            text_widget.tag_configure('search_highlight', background='#FFFF00', foreground='#000000')
+            
+            # 計算總匹配數量
+            count = 0
+            pos = '1.0'
+            while True:
+                pos = text_widget.search(search_text, pos, tk.END, nocase=True)
+                if not pos:
+                    break
+                count += 1
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.tag_add('search_highlight', pos, end_pos)
+                pos = end_pos
+            
+            # 更新搜尋計數
+            self._update_search_count(count)
+            
+            # 從當前游標位置開始搜尋
+            pos = text_widget.search(search_text, tk.INSERT, tk.END, nocase=True)
+            if pos:
+                # 找到匹配項目
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.mark_set(tk.INSERT, end_pos)
+                text_widget.see(pos)
+                text_widget.tag_add(tk.SEL, pos, end_pos)
+                print(f"找到下一個匹配項目：{pos}")
+            else:
+                # 從頭開始搜尋
+                pos = text_widget.search(search_text, '1.0', tk.END, nocase=True)
+                if pos:
+                    end_pos = f"{pos}+{len(search_text)}c"
+                    text_widget.mark_set(tk.INSERT, end_pos)
+                    text_widget.see(pos)
+                    text_widget.tag_add(tk.SEL, pos, end_pos)
+                    print(f"從頭找到匹配項目：{pos}")
+                else:
+                    print("未找到匹配項目")
+                    
+        except Exception as e:
+            print(f"搜尋下一個時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_prev_in_text(self, text_widget, search_text):
+        """在Text元件中搜尋上一個"""
+        try:
+            print(f"在Text中搜尋上一個：'{search_text}'")
+            
+            # 檢查Text元件是否有內容
+            content = text_widget.get('1.0', tk.END)
+            print(f"Text內容長度：{len(content)}")
+            
+            if len(content) <= 1:  # 只有換行符
+                print("Text元件為空，無法搜尋")
+                self._update_search_count(0)
+                return
+            
+            # 先清除之前的選取
+            text_widget.tag_remove(tk.SEL, '1.0', tk.END)
+            text_widget.tag_remove('search_highlight', '1.0', tk.END)
+            
+            # 設定搜尋高亮樣式
+            text_widget.tag_configure('search_highlight', background='#FFFF00', foreground='#000000')
+            
+            # 計算總匹配數量
+            count = 0
+            pos = '1.0'
+            while True:
+                pos = text_widget.search(search_text, pos, tk.END, nocase=True)
+                if not pos:
+                    break
+                count += 1
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.tag_add('search_highlight', pos, end_pos)
+                pos = end_pos
+            
+            # 更新搜尋計數
+            self._update_search_count(count)
+            
+            # 從當前游標位置向前搜尋
+            current_pos = text_widget.index(tk.INSERT)
+            print(f"當前游標位置：{current_pos}")
+            
+            # 從當前位置向前搜尋（不包含當前位置）
+            if current_pos != '1.0':
+                prev_pos = text_widget.index(f"{current_pos}-1c")
+                pos = text_widget.search(search_text, '1.0', prev_pos, nocase=True, backwards=True)
+            else:
+                # 如果已經在開頭，從末尾開始搜尋
+                pos = text_widget.search(search_text, tk.END, '1.0', nocase=True, backwards=True)
+            
+            if pos:
+                # 找到匹配項目
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.mark_set(tk.INSERT, pos)
+                text_widget.see(pos)
+                text_widget.tag_add(tk.SEL, pos, end_pos)
+                print(f"找到上一個匹配項目：{pos}")
+            else:
+                print("未找到匹配項目")
+                    
+        except Exception as e:
+            print(f"搜尋上一個時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _simple_search_prev(self, text_widget, search_text):
+        """簡單的向前搜尋邏輯"""
+        try:
+            # 先清除之前的選取
+            text_widget.tag_remove(tk.SEL, '1.0', tk.END)
+            text_widget.tag_remove('search_highlight', '1.0', tk.END)
+            
+            # 設定搜尋高亮樣式
+            text_widget.tag_configure('search_highlight', background='#FFFF00', foreground='#000000')
+            
+            # 獲取當前游標位置
+            current_pos = text_widget.index(tk.INSERT)
+            print(f"當前游標位置：{current_pos}")
+            
+            # 從當前位置向前搜尋（不包含當前位置）
+            # 先將游標向前移動一個字符
+            if current_pos != '1.0':
+                prev_pos = text_widget.index(f"{current_pos}-1c")
+                pos = text_widget.search(search_text, '1.0', prev_pos, nocase=True, backwards=True)
+            else:
+                # 如果已經在開頭，從末尾開始搜尋
+                pos = text_widget.search(search_text, tk.END, '1.0', nocase=True, backwards=True)
+            
+            if pos:
+                # 找到匹配項目
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.mark_set(tk.INSERT, pos)
+                text_widget.see(pos)
+                text_widget.tag_add(tk.SEL, pos, end_pos)
+                text_widget.tag_add('search_highlight', pos, end_pos)
+                print(f"找到上一個匹配項目：{pos}")
+            else:
+                print("未找到匹配項目")
+                self._update_search_count(0)
+                    
+        except Exception as e:
+            print(f"簡單搜尋上一個時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _perform_search(self):
+        """執行搜尋功能"""
+        try:
+            search_text = self.search_var.get().strip().lower()
+            print(f"開始搜尋：'{search_text}'")
+            
+            if not search_text:
+                self._clear_search()
+                return
+            
+            # 檢查當前選中的標籤頁
+            current_tab = self.notebook.select()
+            print(f"當前標籤頁：{current_tab}")
+            
+            # 根據當前標籤頁決定搜尋範圍
+            # 獲取當前選中的標籤頁索引
+            current_tab_index = self.notebook.index(current_tab)
+            print(f"當前標籤頁索引：{current_tab_index}")
+            
+            # 根據索引判斷標籤頁類型
+            if current_tab_index == 0:  # PASS標籤頁
+                print("在PASS標籤頁中搜尋...")
+                if hasattr(self, 'pass_tree_enhanced'):
+                    self._search_in_tree(self.pass_tree_enhanced, search_text)
+                else:
+                    print("未找到PASS tree")
+            elif current_tab_index == 1:  # FAIL標籤頁
+                print("在FAIL標籤頁中搜尋...")
+                if hasattr(self, 'fail_tree_enhanced'):
+                    self._search_in_tree(self.fail_tree_enhanced, search_text)
+                else:
+                    print("未找到FAIL tree")
+            elif current_tab_index == 2:  # 原始LOG標籤頁
+                print("在原始LOG標籤頁中搜尋...")
+                if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                    self._search_in_text(self.log_text_enhanced.text, search_text)
+                elif hasattr(self, 'raw_text'):
+                    self._search_in_text(self.raw_text, search_text)
+                else:
+                    print("未找到原始LOG Text元件")
+            else:
+                print(f"未知標籤頁索引：{current_tab_index}，嘗試搜尋原始LOG...")
+                if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                    self._search_in_text(self.log_text_enhanced.text, search_text)
+                elif hasattr(self, 'raw_text'):
+                    self._search_in_text(self.raw_text, search_text)
+                
+        except Exception as e:
+            print(f"搜尋時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_in_tree(self, tree_enhanced, search_text):
+        """在TreeView中搜尋"""
+        try:
+            tree = tree_enhanced.tree
+            # 清除之前的選取
+            tree.selection_remove(tree.selection())
+            
+            # 搜尋匹配的項目
+            matches = []
+            for item in tree.get_children():
+                values = tree.item(item, 'values')
+                # 檢查所有欄位是否包含搜尋文字
+                for value in values:
+                    if search_text in str(value).lower():
+                        matches.append(item)
+                        break
+            
+            # 更新搜尋計數
+            self._update_search_count(len(matches))
+            
+            if matches:
+                # 選取第一個匹配項目並滾動到該位置
+                tree.selection_set(matches[0])
+                tree.focus(matches[0])
+                tree.see(matches[0])
+                
+                # 高亮顯示所有匹配項目
+                for match in matches:
+                    tree.selection_add(match)
+                
+                print(f"找到 {len(matches)} 個匹配項目")
+            else:
+                print("未找到匹配項目")
+                
+        except Exception as e:
+            print(f"TreeView搜尋時發生錯誤: {e}")
+    
+    def _search_in_text(self, text_widget, search_text):
+        """在Text元件中搜尋 - 使用內建搜尋功能"""
+        try:
+            print(f"在Text元件中搜尋：'{search_text}'")
+            
+            # 檢查Text元件是否有內容
+            content = text_widget.get('1.0', tk.END)
+            print(f"Text內容長度：{len(content)}")
+            
+            if len(content) <= 1:  # 只有換行符
+                print("Text元件為空，無法搜尋")
+                self._update_search_count(0)
+                return
+            
+            # 先清除之前的搜尋
+            text_widget.tag_remove(tk.SEL, '1.0', tk.END)
+            text_widget.tag_remove('search_highlight', '1.0', tk.END)
+            
+            # 設定搜尋高亮樣式
+            text_widget.tag_configure('search_highlight', background='#FFFF00', foreground='#000000')
+            
+            # 計算總匹配數量
+            count = 0
+            pos = '1.0'
+            while True:
+                pos = text_widget.search(search_text, pos, tk.END, nocase=True)
+                if not pos:
+                    break
+                count += 1
+                end_pos = f"{pos}+{len(search_text)}c"
+                text_widget.tag_add('search_highlight', pos, end_pos)
+                pos = end_pos
+            
+            # 更新搜尋計數
+            self._update_search_count(count)
+            
+            if count > 0:
+                # 找到第一個匹配項目並滾動到該位置
+                first_pos = text_widget.search(search_text, '1.0', tk.END, nocase=True)
+                if first_pos:
+                    end_pos = f"{first_pos}+{len(search_text)}c"
+                    text_widget.mark_set(tk.INSERT, end_pos)
+                    text_widget.see(first_pos)
+                    text_widget.tag_add(tk.SEL, first_pos, end_pos)
+                    print(f"找到 {count} 個匹配項目，第一個在：{first_pos}")
+            else:
+                print("未找到匹配項目")
+                
+        except Exception as e:
+            print(f"Text搜尋時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _clear_search(self):
+        """清除搜尋結果"""
+        try:
+            # 清除搜尋框
+            self.search_var.set("")
+            
+            # 清除PASS樹狀檢視的選取
+            if hasattr(self, 'pass_tree_enhanced'):
+                self.pass_tree_enhanced.tree.selection_remove(self.pass_tree_enhanced.tree.selection())
+            
+            # 清除FAIL樹狀檢視的選取
+            if hasattr(self, 'fail_tree_enhanced'):
+                self.fail_tree_enhanced.tree.selection_remove(self.fail_tree_enhanced.tree.selection())
+            
+            # 清除原始LOG的選取和高亮
+            if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                self.log_text_enhanced.text.tag_remove(tk.SEL, '1.0', tk.END)
+                self.log_text_enhanced.text.tag_remove('search_highlight', '1.0', tk.END)
+                # 重置游標到開頭
+                self.log_text_enhanced.text.mark_set(tk.INSERT, '1.0')
+            elif hasattr(self, 'raw_text'):
+                self.raw_text.tag_remove(tk.SEL, '1.0', tk.END)
+                self.raw_text.tag_remove('search_highlight', '1.0', tk.END)
+                # 重置游標到開頭
+                self.raw_text.mark_set(tk.INSERT, '1.0')
+            
+            # 清除搜尋計數
+            if hasattr(self, 'search_count_label'):
+                self.search_count_label.config(text="")
+            
+            print("已清除搜尋結果")
+            
+        except Exception as e:
+            print(f"清除搜尋時發生錯誤: {e}")
+    
+    def _update_search_count(self, count):
+        """更新搜尋結果計數"""
+        try:
+            if hasattr(self, 'search_count_label'):
+                if count > 0:
+                    self.search_count_label.config(text=f"找到 {count} 個匹配項目", fg='#2196F3')
+                else:
+                    self.search_count_label.config(text="未找到匹配項目", fg='#F44336')
+        except Exception as e:
+            print(f"更新搜尋計數時發生錯誤: {e}")
+    
     def _analyze_enhanced_log(self):
         """分析log檔案並更新增強版GUI顯示"""
         if not self.current_log_path:
@@ -365,24 +1540,37 @@ class EnhancedLogAnalyzerApp:
         self.fail_tree_enhanced.clear()
         self.log_text_enhanced.clear()
 
+        # 顯示分析進度
+        filename = os.path.basename(self.current_log_path)
+        self._show_progress("正在分析LOG檔案", f"分析檔案: {filename}")
         
         try:
             if self.current_mode == 'single':
                 self._analyze_enhanced_single_file()
             else:
                 self._analyze_enhanced_multiple_files()
+            
+            # 分析完成後關閉進度條
+            self.root.after(100, self._close_progress)
                 
         except Exception as e:
+            self._close_progress()
             messagebox.showerror("分析錯誤", f"分析過程中發生錯誤：\n{str(e)}")
     
     def _analyze_enhanced_single_file(self):
         """分析單一檔案（增強版）"""
+        # 更新進度：開始解析
+        self._update_progress("正在解析LOG檔案內容...")
+        
         result = self.log_parser.parse_log_file(self.current_log_path)
         pass_items = result['pass_items']
         fail_items = result['fail_items']
         raw_lines = result['raw_lines']
         last_fail = result['last_fail']
         fail_line_idx = result['fail_line_idx']
+        
+        # 更新進度：處理PASS項目
+        self._update_progress(f"處理PASS項目 ({len(pass_items)} 個)...")
         
         # Tab1: PASS - 顯示所有通過的測項
         for idx, item in enumerate(pass_items, 1):
@@ -395,6 +1583,9 @@ class EnhancedLogAnalyzerApp:
                 has_retry=has_retry
             )
         
+        # 更新進度：處理FAIL項目
+        self._update_progress(f"處理FAIL項目 ({len(fail_items)} 個)...")
+        
         # Tab2: FAIL - 顯示所有FAIL區塊
         for idx, item in enumerate(fail_items):
             is_main_fail = item.get('is_main_fail', False)
@@ -404,6 +1595,9 @@ class EnhancedLogAnalyzerApp:
                 full_response=full_response,
                 is_main_fail=is_main_fail
             )
+        
+        # 更新進度：處理原始LOG
+        self._update_progress("處理原始LOG內容...")
         
         # Tab3: 原始LOG，標紅錯誤行並自動跳轉
         if raw_lines:
@@ -420,30 +1614,240 @@ class EnhancedLogAnalyzerApp:
                 self.log_text_enhanced.highlight_error_block(fail_line_idx + 1, fail_line_idx + 1)
                 self.log_text_enhanced.text.see(f"{fail_line_idx + 1}.0")
         
+        # 更新進度：完成分析
+        self._update_progress("分析完成！")
+        
         # 自動切換到相關Tab
         if fail_items:
             self.notebook.select(self.tab_fail)
+            # 延遲切換到原始LOG標籤頁並聚焦錯誤位置
+            self.root.after(2000, self._switch_to_log_and_focus_error)
         else:
             self.notebook.select(self.tab_pass)
+        
+        # 根據分析結果動態顯示/隱藏標籤頁
+        self._update_tab_visibility(pass_items, fail_items)
+    
+    def _update_tab_visibility(self, pass_items, fail_items):
+        """根據分析結果動態顯示/隱藏標籤頁"""
+        try:
+            # 如果沒有FAIL項目，隱藏FAIL標籤頁
+            if not fail_items:
+                # 檢查FAIL標籤頁是否存在於notebook中
+                fail_tab_index = None
+                for i in range(self.notebook.index("end")):
+                    if self.notebook.tab(i, "text") == "❌ FAIL測項":
+                        fail_tab_index = i
+                        break
+                
+                if fail_tab_index is not None:
+                    # 隱藏FAIL標籤頁
+                    self.notebook.forget(fail_tab_index)
+                    print("已隱藏FAIL標籤頁（無FAIL項目）")
+            else:
+                # 如果有FAIL項目，確保FAIL標籤頁存在
+                fail_tab_exists = False
+                for i in range(self.notebook.index("end")):
+                    if self.notebook.tab(i, "text") == "❌ FAIL測項":
+                        fail_tab_exists = True
+                        break
+                
+                if not fail_tab_exists:
+                    # 重新添加FAIL標籤頁
+                    self._build_enhanced_fail_tab()
+                    print("已重新顯示FAIL標籤頁")
+        
+        except Exception as e:
+            print(f"更新標籤頁可見性時發生錯誤: {e}")
+    
+    def _show_file_preview(self, file_path, file_type):
+        """顯示檔案預覽視窗"""
+        try:
+            import os
+            import zipfile
+            from datetime import datetime
+            
+            # 創建預覽視窗
+            preview_window = tk.Toplevel(self.root)
+            preview_window.title("檔案預覽")
+            preview_window.geometry("600x400")
+            preview_window.resizable(True, True)
+            
+            # 主框架
+            main_frame = tk.Frame(preview_window)
+            main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            
+            # 檔案基本資訊
+            filename = os.path.basename(file_path)
+            file_size = os.path.getsize(file_path)
+            file_size_mb = file_size / (1024 * 1024)
+            mod_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+            
+            # 標題
+            title_label = tk.Label(main_frame, text=f"📄 {filename}", 
+                                 font=('Arial', 14, 'bold'))
+            title_label.pack(pady=(0, 10))
+            
+            # 基本資訊框架
+            info_frame = tk.Frame(main_frame)
+            info_frame.pack(fill=tk.X, pady=(0, 10))
+            
+            tk.Label(info_frame, text=f"檔案類型: {file_type.upper()}", 
+                   font=('Arial', 10)).pack(anchor='w')
+            tk.Label(info_frame, text=f"檔案大小: {file_size_mb:.2f} MB", 
+                   font=('Arial', 10)).pack(anchor='w')
+            tk.Label(info_frame, text=f"修改時間: {mod_time.strftime('%Y-%m-%d %H:%M:%S')}", 
+                   font=('Arial', 10)).pack(anchor='w')
+            tk.Label(info_frame, text=f"完整路徑: {file_path}", 
+                   font=('Arial', 9), fg='gray').pack(anchor='w')
+            
+            # 內容預覽
+            content_frame = tk.Frame(main_frame)
+            content_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+            
+            tk.Label(content_frame, text="內容預覽:", 
+                   font=('Arial', 11, 'bold')).pack(anchor='w')
+            
+            # 創建文字區域顯示內容
+            text_frame = tk.Frame(content_frame)
+            text_frame.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
+            
+            text_widget = tk.Text(text_frame, wrap=tk.WORD, height=10)
+            scrollbar = tk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
+            text_widget.configure(yscrollcommand=scrollbar.set)
+            
+            text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            # 根據檔案類型顯示不同內容
+            if file_type == 'log':
+                self._preview_log_content(file_path, text_widget)
+            elif file_type == 'compressed':
+                self._preview_compressed_content(file_path, text_widget)
+            
+            # 按鈕框架
+            button_frame = tk.Frame(main_frame)
+            button_frame.pack(fill=tk.X, pady=(10, 0))
+            
+            tk.Button(button_frame, text="確認開啟", 
+                     command=lambda: self._confirm_open_file(preview_window, file_path),
+                     bg='#4CAF50', fg='white', font=('Arial', 10)).pack(side=tk.RIGHT, padx=(5, 0))
+            
+            tk.Button(button_frame, text="取消", 
+                     command=preview_window.destroy,
+                     bg='#f44336', fg='white', font=('Arial', 10)).pack(side=tk.RIGHT)
+            
+            # 讓文字區域不可編輯
+            text_widget.config(state=tk.DISABLED)
+            
+        except Exception as e:
+            print(f"顯示檔案預覽時發生錯誤: {e}")
+            # 如果預覽失敗，直接繼續處理
+            return True
+    
+    def _preview_log_content(self, file_path, text_widget):
+        """預覽LOG檔案內容"""
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()[:50]  # 只讀取前50行
+                content = ''.join(lines)
+                text_widget.insert(tk.END, content)
+                
+                if len(lines) == 50:
+                    text_widget.insert(tk.END, "\n... (顯示前50行，完整內容將在分析時載入)")
+        except Exception as e:
+            text_widget.insert(tk.END, f"無法讀取檔案內容: {e}")
+    
+    def _preview_compressed_content(self, file_path, text_widget):
+        """預覽壓縮檔案內容"""
+        try:
+            file_ext = os.path.splitext(file_path)[1].lower()
+            
+            if file_ext == '.zip':
+                with zipfile.ZipFile(file_path, 'r') as zip_file:
+                    file_list = zip_file.namelist()
+                    text_widget.insert(tk.END, f"ZIP檔案包含 {len(file_list)} 個檔案:\n\n")
+                    
+                    # 顯示前20個檔案
+                    for i, filename in enumerate(file_list[:20]):
+                        file_info = zip_file.getinfo(filename)
+                        text_widget.insert(tk.END, f"  📄 {filename} ({file_info.file_size} bytes)\n")
+                    
+                    if len(file_list) > 20:
+                        text_widget.insert(tk.END, f"\n... 還有 {len(file_list) - 20} 個檔案")
+                        
+            elif file_ext == '.7z':
+                # 檢查是否安裝了py7zr
+                try:
+                    import py7zr
+                    with py7zr.SevenZipFile(file_path, mode='r') as archive:
+                        file_list = archive.getnames()
+                        text_widget.insert(tk.END, f"7Z檔案包含 {len(file_list)} 個檔案:\n\n")
+                        
+                        # 顯示前20個檔案
+                        for i, filename in enumerate(file_list[:20]):
+                            text_widget.insert(tk.END, f"  📄 {filename}\n")
+                        
+                        if len(file_list) > 20:
+                            text_widget.insert(tk.END, f"\n... 還有 {len(file_list) - 20} 個檔案")
+                except ImportError:
+                    text_widget.insert(tk.END, f"7Z檔案預覽需要安裝 py7zr 套件\n")
+                    text_widget.insert(tk.END, f"請執行: pip install py7zr\n\n")
+                    text_widget.insert(tk.END, f"檔案大小: {os.path.getsize(file_path) / (1024*1024):.2f} MB")
+                    
+            elif file_ext == '.rar':
+                text_widget.insert(tk.END, f"RAR檔案預覽功能尚未實現\n")
+                text_widget.insert(tk.END, f"檔案大小: {os.path.getsize(file_path) / (1024*1024):.2f} MB")
+            else:
+                text_widget.insert(tk.END, f"不支援的壓縮格式: {file_ext}")
+                
+        except Exception as e:
+            text_widget.insert(tk.END, f"無法讀取壓縮檔案內容: {e}")
+    
+    def _confirm_open_file(self, preview_window, file_path):
+        """確認開啟檔案"""
+        preview_window.destroy()
+        # 這裡可以添加額外的確認邏輯
+        return True
     
     def _analyze_enhanced_multiple_files(self):
         """分析多個檔案（增強版）"""
         # 逐檔案解析，按照檔名是否含 PASS 分類
         folder = self.current_log_path
+        
+        # 先計算總檔案數
+        total_files = 0
+        for root, dirs, files in os.walk(folder):
+            for fn in files:
+                if fn.lower().endswith('.log'):
+                    total_files += 1
+        
+        # 設定進度條為確定模式
+        self._progress_set_determinate(total_files)
+        self._update_progress(f"準備分析 {total_files} 個LOG檔案...")
+        
         # 顯示將被處理的 .log 檔清單預覽
         try:
             self._show_log_file_preview(folder)
         except Exception:
             pass
+        
         pass_logs = []
         fail_logs = []
-        total_files = 0
+        processed_files = 0
+        
         for root, dirs, files in os.walk(folder):
             for fn in files:
                 if not fn.lower().endswith('.log'):
                     continue
-                total_files += 1
+                
+                processed_files += 1
                 path = os.path.join(root, fn)
+                
+                # 更新進度
+                self._update_progress(f"分析檔案 {processed_files}/{total_files}: {fn}")
+                self._progress_set_value(processed_files, total_files)
+                
                 res = self.log_parser.parse_log_file(path)
                 # 擷取必要資訊供 Excel 與 Summary Tab 使用
                 entry = {
@@ -459,10 +1863,16 @@ class EnhancedLogAnalyzerApp:
                 if 'PASS' in fn.upper():
                     pass_logs.append(entry)
                 else:
-                    # 記錄第一個 FAIL 原因到 summary
+                    # 記錄第一個 FAIL 原因到 summary，使用統一的錯誤提取邏輯
                     if res.get('fail_items'):
-                        entry['summary']['FAIL原因'] = res['fail_items'][0].get('error', '')
+                        # 使用統一的錯誤提取邏輯
+                        main_error = self._extract_main_fail_reason_from_items(res['fail_items'])
+                        entry['summary']['FAIL原因'] = main_error
                     fail_logs.append(entry)
+                    
+        # 為左側視窗添加LOG分類顯示
+        self._display_folder_analysis_preview(pass_logs, fail_logs)
+        
         # 將 pass/fail 測項分別展示於 PASS/FAIL 標籤頁（聚合）
         for idx, entry in enumerate(pass_logs, 1):
             for j, item in enumerate(entry['pass_items'], 1):
@@ -479,6 +1889,31 @@ class EnhancedLogAnalyzerApp:
                     full_response=item.get('full_response', ''),
                     is_main_fail=item.get('is_main_fail', False)
                 )
+        # 為資料夾分析添加原始LOG顯示功能
+        if fail_logs:
+            # 合併所有FAIL LOG的內容到原始LOG標籤頁
+            all_raw_lines = []
+            all_fail_items = []
+            all_pass_items = []
+            fail_line_idx = None
+            
+            for entry in fail_logs:
+                all_raw_lines.extend(entry.get('raw_lines', []))
+                all_fail_items.extend(entry.get('fail_items', []))
+                all_pass_items.extend(entry.get('pass_items', []))
+            
+            # 在原始LOG標籤頁顯示合併的內容
+            if all_raw_lines:
+                log_content = '\n'.join(all_raw_lines)
+                self.log_text_enhanced.insert_log_with_highlighting(log_content, {
+                    'fail_line_idx': fail_line_idx,
+                    'pass_items': all_pass_items,
+                    'fail_items': all_fail_items
+                })
+            
+            # 自動切換到原始LOG標籤頁
+            self.notebook.select(self.tab_log)
+        
         # 匯出 Excel：PASS匯總/FAIL匯總，放同資料夾
         try:
             # 在 LOG 目錄下建立 LOG集總整理 子目錄
@@ -494,6 +1929,121 @@ class EnhancedLogAnalyzerApp:
         # 自動切到匯總報表（取消）
         # self.notebook.select(self.tab_summary)
 
+    def _display_folder_analysis_preview(self, pass_logs, fail_logs):
+        """在左側視窗顯示資料夾分析預覽"""
+        try:
+            preview_text = "=== 資料夾分析預覽 ===\n\n"
+            
+            # 顯示 PASS 檔案
+            if pass_logs:
+                preview_text += "✅ PASS 檔案:\n"
+                for entry in pass_logs:
+                    preview_text += f"  • {entry['file_name']}\n"
+                preview_text += "\n"
+            
+            # 顯示 FAIL 檔案與主要錯誤原因
+            if fail_logs:
+                preview_text += "❌ FAIL 檔案與主要錯誤原因:\n"
+                for entry in fail_logs:
+                    filename = entry['file_name']
+                    main_error = entry['summary'].get('FAIL原因', '未知錯誤')
+                    preview_text += f"  📄 {filename}\n"
+                    
+                    # 突出顯示錯誤原因
+                    if "doesn't match" in main_error.lower():
+                        preview_text += f"     🔴 主要錯誤: {main_error}\n"
+                    else:
+                        preview_text += f"     ⚠️  主要錯誤: {main_error}\n"
+                    preview_text += "\n"
+            
+            # 統計資訊
+            preview_text += f"📊 統計:\n"
+            preview_text += f"  PASS: {len(pass_logs)} 個檔案\n"
+            preview_text += f"  FAIL: {len(fail_logs)} 個檔案\n"
+            preview_text += f"  總計: {len(pass_logs) + len(fail_logs)} 個檔案\n"
+            
+            # 在左側面板顯示
+            if hasattr(self, 'file_info_label'):
+                self.file_info_label.config(text=preview_text, justify='left', wraplength=250)
+            
+        except Exception as e:
+            print(f"顯示資料夾分析預覽失敗: {e}")
+
+    def _extract_main_fail_reason_from_items(self, fail_items):
+        """從FAIL項目列表中提取主要錯誤原因"""
+        if not fail_items:
+            return "未知錯誤"
+        
+        # 優先找到包含 "is Fail" 的項目
+        for item in fail_items:
+            full_response = item.get('full_response', '')
+            if full_response:
+                lines = full_response.split('\n')
+                for line in lines:
+                    # 移除行號前綴（如 "370. "）
+                    clean_line = line
+                    if '. ' in line and line.split('. ', 1)[0].strip().isdigit():
+                        clean_line = line.split('. ', 1)[1]
+                    
+                    # 找到包含 "is Fail" 的行
+                    if "is Fail" in clean_line:
+                        # 處理類似 "VSCH026-043:Chec Frimware version is Fail ! <ErrorCode: BSFR18>" 的格式
+                        if ':' in clean_line and "is Fail" in clean_line:
+                            # 擷取冒號後的部分
+                            after_colon = clean_line.split(":", 1)[1].strip()
+                            # 找到 "is Fail" 的位置
+                            if "is Fail" in after_colon:
+                                fail_pos = after_colon.find("is Fail")
+                                # 擷取到 "is Fail" 結束的部分，去掉後面的 <ErrorCode: xxx> 和時間戳記
+                                test_name_with_fail = after_colon[:fail_pos + 7].strip()  # 7 = len("is Fail")
+                                
+                                # 移除時間戳記（如 "2025/08/07 08:53:36 [1]" 格式）
+                                if '[' in test_name_with_fail and ']' in test_name_with_fail:
+                                    bracket_start = test_name_with_fail.find('[')
+                                    bracket_end = test_name_with_fail.find(']')
+                                    if bracket_start != -1 and bracket_end != -1:
+                                        # 檢查括號前是否有時間戳記格式
+                                        before_bracket = test_name_with_fail[:bracket_start].strip()
+                                        if '/' in before_bracket and ':' in before_bracket:
+                                            # 移除時間戳記部分
+                                            test_name_with_fail = test_name_with_fail[bracket_end + 1:].strip()
+                                
+                                return test_name_with_fail
+                        elif "is Fail" in clean_line:
+                            # 如果沒有冒號但有 "is Fail"，直接擷取到 "is Fail" 結束
+                            fail_pos = clean_line.find("is Fail")
+                            if fail_pos != -1:
+                                # 找到 <ErrorCode: 的位置
+                                error_code_pos = clean_line.find("<ErrorCode:")
+                                if error_code_pos != -1:
+                                    return clean_line[:error_code_pos].strip()
+                                else:
+                                    return clean_line[:fail_pos + 7].strip()
+        
+        # 如果沒有找到 "is Fail"，嘗試找到其他錯誤資訊
+        for item in fail_items:
+            full_response = item.get('full_response', '')
+            if full_response:
+                lines = full_response.split('\n')
+                for line in lines:
+                    clean_line = line
+                    if '. ' in line and line.split('. ', 1)[0].strip().isdigit():
+                        clean_line = line.split('. ', 1)[1]
+                    
+                    # 尋找包含 "All Test Aborted" 的行
+                    if "All Test Aborted" in clean_line:
+                        return clean_line
+                    
+                    # 尋找其他嚴重錯誤
+                    line_lower = clean_line.lower()
+                    if any(critical_error in line_lower for critical_error in [
+                        'segmentation fault', 'core dumped', 'executes fail', 
+                        "doesn't match", 'timeout', 'exception'
+                    ]):
+                        return clean_line
+        
+        # 如果都沒有找到，返回第一個項目的錯誤信息
+        return fail_items[0].get('error', '未知錯誤')
 
     def _extract_file_summary(self, parse_result: dict, file_path: str) -> dict:
         """從檔名或檔案內容提取測試日期時間、SFIS狀態、測試總時間、主要FAIL原因（若有）"""
@@ -666,7 +2216,7 @@ class EnhancedLogAnalyzerApp:
             print(f"處理FAIL項目選擇失敗: {e}")
     
     def _extract_fail_reason(self, full_content):
-        """提取FAIL原因部分，優先提取包含 'is Fail' 的行"""
+        """提取FAIL原因部分，包含更多錯誤關鍵字"""
         if not full_content:
             return "沒有詳細錯誤內容可顯示"
         
@@ -684,12 +2234,8 @@ class EnhancedLogAnalyzerApp:
             # 優先提取包含 "is Fail" 的行
             if "is Fail" in clean_line:
                 is_fail_lines.append(clean_line)
-            # 其他包含重要錯誤資訊的行
-            elif any(keyword in clean_line for keyword in [
-                'Result:', 'validation:', 'type of', 'TestTime:', 
-                'ErrorCode:', 'Test Completed', 'Test Aborted', 'TotalCount:', 
-                'Report name:', 'Execute Phase', 'FAIL', 'ERROR', 'NACK'
-            ]):
+            # 其他包含重要錯誤資訊的行，使用統一的錯誤關鍵字
+            elif self._is_error_line(clean_line):
                 fail_reason_lines.append(clean_line)
         
         # 優先顯示包含 "is Fail" 的行，然後是其他錯誤資訊
@@ -757,18 +2303,111 @@ class EnhancedLogAnalyzerApp:
         
         return "未知錯誤"
     
-    def _insert_formatted_fail_content(self, content):
-        """插入格式化的FAIL內容，特定行顯示紅色"""
-        lines = content.split('\n')
-        for line in lines:
-            # 檢查是否包含 "is Fail" 的行，顯示紅色
-            if "is Fail" in line:
-                self.fail_error_text.insert(tk.END, line + '\n', 'fail_red')
-            else:
-                self.fail_error_text.insert(tk.END, line + '\n')
+    def _is_error_line(self, line):
+        """統一的錯誤行識別邏輯"""
+        if not line:
+            return False
         
-        # 設定紅色文字標籤
+        line_lower = line.lower()
+        # 統一的錯誤關鍵字列表
+        error_keywords = [
+            'Result:', 'validation:', 'type of', 'TestTime:', 
+            'ErrorCode:', 'Test Completed', 'Test Aborted', 'TotalCount:', 
+            'Report name:', 'Execute Phase', 'FAIL', 'ERROR', 'NACK',
+            'fail', 'error', 'wrong', 'segmentation fault', 'core dumped',
+            'executes fail', "doesn't match", 'timeout', 'exception'
+        ]
+        
+        return any(keyword in line_lower for keyword in error_keywords)
+    
+    def _switch_to_log_and_focus_error(self):
+        """切換到原始LOG標籤頁並聚焦到錯誤位置"""
+        try:
+            # 切換到原始LOG標籤頁
+            self.notebook.select(self.tab_log)
+            
+            # 尋找第一個錯誤行並聚焦
+            if hasattr(self, 'log_text_enhanced') and self.log_text_enhanced:
+                self.log_text_enhanced.focus_first_error_line()
+        except Exception as e:
+            print(f"切換到LOG標籤頁並聚焦錯誤失敗: {e}")
+    
+    def _insert_formatted_fail_content(self, content):
+        """插入格式化的FAIL內容，顯示所有錯誤"""
+        # 先插入標題
+        self.fail_error_text.insert(tk.END, "===============錯誤原因====================\n", 'error_title')
+        
+        lines = content.split('\n')
+        error_lines = []
+        doesnt_match_lines = []
+        
+        # 收集所有錯誤行，特別標記 "doesn't match"
+        for line in lines:
+            line_lower = line.lower()
+            
+            # 檢查不同類型的錯誤
+            if ("is Fail" in line or 
+                any(critical_error in line_lower for critical_error in [
+                    'segmentation fault', 'core dumped', 'executes fail', 
+                    "doesn't match", 'timeout', 'exception'
+                ]) or
+                any(error_keyword in line_lower for error_keyword in [
+                    'error', 'fail', 'wrong'
+                ]) or
+                any(keyword in line_lower for keyword in [
+                    'errorcode:', 'test aborted', 'all test aborted'
+                ])):
+                error_lines.append(line)
+                
+                # 特別標記 "doesn't match" 相關行
+                if "doesn't match" in line_lower:
+                    doesnt_match_lines.append(line)
+        
+        # 優先顯示 "doesn't match" 錯誤
+        if doesnt_match_lines:
+            self.fail_error_text.insert(tk.END, "\n🔴 突出錯誤 (doesn't match):\n", 'highlight_title')
+            for line in doesnt_match_lines:
+                self.fail_error_text.insert(tk.END, line + '\n', 'doesnt_match_error')
+            self.fail_error_text.insert(tk.END, "\n" + "=" * 50 + "\n\n", 'separator')
+        
+        # 顯示所有其他錯誤行
+        for line in error_lines:
+            if line not in doesnt_match_lines:  # 避免重複顯示
+                line_lower = line.lower()
+                
+                # 檢查不同類型的錯誤並用不同顏色標記
+                if "is Fail" in line:
+                    # 主要錯誤：紅色粗體
+                    self.fail_error_text.insert(tk.END, line + '\n', 'fail_red')
+                elif any(critical_error in line_lower for critical_error in [
+                    'segmentation fault', 'core dumped', 'executes fail', 
+                    'timeout', 'exception'
+                ]):
+                    # 嚴重錯誤：深紅色粗體
+                    self.fail_error_text.insert(tk.END, line + '\n', 'critical_error')
+                elif any(error_keyword in line_lower for error_keyword in [
+                    'error', 'fail', 'wrong'
+                ]) and not "is Fail" in line:
+                    # 一般錯誤關鍵字：橙紅色
+                    self.fail_error_text.insert(tk.END, line + '\n', 'error_keyword')
+                elif any(keyword in line_lower for keyword in [
+                    'errorcode:', 'test aborted', 'all test aborted'
+                ]):
+                    # 錯誤代碼：橙色
+                    self.fail_error_text.insert(tk.END, line + '\n', 'error_code')
+                else:
+                    # 其他錯誤：紅色
+                    self.fail_error_text.insert(tk.END, line + '\n', 'fail_red')
+        
+        # 設定不同的文字標籤樣式
+        self.fail_error_text.tag_configure('error_title', foreground='red', font=('Arial', 14, 'bold'))
+        self.fail_error_text.tag_configure('highlight_title', foreground='darkred', font=('Arial', 12, 'bold'))
+        self.fail_error_text.tag_configure('doesnt_match_error', foreground='darkred', font=('Consolas', 12, 'bold'), background='#FFE6E6')
+        self.fail_error_text.tag_configure('separator', foreground='gray', font=('Consolas', 10))
         self.fail_error_text.tag_configure('fail_red', foreground='red', font=('Consolas', 12, 'bold'))
+        self.fail_error_text.tag_configure('critical_error', foreground='darkred', font=('Consolas', 12, 'bold'))
+        self.fail_error_text.tag_configure('error_keyword', foreground='orangered', font=('Consolas', 11, 'bold'))
+        self.fail_error_text.tag_configure('error_code', foreground='darkorange', font=('Consolas', 11, 'bold'))
     
     def _apply_font_size(self):
         """套用字體大小"""
@@ -1154,7 +2793,23 @@ class EnhancedLogAnalyzerApp:
             self.paned.update_idletasks()
         save_settings(self.settings)
 
-
+    def _show_log_file_preview(self, folder):
+        """顯示將被處理的 .log 檔清單預覽"""
+        try:
+            log_files = []
+            for root, dirs, files in os.walk(folder):
+                for fn in files:
+                    if fn.lower().endswith('.log'):
+                        log_files.append(fn)
+            
+            if log_files:
+                preview_text = f"將處理 {len(log_files)} 個 .log 檔案:\n"
+                preview_text += "\n".join(f"  • {fn}" for fn in sorted(log_files))
+                # 可以在這裡顯示預覽，例如更新左側面板的某個標籤
+                # 但目前先保持簡單
+                print(preview_text)
+        except Exception as e:
+            print(f"顯示LOG檔案預覽失敗: {e}")
 
     def _auto_resize_text_window(self, win, text_widget):
         """根據文字內容自動調整文字視窗大小，確保導航按鈕始終可見"""
@@ -1195,23 +2850,25 @@ class EnhancedLogAnalyzerApp:
             print(f"自動調整文字視窗大小失敗: {e}")
 
     def _show_open_folder_prompt(self, out_dir: str, total_files: int, pass_count: int, fail_count: int, pass_path: str, fail_path: str):
-        """白底視窗，僅問題段落以黃底黑字反白"""
+        """白底視窗，加入打勾選項選擇要開啟的檔案"""
         win = tk.Toplevel(self.root)
         win.title("匯出完成")
-        win.geometry("700x300")
+        win.geometry("700x400")
         
         # 讓視窗居中顯示
         win.transient(self.root)
         win.grab_set()
         win.update_idletasks()
         x = (win.winfo_screenwidth() // 2) - (700 // 2)
-        y = (win.winfo_screenheight() // 2) - (300 // 2)
-        win.geometry(f"700x300+{x}+{y}")
+        y = (win.winfo_screenheight() // 2) - (400 // 2)
+        win.geometry(f"700x400+{x}+{y}")
         
         try:
             win.configure(bg='white')
         except Exception:
             pass
+        
+        # 主要資訊
         info = (
             f"匯出完成 / 共 {total_files} 個檔案\n\n"
             f"PASS: {pass_count}\nFAIL: {fail_count}\n\n"
@@ -1219,22 +2876,90 @@ class EnhancedLogAnalyzerApp:
         )
         lbl_info = tk.Label(win, text=info, bg='white', fg='black', font=('Microsoft JhengHei', 11))
         lbl_info.pack(fill=tk.BOTH, expand=1, padx=16, pady=(16, 6))
-        lbl_ask = tk.Label(win, text="是否要開啟輸出資料夾？", bg='#FFF176', fg='black', font=('Microsoft JhengHei', 11, 'bold'))
+        
+        # 選擇要開啟的檔案
+        lbl_ask = tk.Label(win, text="選擇要開啟的檔案：", bg='#FFF176', fg='black', font=('Microsoft JhengHei', 11, 'bold'))
         lbl_ask.pack(fill=tk.X, padx=16, pady=(0, 8))
+        
+        # 打勾選項框架
+        check_frame = tk.Frame(win, bg='white')
+        check_frame.pack(fill=tk.X, padx=16, pady=(0, 16))
+        
+        # 建立打勾變數（預設都打勾）
+        open_folder_var = tk.BooleanVar(value=True)
+        open_pass_var = tk.BooleanVar(value=True)
+        open_fail_var = tk.BooleanVar(value=True)
+        
+        # 打勾選項
+        cb_folder = tk.Checkbutton(check_frame, text="開啟輸出資料夾", variable=open_folder_var, 
+                                  bg='white', fg='black', font=('Microsoft JhengHei', 10))
+        cb_folder.pack(anchor='w', pady=2)
+        
+        cb_pass = tk.Checkbutton(check_frame, text="開啟 PASS匯總.xlsx", variable=open_pass_var, 
+                                bg='white', fg='black', font=('Microsoft JhengHei', 10))
+        cb_pass.pack(anchor='w', pady=2)
+        
+        cb_fail = tk.Checkbutton(check_frame, text="開啟 FAIL匯總.xlsx", variable=open_fail_var, 
+                                bg='white', fg='black', font=('Microsoft JhengHei', 10))
+        cb_fail.pack(anchor='w', pady=2)
+        
+        # 按鈕框架
         btns = tk.Frame(win, bg='white')
         btns.pack(pady=8)
-        def on_yes():
+        
+        def on_confirm():
             try:
-                os.startfile(out_dir)
-            except Exception:
-                pass
+                # 開啟資料夾
+                if open_folder_var.get():
+                    os.startfile(out_dir)
+                
+                # 開啟 PASS 檔案
+                if open_pass_var.get() and os.path.exists(pass_path):
+                    os.startfile(pass_path)
+                
+                # 開啟 FAIL 檔案
+                if open_fail_var.get() and os.path.exists(fail_path):
+                    os.startfile(fail_path)
+                    
+            except Exception as e:
+                print(f"開啟檔案時發生錯誤: {e}")
             win.destroy()
-        def on_no():
+            
+        def on_cancel():
             win.destroy()
-        yes = tk.Button(btns, text="開啟資料夾", command=on_yes)
-        no = tk.Button(btns, text="關閉", command=on_no)
-        yes.pack(side=tk.LEFT, padx=10)
-        no.pack(side=tk.LEFT, padx=10)
+            
+        btn_confirm = tk.Button(btns, text="確定", command=on_confirm, bg='#4CAF50', fg='white', font=('Microsoft JhengHei', 10))
+        btn_cancel = tk.Button(btns, text="取消", command=on_cancel, bg='#F44336', fg='white', font=('Microsoft JhengHei', 10))
+        btn_confirm.pack(side=tk.LEFT, padx=10)
+        btn_cancel.pack(side=tk.LEFT, padx=10)
+
+    def start_csv_processing(self):
+        """開始CSV檔案處理"""
+        try:
+            from csv_processor import CSVProcessor
+            processor = CSVProcessor(self)
+            
+            # 提供選擇方式
+            choice = messagebox.askyesnocancel(
+                "CSV處理方式", 
+                "請選擇CSV檔案處理方式：\n\n" +
+                "是(Y) - 選擇資料夾（自動搜尋CSV檔案）\n" +
+                "否(N) - 直接選擇CSV檔案（支援多選）\n" +
+                "取消 - 取消操作"
+            )
+            
+            if choice is True:
+                # 選擇資料夾
+                processor.select_directory()
+            elif choice is False:
+                # 直接選擇檔案
+                processor.select_files()
+            # choice is None 表示取消
+            
+        except ImportError as e:
+            messagebox.showerror("錯誤", f"無法載入CSV處理模組: {e}")
+        except Exception as e:
+            messagebox.showerror("錯誤", f"CSV處理發生錯誤: {e}")
 
 
 def main_enhanced():

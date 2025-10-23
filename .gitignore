@@ -1,26 +1,70 @@
-# Python cache
+# Python
 __pycache__/
-*.pyc
-*.pyo
-
-# PyInstaller build directories
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
-build_*/
-
+develop-eggs/
 dist/
-dist_*/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Virtual env
-venv/
-.env/
+# 暫存檔案
+*.tmp
+*.temp
+temp/
+tmp/
 
-# OS files
+# 分析結果
+Analysis_CSV_FILE/
+*.xlsx
+*.csv
+
+# 設定檔案（可選，建議保留）
+# settings.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系統檔案
 .DS_Store
 Thumbs.db
 
-# Logs and large local data
-MINE/FUNCTION_LOG/
-MINE/LOG/
+# 測試檔案
+test_*.log
+*.log
 
-# Notebook checkpoints
-.ipynb_checkpoints/ 
+# 備份檔案
+BACKUP_DEL/
+*.bak
+*.backup
+
+# 編譯檔案
+*.spec
+build/
+dist/
+
+# 日誌檔案
+*.log
+logs/
+
+# 環境變數
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

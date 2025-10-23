@@ -743,15 +743,21 @@ class LogParser:
         }
     
     def _get_effective_retry_count(self, lines):
-        """取得有效的 Retry 次數：忽略出現在 Run 行（含 Mode: x, Retry: y）的說明性參數"""
+        """基於指令出現次數判斷RETRY，而不是基於Retry: N關鍵字"""
+        # 提取所有指令
+        commands = []
         for line in lines:
-            if 'Run ' in line:
-                # 跳過包含 Run 的描述行，例如：Run XXX:YYY\tMode: 0, Retry: 3
-                continue
-            retry_match = self.retry_pattern.search(line)
-            if retry_match:
-                try:
-                    return int(retry_match.group(1))
-                except Exception:
-                    pass
-        return 0
+            cmd_match = self.cmd_pattern.search(line)
+            if cmd_match:
+                command = cmd_match.group(1).strip()
+                commands.append(command)
+        
+        if not commands:
+            return 0
+        
+        # 計算主要指令的出現次數
+        main_command = commands[0]  # 第一個指令作為主要指令
+        command_count = commands.count(main_command)
+        
+        # 如果指令出現次數大於1，表示有RETRY
+        return command_count if command_count > 1 else 0

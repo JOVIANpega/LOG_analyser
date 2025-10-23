@@ -11,6 +11,7 @@ import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 import logging
+from log_format_manager import LogFormatManager, FormatConverter
 
 class LogAnalyzer:
     """
@@ -24,8 +25,13 @@ class LogAnalyzer:
         self.fail_tests = []  # 儲存失敗的測試項目
         self.script_tests = []  # 儲存腳本中的測試項目
         self.log_content = ""  # 原始log內容
+        self.current_format = "pega_standard"  # 當前使用的格式
         
-        # 設定正則表達式模式
+        # 初始化格式管理器
+        self.format_manager = LogFormatManager()
+        self.format_converter = FormatConverter()
+        
+        # 設定正則表達式模式（預設PEGA格式）
         self.patterns = {
             'step': r'Do @STEP\d+@([^@]+)',
             'test_id': r'Run ([A-Z0-9]+-\d+):',
@@ -61,6 +67,12 @@ class LogAnalyzer:
         except Exception as e:
             self.logger.error(f"載入log檔案失敗: {e}")
             return False
+        
+        # 自動檢測LOG格式
+        if self.log_content:
+            self._auto_detect_format(file_path)
+        
+        return True
     
     def load_log_directory(self, directory_path: str) -> bool:
         """
@@ -421,4 +433,239 @@ class LogAnalyzer:
         self.fail_tests = []
         self.script_tests = []
         self.log_content = ""
-        self.logger.info("已清除所有分析結果") 
+        self.logger.info("已清除所有分析結果")
+    
+    def _auto_detect_format(self, file_path: str = ""):
+        """自動檢測LOG格式"""
+        if not self.log_content:
+            return
+        
+        detected_format = self.format_manager.auto_detect_format(self.log_content, file_path)
+        if detected_format != "unknown":
+            self.set_format_patterns(detected_format)
+            self.logger.info(f"自動檢測到LOG格式: {detected_format}")
+        else:
+            self.logger.warning("無法自動檢測LOG格式，使用預設PEGA格式")
+    
+    def set_format_patterns(self, format_key: str):
+        """設定解析模式"""
+        format_config = self.format_manager.get_format_config(format_key)
+        if format_config:
+            self.patterns = format_config['patterns']
+            self.current_format = format_key
+            self.logger.info(f"已切換到格式: {format_config['name']}")
+        else:
+            self.logger.warning(f"未找到格式配置: {format_key}")
+    
+    def get_current_format_name(self) -> str:
+        """獲取當前格式名稱"""
+        format_config = self.format_manager.get_format_config(self.current_format)
+        return format_config['name'] if format_config else "未知格式"
+    
+    def get_available_formats(self) -> List[str]:
+        """獲取所有可用格式名稱"""
+        return self.format_manager.get_format_names()
+    
+    def parse_test_steps(self) -> Tuple[List[Dict], List[Dict]]:
+        """解析log中的測試步驟（支援多格式）"""
+        if not self.log_content:
+            return [], []
+        
+        # 根據當前格式選擇解析方法
+        if self.current_format == "pega_standard":
+            return self._parse_pega_format()
+        elif self.current_format == "iqgprf_format":
+            return self._parse_iqgprf_format()
+        elif self.current_format == "generic_test":
+            return self._parse_generic_format()
+        else:
+            # 預設使用PEGA格式解析
+            return self._parse_pega_format()
+    
+    def _parse_pega_format(self) -> Tuple[List[Dict], List[Dict]]:
+        """解析PEGA格式（原有邏輯）"""
+        # 這裡保持原有的解析邏輯
+        lines = self.log_content.split('\n')
+        pass_tests = []
+        fail_tests = []
+        
+        current_test = None
+        current_phase = 0
+        
+        for i, line in enumerate(lines):
+            # 檢查是否為新的Phase
+            phase_match = re.search(self.patterns['phase'], line)
+            if phase_match:
+                current_phase = int(phase_match.group(1))
+                continue
+            
+            # 檢查是否為新的測試步驟
+            step_match = re.search(self.patterns['step'], line)
+            if step_match:
+                step_name = step_match.group(1).strip()
+                
+                # 尋找對應的測試ID
+                test_id = self._find_test_id(lines, i)
+                
+                current_test = {
+                    'step_name': step_name,
+                    'test_id': test_id,
+                    'phase': current_phase,
+                    'commands': [],
+                    'responses': [],
+                    'retry_count': 0,
+                    'execution_time': 0.0,
+                    'error_message': '',
+                    'status': 'Unknown'
+                }
+                continue
+            
+            # 如果當前有測試項目，繼續收集資訊
+            if current_test:
+                # 收集指令
+                cmd_match = re.search(self.patterns['command'], line)
+                if cmd_match:
+                    current_test['commands'].append(cmd_match.group(1).strip())
+                
+                # 收集回應
+                resp_match = re.search(self.patterns['response'], line)
+                if resp_match:
+                    current_test['responses'].append(resp_match.group(1).strip())
+                
+                # 檢查重試次數
+                retry_match = re.search(self.patterns['retry_count'], line)
+                if retry_match:
+                    current_test['retry_count'] = int(retry_match.group(1))
+                
+                # 檢查結果
+                if re.search(self.patterns['pass_result'], line):
+                    current_test['status'] = 'PASS'
+                    # 提取執行時間
+                    time_match = re.search(self.patterns['execution_time'], line)
+                    if time_match:
+                        current_test['execution_time'] = float(time_match.group(1))
+                    
+                    # 完成當前測試，加入通過列表
+                    if current_test['test_id']:
+                        pass_tests.append(current_test.copy())
+                    current_test = None
+                
+                elif re.search(self.patterns['fail_result'], line):
+                    current_test['status'] = 'FAIL'
+                    # 提取執行時間
+                    time_match = re.search(self.patterns['execution_time'], line)
+                    if time_match:
+                        current_test['execution_time'] = float(time_match.group(1))
+                    
+                    # 尋找錯誤訊息
+                    error_msg = self._find_error_message(lines, i)
+                    current_test['error_message'] = error_msg
+                    
+                    # 完成當前測試，加入失敗列表
+                    if current_test['test_id']:
+                        fail_tests.append(current_test.copy())
+                    current_test = None
+        
+        self.pass_tests = pass_tests
+        self.fail_tests = fail_tests
+        
+        return pass_tests, fail_tests
+    
+    def _parse_iqgprf_format(self) -> Tuple[List[Dict], List[Dict]]:
+        """解析IQGPRF格式"""
+        lines = self.log_content.split('\n')
+        pass_tests = []
+        fail_tests = []
+        
+        current_test = None
+        current_phase = 0
+        
+        for i, line in enumerate(lines):
+            # 檢查是否為新的Phase
+            if 'phase' in self.patterns:
+                phase_match = re.search(self.patterns['phase'], line)
+                if phase_match:
+                    current_phase = int(phase_match.group(1))
+                    continue
+            
+            # 檢查是否為新的測試步驟
+            if 'step' in self.patterns:
+                step_match = re.search(self.patterns['step'], line)
+                if step_match:
+                    step_name = step_match.group(1).strip()
+                    
+                    # 尋找對應的測試ID
+                    test_id = self._find_test_id(lines, i)
+                    
+                    current_test = {
+                        'step_name': step_name,
+                        'test_id': test_id,
+                        'phase': current_phase,
+                        'commands': [],
+                        'responses': [],
+                        'retry_count': 0,
+                        'execution_time': 0.0,
+                        'error_message': '',
+                        'status': 'Unknown'
+                    }
+                    continue
+            
+            # 如果當前有測試項目，繼續收集資訊
+            if current_test:
+                # 收集指令
+                if 'command' in self.patterns:
+                    cmd_match = re.search(self.patterns['command'], line)
+                    if cmd_match:
+                        current_test['commands'].append(cmd_match.group(1).strip())
+                
+                # 收集回應
+                if 'response' in self.patterns:
+                    resp_match = re.search(self.patterns['response'], line)
+                    if resp_match:
+                        current_test['responses'].append(resp_match.group(1).strip())
+                
+                # 檢查重試次數
+                if 'retry_count' in self.patterns:
+                    retry_match = re.search(self.patterns['retry_count'], line)
+                    if retry_match:
+                        current_test['retry_count'] = int(retry_match.group(1))
+                
+                # 檢查結果
+                if 'pass_result' in self.patterns and re.search(self.patterns['pass_result'], line):
+                    current_test['status'] = 'PASS'
+                    # 提取執行時間
+                    if 'execution_time' in self.patterns:
+                        time_match = re.search(self.patterns['execution_time'], line)
+                        if time_match:
+                            current_test['execution_time'] = float(time_match.group(1))
+                    
+                    # 完成當前測試，加入通過列表
+                    if current_test['test_id']:
+                        pass_tests.append(current_test.copy())
+                    current_test = None
+                
+                elif 'fail_result' in self.patterns and re.search(self.patterns['fail_result'], line):
+                    current_test['status'] = 'FAIL'
+                    # 提取執行時間
+                    if 'execution_time' in self.patterns:
+                        time_match = re.search(self.patterns['execution_time'], line)
+                        if time_match:
+                            current_test['execution_time'] = float(time_match.group(1))
+                    
+                    # 尋找錯誤訊息
+                    error_msg = self._find_error_message(lines, i)
+                    current_test['error_message'] = error_msg
+                    
+                    # 完成當前測試，加入失敗列表
+                    if current_test['test_id']:
+                        fail_tests.append(current_test.copy())
+                    current_test = None
+        
+        self.pass_tests = pass_tests
+        self.fail_tests = fail_tests
+        
+        return pass_tests, fail_tests
+    
+    def _parse_generic_format(self) -> Tuple[List[Dict], List[Dict]]:
+        """解析通用格式（類似IQGPRF的邏輯）"""
+        return self._parse_iqgprf_format() 
