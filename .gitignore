@@ -58,6 +58,12 @@ BACKUP_DEL/
 build/
 dist/
 
+# 測試和開發檔案
+test_*.py
+*_test.py
+debug_*.py
+temp_*.py
+
 # 日誌檔案
 *.log
 logs/

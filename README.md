@@ -120,7 +120,7 @@ PEGA_Log_Analyzer/
 
 ## 🔄 版本歷史
 
-### V1.8.5 (最新)
+### V1.9.0 (最新)
 - ✅ 新增搜尋功能
 - ✅ 新增Tooltip提示功能
 - ✅ 新增加密驗證功能
@@ -149,7 +149,7 @@ git init
 git add .
 
 # 提交初始版本
-git commit -m "Initial commit: PEGA Log Analyzer V1.8.5"
+git commit -m "Initial commit: PEGA Log Analyzer V1.9.0"
 ```
 
 ### 2. 創建GitHub倉庫
