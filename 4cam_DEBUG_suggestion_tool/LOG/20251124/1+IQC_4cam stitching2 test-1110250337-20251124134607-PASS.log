@@ -1,0 +1,1413 @@
+2025/11/24 13:46:07 [1]	System Version is 1.1.8.64.
+2025/11/24 13:46:07 [1]	Script File is VALO360_TestFlow_AOCI_4cam_stitching_test2_251120_cacnel3m5m.xlsx.
+2025/11/24 13:46:07 [1]	Script Version is 2511201453055.
+2025/11/24 13:46:07 [1]	Script Creator is jovian_li.
+2025/11/24 13:46:07 [1]	Utility Version is 1.0.9.20.
+2025/11/24 13:46:07 [1]	DeviceID is 822221.
+2025/11/24 13:46:07 [1]	SFIS is off.
+2025/11/24 13:46:07 [1]	MiniCloud2 is on.
+2025/11/24 13:46:07 [1]	FTP is off.
+2025/11/24 13:46:07 [1]	Active IPs:
+乙太網路:[107C610761E9]#192.168.11.142#
+藍牙網路連線:[C85EA9CB03AD]#169.254.255.118#
+2025/11/24 13:46:07 [1]	Script has 1 phase cases
+2025/11/24 13:46:07 [1]	Script has 97 phase cases
+****************************************************************************************************
+2025/11/24 13:46:07 [1]	Execute Phase 0 Test.
+2025/11/24 13:46:07 [1]	Do @STEP002@START
+2025/11/24 13:46:07 [1]	Run IOET160-000:Delay	Mode: 0, Retry: 3
+[13:46:07.254][PC] [Delay]++
+2025/11/24 13:46:07 [1]	> :Delay,"20000"
+2025/11/24 13:46:27 [1]	< 0
+[13:46:27.267][PC] [Delay]--
+2025/11/24 13:46:27 [1]	[PC] [Delay] ~~ TestTime:20.0136456 sec
+2025/11/24 13:46:27 [1]	Run IOLE015-001:pingcheck	Mode: 0, Retry: 3
+2025/11/24 13:46:27 [1]	> :Utility.Ping,"192.168.11.143","5000","192.168.11.142","5000"
+2025/11/24 13:46:28 [1]	< 0
+2025/11/24 13:46:28 [1]	Run FWCS002-002:LAN disconnection	Mode: 1, Retry: 3
+2025/11/24 13:46:28 [1]	> :Disconnect,"LAN"
+2025/11/24 13:46:28 [1]	< 0
+2025/11/24 13:46:28 [1]	Run SCSC001-003:Delay	Mode: 1, Retry: 3
+2025/11/24 13:46:28 [1]	> :Delay,"500"
+2025/11/24 13:46:28 [1]	< 0
+2025/11/24 13:46:28 [1]	Run FWCS002-004:LAN connection	Mode: 1, Retry: 3
+2025/11/24 13:46:28 [1]	> :Connect,"LAN"
+2025/11/24 13:46:29 [1]	< 0
+2025/11/24 13:46:29 [1]	Run SCSC001-005:Delay	Mode: 1, Retry: 3
+2025/11/24 13:46:29 [1]	> :Delay,"500"
+2025/11/24 13:46:29 [1]	< 0
+2025/11/24 13:46:29 [1]	Run OTCH013-006:Disconnect CMD	Mode: 1, Retry: 3
+[13:46:29.874][PC] [Disconnect CMD]++
+2025/11/24 13:46:29 [1]	> :Disconnect,"CmdConsole"
+2025/11/24 13:46:29 [1]	< 0
+[13:46:29.879][PC] [Disconnect CMD]--
+2025/11/24 13:46:29 [1]	[PC] [Disconnect CMD] ~~ TestTime:0.0052575 sec
+2025/11/24 13:46:29 [1]	Run IOET160-007:Delay	Mode: 1, Retry: 3
+[13:46:29.879][PC] [Delay]++
+2025/11/24 13:46:29 [1]	> :Delay,"100"
+2025/11/24 13:46:29 [1]	< 0
+[13:46:29.986][PC] [Delay]--
+2025/11/24 13:46:29 [1]	[PC] [Delay] ~~ TestTime:0.1068452 sec
+2025/11/24 13:46:29 [1]	Run OTCH013-008:Connect CMD	Mode: 1, Retry: 3
+[13:46:29.986][PC] [Connect CMD]++
+2025/11/24 13:46:29 [1]	> :Connect,"CmdConsole"
+2025/11/24 13:46:30 [1]	< 0
+[13:46:30.007][PC] [Connect CMD]--
+2025/11/24 13:46:30 [1]	[PC] [Connect CMD] ~~ TestTime:0.0214377 sec
+2025/11/24 13:46:30 [1]	Run B7PL011-009:get cam0 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep sn 0
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep sn 0
+cam0 SN = 1110250337
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	get cam0 eeprom Result: ISN=1110250337
+2025/11/24 13:46:30 [1]	CurrentTestID:B7PL011-0090 - The validation: ISN = 1110250337 (10,10)
+2025/11/24 13:46:30 [1]	Run B7PL025-010:Show SN to UI	Mode: 1, Retry: 3
+[13:46:30.065][PC] [Show SN to UI]++
+2025/11/24 13:46:30 [1]	> :ShowISN,"1110250337"
+2025/11/24 13:46:30 [1]	< 0
+[13:46:30.065][PC] [Show SN to UI]--
+2025/11/24 13:46:30 [1]	[PC] [Show SN to UI] ~~ TestTime:0 sec
+2025/11/24 13:46:30 [1]	Run IOCD041-012:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	> :Utility.GenDT,"yyyyMMdd_hh_mm_ss"
+2025/11/24 13:46:30 [1]	< 0
+2025/11/24 13:46:30 [1]	TRY_TEXT Result: time=20251124_01_46_30
+2025/11/24 13:46:30 [1]	Run B7PL011-013:check pega version	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > pegacmd version
+
+2025/11/24 13:46:30 [1]	(LAN) < pegacmd version
+0.5.1.34.0_3_4bad321
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	B7PL011-013:@STEP002@START Test is Pass ! 			----- 22.8746976 Sec.
+2025/11/24 13:46:30 [1]	DUT Test Completed !        ----- 22.8746976 Sec.
+2025/11/24 13:46:30 [1]	Execute Phase 1 Test.
+2025/11/24 13:46:30 [1]	Do @STEP004@Check EEP ROM data
+2025/11/24 13:46:30 [1]	Run B7PL011-014:get cam0 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep qr 0
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep qr 0
+cam0 qr = 0979N65T010404
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-015:get cam1 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep qr 1
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep qr 1
+cam1 qr = 0979N65T010461
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-016:get cam2 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep qr 2
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep qr 2
+cam2 qr = 0979N65T010345
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-017:get cam3 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep qr 3
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep qr 3
+cam3 qr = 0979N65T010458
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-018:get cam0 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep lm 0
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep lm 0
+cam0 level marker = 2
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-019:get cam1 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep lm 1
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep lm 1
+cam1 level marker = 2
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-020:get cam2 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep lm 2
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep lm 2
+cam2 level marker = 2
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-021:get cam3 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep lm 3
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep lm 3
+cam3 level marker = 2
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-022:get cam0 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep sn 0
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep sn 0
+cam0 SN = 1110250337
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-023:get cam1 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep sn 1
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep sn 1
+cam1 SN = 1110250337
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-024:get cam2 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep sn 2
+
+2025/11/24 13:46:30 [1]	(LAN) < diag -g eep sn 2
+cam2 SN = 1110250337
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:30 [1]	Run B7PL011-025:get cam3 eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:30 [1]	(LAN) > diag -g eep sn 3
+
+2025/11/24 13:46:31 [1]	(LAN) < diag -g eep sn 3
+cam3 SN = 1110250337
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:31 [1]	Run B7PL011-026:read temp 0	Mode: 1, Retry: 3
+2025/11/24 13:46:31 [1]	(LAN) > diag -g temp s0
+
+2025/11/24 13:46:31 [1]	(LAN) < diag -g temp s0
+24
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:31 [1]	Run B7PL011-027:read temp 1	Mode: 1, Retry: 3
+2025/11/24 13:46:31 [1]	(LAN) > diag -g temp s1
+
+2025/11/24 13:46:31 [1]	(LAN) < diag -g temp s1
+24
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:31 [1]	Run B7PL011-028:read temp 2	Mode: 1, Retry: 3
+2025/11/24 13:46:31 [1]	(LAN) > diag -g temp s2
+
+2025/11/24 13:46:31 [1]	(LAN) < diag -g temp s2
+24
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:31 [1]	Run B7PL011-029:read temp 3	Mode: 1, Retry: 3
+2025/11/24 13:46:31 [1]	(LAN) > diag -g temp s3
+
+2025/11/24 13:46:31 [1]	(LAN) < diag -g temp s3
+24
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:31 [1]	Run B7PL011-030:set ircut on	Mode: 1, Retry: 3
+2025/11/24 13:46:31 [1]	(LAN) > diag -s ircut on
+
+2025/11/24 13:46:31 [1]	(LAN) < diag -s ircut on
+diag: set ircut on done
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 13:46:31 [1]	Run IOCD041-031:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:31 [1]	(CmdConsole) > Tool\\tftpd64.exe
+
+2025/11/24 13:46:31 [1]	(CmdConsole) < 
+2025/11/24 13:46:31 [1]	Run IOET160-032:Delay	Mode: 1, Retry: 3
+[13:46:31.449][PC] [Delay]++
+2025/11/24 13:46:31 [1]	> :Delay,"500"
+2025/11/24 13:46:31 [1]	< 0
+[13:46:31.975][PC] [Delay]--
+2025/11/24 13:46:31 [1]	[PC] [Delay] ~~ TestTime:0.5268244 sec
+2025/11/24 13:46:31 [1]	IOET160-032:@STEP004@Check EEP ROM data Test is Pass ! 		----- 1.7358396 Sec.
+2025/11/24 13:46:32 [1]	Do @STEP005@create dir
+2025/11/24 13:46:32 [1]	Run IOCD041-033:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:32 [1]	(CmdConsole) > cd Station_Record
+
+2025/11/24 13:46:32 [1]	(CmdConsole) < 
+2025/11/24 13:46:32 [1]	Run IOCD041-034:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:32 [1]	(CmdConsole) > mkdir 1110250337+20251124_01_46_30
+
+2025/11/24 13:46:32 [1]	(CmdConsole) < 
+2025/11/24 13:46:32 [1]	Run IOCD041-035:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:32 [1]	(CmdConsole) > cd 1110250337+20251124_01_46_30
+
+2025/11/24 13:46:32 [1]	(CmdConsole) < 
+2025/11/24 13:46:32 [1]	Run IOCD041-036:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:32 [1]	(CmdConsole) > mkdir new_cal 2DLUT stitch_ecs_rgb_data 4cam
+
+2025/11/24 13:46:32 [1]	(CmdConsole) < 
+2025/11/24 13:46:32 [1]	IOCD041-036:@STEP005@create dir Test is Pass ! 		----- 0.0108377 Sec.
+2025/11/24 13:46:32 [1]	DUT Test Completed !        ----- 1.8256436 Sec.
+2025/11/24 13:46:32 [1]	Execute Phase 2 Test.
+2025/11/24 13:46:32 [1]	Do @STEP007@get eep
+2025/11/24 13:46:32 [1]	Run B7PL011-037:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:32 [1]	(LAN) > cd /tmp
+
+2025/11/24 13:46:32 [1]	(LAN) < cd /tmp
+root@NOKIA360Camera-Valo360:/tmp$ 
+root@NOKIA360Camera-Valo360:/tmp$ 
+2025/11/24 13:46:32 [1]	Run B7PL011-038:get calibration data from eeprom	Mode: 1, Retry: 3
+2025/11/24 13:46:32 [1]	(LAN) > diag -g eep tar 0
+
+2025/11/24 13:46:33 [1]	(LAN) < diag -g eep tar 0
+reading cam0 eeprom 0x200
+[0;42mPASS to load cam0 tar file to /tmp/tar[0m
+cam0 tar already loaded
+root@NOKIA360Camera-Valo360:/tmp$ 
+root@NOKIA360Camera-Valo360:/tmp$ 
+2025/11/24 13:46:33 [1]	Run B7PL011-039:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:33 [1]	(LAN) > cd /tmp/tar
+
+2025/11/24 13:46:33 [1]	(LAN) < cd /tmp/tar
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+2025/11/24 13:46:33 [1]	Run B7PL011-040:unzip calibration data	Mode: 1, Retry: 3
+2025/11/24 13:46:33 [1]	(LAN) > tar zxvf new_and_ecs.tar.gz
+
+2025/11/24 13:46:33 [1]	(LAN) < tar zxvf new_and_ecs.tar.gz
+new_cal_data_0.yml
+new_cal_data_1.yml
+new_cal_data_2.yml
+new_cal_data_3.yml
+stitch_ecs_rgb_data0.bin
+stitch_ecs_rgb_data1.bin
+stitch_ecs_rgb_data2.bin
+stitch_ecs_rgb_data3.bin
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+2025/11/24 13:46:33 [1]	Run OTCH013-041:Disconnect CMD	Mode: 1, Retry: 3
+[13:46:33.511][PC] [Disconnect CMD]++
+2025/11/24 13:46:33 [1]	> :Disconnect,"CmdConsole"
+2025/11/24 13:46:33 [1]	< 0
+[13:46:33.511][PC] [Disconnect CMD]--
+2025/11/24 13:46:33 [1]	[PC] [Disconnect CMD] ~~ TestTime:0 sec
+2025/11/24 13:46:33 [1]	Run IOET160-042:Delay	Mode: 1, Retry: 3
+[13:46:33.511][PC] [Delay]++
+2025/11/24 13:46:33 [1]	> :Delay,"100"
+2025/11/24 13:46:33 [1]	< 0
+[13:46:33.623][PC] [Delay]--
+2025/11/24 13:46:33 [1]	[PC] [Delay] ~~ TestTime:0.1118892 sec
+2025/11/24 13:46:33 [1]	Run OTCH013-043:Connect CMD	Mode: 1, Retry: 3
+[13:46:33.627][PC] [Connect CMD]++
+2025/11/24 13:46:33 [1]	> :Connect,"CmdConsole"
+2025/11/24 13:46:33 [1]	< 0
+[13:46:33.649][PC] [Connect CMD]--
+2025/11/24 13:46:33 [1]	[PC] [Connect CMD] ~~ TestTime:0.0216552 sec
+2025/11/24 13:46:33 [1]	Run IOCD041-044:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:33 [1]	(CmdConsole) > Tool\\tftpd64.exe
+
+2025/11/24 13:46:33 [1]	(CmdConsole) < 
+2025/11/24 13:46:33 [1]	Run IOET160-045:Delay	Mode: 1, Retry: 3
+[13:46:33.649][PC] [Delay]++
+2025/11/24 13:46:33 [1]	> :Delay,"500"
+2025/11/24 13:46:34 [1]	< 0
+[13:46:34.168][PC] [Delay]--
+2025/11/24 13:46:34 [1]	[PC] [Delay] ~~ TestTime:0.5194601 sec
+2025/11/24 13:46:34 [1]	Run IPIO023-046:copy new_cal_data_0 to PC	Mode: 1, Retry: 3
+2025/11/24 13:46:34 [1]	(LAN) > tftp -pl new_cal_data_0.yml 192.168.11.142 -b 50000
+
+2025/11/24 13:46:34 [1]	(LAN) < tftp -pl new_cal_data_0.yml 192.168.11.142 -b 50000
+new_cal_data_0.yml   100% |************************************************************************************************************************************|  1712  0:00:00 ETAnew_cal_data_0.yml   100% |************************************************************************************************************************************|  1712  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+2025/11/24 13:46:34 [1]	Run IOET160-047:Delay	Mode: 1, Retry: 3
+[13:46:34.231][PC] [Delay]++
+2025/11/24 13:46:34 [1]	> :Delay,"1000"
+2025/11/24 13:46:35 [1]	< 0
+[13:46:35.241][PC] [Delay]--
+2025/11/24 13:46:35 [1]	[PC] [Delay] ~~ TestTime:1.0093192 sec
+2025/11/24 13:46:35 [1]	Run IPIO023-048:copy new_cal_data_1 to PC	Mode: 1, Retry: 3
+2025/11/24 13:46:35 [1]	(LAN) > tftp -pl new_cal_data_1.yml 192.168.11.142 -b 50000
+
+2025/11/24 13:46:35 [1]	(LAN) < tftp -pl new_cal_data_1.yml 192.168.11.142 -b 50000
+new_cal_data_1.yml   100% |************************************************************************************************************************************|  1710  0:00:00 ETAnew_cal_data_1.yml   100% |************************************************************************************************************************************|  1710  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+2025/11/24 13:46:35 [1]	Run IOET160-049:Delay	Mode: 1, Retry: 3
+[13:46:35.304][PC] [Delay]++
+2025/11/24 13:46:35 [1]	> :Delay,"1000"
+2025/11/24 13:46:36 [1]	< 0
+[13:46:36.316][PC] [Delay]--
+2025/11/24 13:46:36 [1]	[PC] [Delay] ~~ TestTime:1.0114206 sec
+2025/11/24 13:46:36 [1]	Run IPIO023-050:copy new_cal_data_2 to PC	Mode: 1, Retry: 3
+2025/11/24 13:46:36 [1]	(LAN) > tftp -pl new_cal_data_2.yml 192.168.11.142 -b 50000
+
+2025/11/24 13:46:36 [1]	(LAN) < tftp -pl new_cal_data_2.yml 192.168.11.142 -b 50000
+new_cal_data_2.yml   100% |************************************************************************************************************************************|  1712  0:00:00 ETAnew_cal_data_2.yml   100% |************************************************************************************************************************************|  1712  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+2025/11/24 13:46:36 [1]	Run IOET160-051:Delay	Mode: 1, Retry: 3
+[13:46:36.379][PC] [Delay]++
+2025/11/24 13:46:36 [1]	> :Delay,"1000"
+2025/11/24 13:46:37 [1]	< 0
+[13:46:37.388][PC] [Delay]--
+2025/11/24 13:46:37 [1]	[PC] [Delay] ~~ TestTime:1.0133366 sec
+2025/11/24 13:46:37 [1]	Run IPIO023-052:copy new_cal_data_3 to PC	Mode: 1, Retry: 3
+2025/11/24 13:46:37 [1]	(LAN) > tftp -pl new_cal_data_3.yml 192.168.11.142 -b 50000
+
+2025/11/24 13:46:37 [1]	(LAN) < tftp -pl new_cal_data_3.yml 192.168.11.142 -b 50000
+new_cal_data_3.yml   100% |************************************************************************************************************************************|  1713  0:00:00 ETAnew_cal_data_3.yml   100% |************************************************************************************************************************************|  1713  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+2025/11/24 13:46:37 [1]	Run IOET160-053:Delay	Mode: 1, Retry: 3
+[13:46:37.452][PC] [Delay]++
+2025/11/24 13:46:37 [1]	> :Delay,"1000"
+2025/11/24 13:46:38 [1]	< 0
+[13:46:38.461][PC] [Delay]--
+2025/11/24 13:46:38 [1]	[PC] [Delay] ~~ TestTime:1.0088871 sec
+2025/11/24 13:46:38 [1]	Run IOCD041-054:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(CmdConsole) > copy "tftp_data\new_cal_data_0.yml" "Station_Record\1110250337+20251124_01_46_30\new_cal"
+
+2025/11/24 13:46:38 [1]	(CmdConsole) < 
+2025/11/24 13:46:38 [1]	Run IOCD041-055:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(CmdConsole) > copy "tftp_data\new_cal_data_1.yml" "Station_Record\1110250337+20251124_01_46_30\new_cal"
+
+2025/11/24 13:46:38 [1]	(CmdConsole) < 
+2025/11/24 13:46:38 [1]	Run IOCD041-056:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(CmdConsole) > copy "tftp_data\new_cal_data_2.yml" "Station_Record\1110250337+20251124_01_46_30\new_cal"
+
+2025/11/24 13:46:38 [1]	(CmdConsole) < 
+2025/11/24 13:46:38 [1]	Run IOCD041-057:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(CmdConsole) > copy "tftp_data\new_cal_data_3.yml" "Station_Record\1110250337+20251124_01_46_30\new_cal"
+
+2025/11/24 13:46:38 [1]	(CmdConsole) < 
+2025/11/24 13:46:38 [1]	Run IOCD041-058:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(CmdConsole) > move tftp_data\new_cal_data_0.yml Tool\Stitching_2DLUT_Gen_Tool\input
+
+2025/11/24 13:46:38 [1]	(CmdConsole) < 
+2025/11/24 13:46:38 [1]	Run IOCD041-059:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(CmdConsole) > move tftp_data\new_cal_data_1.yml Tool\Stitching_2DLUT_Gen_Tool\input
+
+2025/11/24 13:46:38 [1]	(CmdConsole) < 
+2025/11/24 13:46:38 [1]	Run IOCD041-060:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(CmdConsole) > move tftp_data\new_cal_data_2.yml Tool\Stitching_2DLUT_Gen_Tool\input
+
+2025/11/24 13:46:38 [1]	(CmdConsole) < 
+2025/11/24 13:46:38 [1]	Run IOCD041-061:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(CmdConsole) > move tftp_data\new_cal_data_3.yml Tool\Stitching_2DLUT_Gen_Tool\input
+
+2025/11/24 13:46:38 [1]	(CmdConsole) < 系統在 Application 的訊息檔中找不到訊息編號 0x2336 的訊息文字。
+
+2025/11/24 13:46:38 [1]	IOCD041-061:@STEP007@get eep Test is Pass ! 		----- 6.3206409 Sec.
+2025/11/24 13:46:38 [1]	DUT Test Completed !        ----- 6.3520835 Sec.
+2025/11/24 13:46:38 [1]	Execute Phase 3 Test.
+2025/11/24 13:46:38 [1]	Do @STEP009@write stitch_ecs to vsp
+2025/11/24 13:46:38 [1]	Run B7PL011-062:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(LAN) > mv stitch_ecs_rgb_data0.bin /var/vsp
+
+2025/11/24 13:46:38 [1]	(LAN) < mv stitch_ecs_rgb_data0.bin /var/vsp
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+2025/11/24 13:46:38 [1]	Run B7PL011-063:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(LAN) > mv stitch_ecs_rgb_data1.bin /var/vsp
+
+2025/11/24 13:46:38 [1]	(LAN) < mv stitch_ecs_rgb_data1.bin /var/vsp
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+2025/11/24 13:46:38 [1]	Run B7PL011-064:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(LAN) > mv stitch_ecs_rgb_data2.bin /var/vsp
+
+2025/11/24 13:46:38 [1]	(LAN) < mv stitch_ecs_rgb_data2.bin /var/vsp
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+2025/11/24 13:46:38 [1]	Run B7PL011-065:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(LAN) > mv stitch_ecs_rgb_data3.bin /var/vsp
+
+2025/11/24 13:46:38 [1]	(LAN) < mv stitch_ecs_rgb_data3.bin /var/vsp
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+root@NOKIA360Camera-Valo360:/tmp/tar$ 
+2025/11/24 13:46:38 [1]	Run B7PL011-066:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(LAN) > cd /var/vsp
+
+2025/11/24 13:46:38 [1]	(LAN) < cd /var/vsp
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:46:38 [1]	Run IPIO023-067:copy ecs_0 to PC	Mode: 1, Retry: 3
+2025/11/24 13:46:38 [1]	(LAN) > tftp -pl stitch_ecs_rgb_data0.bin 192.168.11.142 -b 50000
+
+2025/11/24 13:46:39 [1]	(LAN) < tftp -pl stitch_ecs_rgb_data0.bin 192.168.11.142 -b 50000
+stitch_ecs_rgb_data0 100% |************************************************************************************************************************************| 16900  0:00:00 ETAstitch_ecs_rgb_data0 100% |************************************************************************************************************************************| 16900  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:46:39 [1]	Run IOET160-068:Delay	Mode: 1, Retry: 3
+[13:46:39.032][PC] [Delay]++
+2025/11/24 13:46:39 [1]	> :Delay,"1000"
+2025/11/24 13:46:40 [1]	< 0
+[13:46:40.042][PC] [Delay]--
+2025/11/24 13:46:40 [1]	[PC] [Delay] ~~ TestTime:1.0097805 sec
+2025/11/24 13:46:40 [1]	Run IPIO023-069:copy ecs_1 to PC	Mode: 1, Retry: 3
+2025/11/24 13:46:40 [1]	(LAN) > tftp -pl stitch_ecs_rgb_data1.bin 192.168.11.142 -b 50000
+
+2025/11/24 13:46:40 [1]	(LAN) < tftp -pl stitch_ecs_rgb_data1.bin 192.168.11.142 -b 50000
+stitch_ecs_rgb_data1 100% |************************************************************************************************************************************| 16900  0:00:00 ETAstitch_ecs_rgb_data1 100% |************************************************************************************************************************************| 16900  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:46:40 [1]	Run IOET160-070:Delay	Mode: 1, Retry: 3
+[13:46:40.105][PC] [Delay]++
+2025/11/24 13:46:40 [1]	> :Delay,"1000"
+2025/11/24 13:46:41 [1]	< 0
+[13:46:41.115][PC] [Delay]--
+2025/11/24 13:46:41 [1]	[PC] [Delay] ~~ TestTime:1.0095816 sec
+2025/11/24 13:46:41 [1]	Run IPIO023-071:copy ecs_2 to PC	Mode: 1, Retry: 3
+2025/11/24 13:46:41 [1]	(LAN) > tftp -pl stitch_ecs_rgb_data2.bin 192.168.11.142 -b 50000
+
+2025/11/24 13:46:41 [1]	(LAN) < tftp -pl stitch_ecs_rgb_data2.bin 192.168.11.142 -b 50000
+stitch_ecs_rgb_data2 100% |************************************************************************************************************************************| 16900  0:00:00 ETAstitch_ecs_rgb_data2 100% |************************************************************************************************************************************| 16900  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:46:41 [1]	Run IOET160-072:Delay	Mode: 1, Retry: 3
+[13:46:41.177][PC] [Delay]++
+2025/11/24 13:46:41 [1]	> :Delay,"1000"
+2025/11/24 13:46:42 [1]	< 0
+[13:46:42.186][PC] [Delay]--
+2025/11/24 13:46:42 [1]	[PC] [Delay] ~~ TestTime:1.0080521 sec
+2025/11/24 13:46:42 [1]	Run IPIO023-073:copy ecs_3 to PC	Mode: 1, Retry: 3
+2025/11/24 13:46:42 [1]	(LAN) > tftp -pl stitch_ecs_rgb_data3.bin 192.168.11.142 -b 50000
+
+2025/11/24 13:46:42 [1]	(LAN) < tftp -pl stitch_ecs_rgb_data3.bin 192.168.11.142 -b 50000
+stitch_ecs_rgb_data3 100% |************************************************************************************************************************************| 16900  0:00:00 ETAstitch_ecs_rgb_data3 100% |************************************************************************************************************************************| 16900  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:46:42 [1]	Run IOET160-074:Delay	Mode: 1, Retry: 3
+[13:46:42.248][PC] [Delay]++
+2025/11/24 13:46:42 [1]	> :Delay,"1000"
+2025/11/24 13:46:43 [1]	< 0
+[13:46:43.257][PC] [Delay]--
+2025/11/24 13:46:43 [1]	[PC] [Delay] ~~ TestTime:1.0082481 sec
+2025/11/24 13:46:43 [1]	Run IOCD041-075:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:43 [1]	(CmdConsole) > move tftp_data\stitch_ecs_rgb_data0.bin Station_Record\1110250337+20251124_01_46_30\stitch_ecs_rgb_data
+
+2025/11/24 13:46:43 [1]	(CmdConsole) < 
+2025/11/24 13:46:43 [1]	Run IOCD041-076:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:43 [1]	(CmdConsole) > move tftp_data\stitch_ecs_rgb_data1.bin Station_Record\1110250337+20251124_01_46_30\stitch_ecs_rgb_data
+
+2025/11/24 13:46:43 [1]	(CmdConsole) < 
+2025/11/24 13:46:43 [1]	Run IOCD041-077:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:43 [1]	(CmdConsole) > move tftp_data\stitch_ecs_rgb_data2.bin Station_Record\1110250337+20251124_01_46_30\stitch_ecs_rgb_data
+
+2025/11/24 13:46:43 [1]	(CmdConsole) < 
+2025/11/24 13:46:43 [1]	Run IOCD041-078:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:43 [1]	(CmdConsole) > move tftp_data\stitch_ecs_rgb_data3.bin Station_Record\1110250337+20251124_01_46_30\stitch_ecs_rgb_data
+
+2025/11/24 13:46:43 [1]	(CmdConsole) < 
+2025/11/24 13:46:43 [1]	IOCD041-078:@STEP009@write stitch_ecs to vsp Test is Pass ! 		----- 4.6053976 Sec.
+2025/11/24 13:46:43 [1]	DUT Test Completed !        ----- 4.669064 Sec.
+2025/11/24 13:46:43 [1]	Execute Phase 4 Test.
+2025/11/24 13:46:43 [1]	Do @STEP011@get 2DLUT and write to vsp_1m
+2025/11/24 13:46:43 [1]	Run OTCH013-079:Disconnect CMD	Mode: 1, Retry: 3
+[13:46:43.387][PC] [Disconnect CMD]++
+2025/11/24 13:46:43 [1]	> :Disconnect,"CmdConsole"
+2025/11/24 13:46:43 [1]	< 0
+[13:46:43.387][PC] [Disconnect CMD]--
+2025/11/24 13:46:43 [1]	[PC] [Disconnect CMD] ~~ TestTime:0 sec
+2025/11/24 13:46:43 [1]	Run IOET160-080:Delay	Mode: 1, Retry: 3
+[13:46:43.387][PC] [Delay]++
+2025/11/24 13:46:43 [1]	> :Delay,"100"
+2025/11/24 13:46:43 [1]	< 0
+[13:46:43.510][PC] [Delay]--
+2025/11/24 13:46:43 [1]	[PC] [Delay] ~~ TestTime:0.1239003 sec
+2025/11/24 13:46:43 [1]	Run OTCH013-081:Connect CMD	Mode: 1, Retry: 3
+[13:46:43.510][PC] [Connect CMD]++
+2025/11/24 13:46:43 [1]	> :Connect,"CmdConsole"
+2025/11/24 13:46:43 [1]	< 0
+[13:46:43.527][PC] [Connect CMD]--
+2025/11/24 13:46:43 [1]	[PC] [Connect CMD] ~~ TestTime:0.0160592 sec
+2025/11/24 13:46:43 [1]	Run IOCD041-082:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:43 [1]	(CmdConsole) > cd Tool\Stitching_2DLUT_Gen_Tool\exe
+
+2025/11/24 13:46:43 [1]	(CmdConsole) < 
+2025/11/24 13:46:43 [1]	Run B7PL011-083:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:43 [1]	(LAN) > cd /var/vsp
+
+2025/11/24 13:46:43 [1]	(LAN) < cd /var/vsp
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:46:43 [1]	Run IOCD041-084:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:46:43 [1]	(CmdConsole) > Stitching2DLUTGenTool.exe ..\\input\\1m_StitchingSetting.yml ..\\output
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < Stitching2DLUTGenTool.exe ..\\input\\1m_StitchingSetting.yml ..\\output
+
+******************** Stitching 2D LUT Gen Tool Version 2.2.13 ********************
+
+The output path is valid!
+StitchingSetting.yml is found!
+Camera parameters reading...
+------------------------------------
+Camera modules parameters reading...
+------------------------------------
+Camera Index: 0
+Camera Lens Model: Equidistant
+Camera Index: 1
+Camera Lens Model: Equidistant
+Camera Index: 2
+Camera Lens Model: Equidistant
+Camera Index: 3
+Camera Lens Model: Equidistant
+Virtual Camera Mode
+---------------------------
+Camera Modules initialized!
+---------------------------
+-------------------------------
+Stitching Parameters reading...
+-------------------------------
+Alignment Type: PANO_PERSPECTIVE
+Panorama Projection Type: EQUIRECTANGULAR
+2D LUT Size :257
+Align Distance Setting :100
+Will Resize to Fit Setting Size
+Goal Width:7680<-- Current Goal
+Goal Height:3840<-- Current Goal
+---------------------------------
+Stitching Parameters initialized!
+---------------------------------
+---------------------------------
+Camera Setting...
+---------------------------------
+*********************************
+Camera 0:
+Optical hPerspective: 135.189
+hFov: 180
+Optical vPerspective: 0
+vFov: 180
+*********************************
+*********************************
+Camera 1:
+Optical hPerspective: 44.896
+hFov: 180
+Optical vPerspective: 0
+vFov: 180
+*********************************
+*********************************
+Camera 2:
+Optical hPerspective: -45.0621
+hFov: 180
+Optical vPerspective: 0
+vFov: 180
+*********************************
+*********************************
+Camera 3:
+Optical hPerspective: 224.856
+hFov: 180
+Optical vPerspective: 0
+vFov: 180
+*********************************
+---------------------------------
+Camera Setting Done!
+---------------------------------
+Stitching....
+---- AdjustCrop Adjust before -------------
+tl    x: 1087 y: 227 width: 2709 height: 4452
+br    x: 3796 y: 4679 width: 2709 height: 4452
+---- AdjustCrop Adjust After --------------
+tl    x: 1087 y: 227 width: 2704 height: 4452
+br    x: 3791 y: 4679 width: 2704 height: 4452
+--------------------------------------------
+---- AdjustCrop Adjust before -------------
+tl    x: 3496 y: 227 width: 2712 height: 4452
+br    x: 6208 y: 4679 width: 2712 height: 4452
+---- AdjustCrop Adjust After --------------
+tl    x: 3503 y: 227 width: 2704 height: 4452
+br    x: 6207 y: 4679 width: 2704 height: 4452
+--------------------------------------------
+---- AdjustCrop Adjust before -------------
+tl    x: 5981 y: 227 width: 2696 height: 4452
+br    x: 8677 y: 4679 width: 2696 height: 4452
+---- AdjustCrop Adjust After --------------
+tl    x: 5983 y: 227 width: 2688 height: 4452
+br    x: 8671 y: 4679 width: 2688 height: 4452
+--------------------------------------------
+---- AdjustCrop Adjust before -------------
+tl    x: 8390 y: 227 width: 2691 height: 4452
+br    x: 11081 y: 4679 width: 2691 height: 4452
+---- AdjustCrop Adjust After --------------
+tl    x: 8399 y: 227 width: 2672 height: 4452
+br    x: 11071 y: 4679 width: 2672 height: 4452
+--------------------------------------------
+Final Width
+9984
+Final Height
+4452
+Overlap Size
+------
+288
+------
+224
+------
+272
+------
+Hardware Cropped Width/Height Ratio
+----------------------------------------
+Width/Height Ratio: 16 / 7.13462
+----------------------------------------
+---- FitCrop(Scale) Adjust before -------------
+tl    x: 1087 y: 227 width: 2709 height: 4452
+br    x: 3796 y: 4679 width: 2709 height: 4452
+---- FitCrop(Scale) Adjust After --------------
+tl    x: 0 y: 0 width: 2128 height: 3840
+br    x: 2128 y: 3840 width: 2128 height: 3840
+--------------------------------------------
+---- FitCrop(Scale) Adjust before -------------
+tl    x: 3496 y: 227 width: 2712 height: 4452
+br    x: 6208 y: 4679 width: 2712 height: 4452
+---- FitCrop(Scale) Adjust After --------------
+tl    x: 1920 y: 0 width: 2128 height: 3840
+br    x: 4048 y: 3840 width: 2128 height: 3840
+--------------------------------------------
+---- FitCrop(Scale) Adjust before -------------
+tl    x: 5981 y: 227 width: 2696 height: 4452
+br    x: 8677 y: 4679 width: 2696 height: 4452
+---- FitCrop(Scale) Adjust After --------------
+tl    x: 3872 y: 0 width: 2128 height: 3840
+br    x: 6000 y: 3840 width: 2128 height: 3840
+--------------------------------------------
+---- FitCrop(Scale) Adjust before -------------
+tl    x: 8390 y: 227 width: 2691 height: 4452
+br    x: 11081 y: 4679 width: 2691 height: 4452
+---- FitCrop(Scale) Adjust After --------------
+tl    x: 5776 y: 0 width: 2128 height: 3840
+br    x: 7904 y: 3840 width: 2128 height: 3840
+--------------------------------------------
+Final Width
+7904
+Final Height
+3840
+Overlap Size
+------
+208
+------
+176
+------
+224
+------
+bestCrop Fov
+----------------------------------------
+H Fov : 368.443
+V Fov : 164.109
+----------------------------------------
+AdjustCrop Fov
+----------------------------------------
+H Fov : 368.075
+V Fov : 164.109
+----------------------------------------
+FitCrop(Scale) Fov
+----------------------------------------
+H Fov : 368.443
+V Fov : 164.109
+----------------------------------------
+---- Remove 360 Overlap Adjust before -------------
+tl    x: 0 y: 0 width: 2128 height: 3840
+br    x: 2128 y: 3840 width: 2128 height: 3840
+---- Remove 360 Overlap Adjust After --------------
+tl    x: 0 y: 0 width: 2128 height: 3840
+br    x: 2128 y: 3840 width: 2128 height: 3840
+--------------------------------------------
+---- Remove 360 Overlap Adjust before -------------
+tl    x: 1904 y: 0 width: 2112 height: 3840
+br    x: 4016 y: 3840 width: 2112 height: 3840
+---- Remove 360 Overlap Adjust After --------------
+tl    x: 1904 y: 0 width: 2112 height: 3840
+br    x: 4016 y: 3840 width: 2112 height: 3840
+--------------------------------------------
+---- Remove 360 Overlap Adjust before -------------
+tl    x: 3856 y: 0 width: 2096 height: 3840
+br    x: 5952 y: 3840 width: 2096 height: 3840
+---- Remove 360 Overlap Adjust After --------------
+tl    x: 3856 y: 0 width: 2096 height: 3840
+br    x: 5952 y: 3840 width: 2096 height: 3840
+--------------------------------------------
+---- Remove 360 Overlap Adjust before -------------
+tl    x: 5744 y: 0 width: 2112 height: 3840
+br    x: 7856 y: 3840 width: 2112 height: 3840
+---- Remove 360 Overlap Adjust After --------------
+tl    x: 5744 y: 0 width: 2112 height: 3840
+br    x: 7856 y: 3840 width: 2112 height: 3840
+--------------------------------------------
+Final Width
+7680
+Final Height
+3840
+Overlap Size
+------
+224
+------
+160
+------
+208
+------
+Exporting FitCrop(Scaled) 2D Lut...
+essential LUT size (w x h): 257  x  257
+essential LUT size (w x h): 257  x  257
+essential LUT size (w x h): 257  x  257
+essential LUT size (w x h): 257  x  257
+ProcTime: 23.492
+Stitching Done!
+
+D:\IQC stitch test2 _AOCI\Tool\Stitching_2DLUT_Gen_Tool\exe>
+2025/11/24 13:47:07 [1]	Run IOCD041-085:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:07 [1]	(CmdConsole) > copy "..\output\cam1_LUT257_ROT90_hflip0.bin" "..\..\..\Station_Record\1110250337+20251124_01_46_30\2DLUT\1m_cam0_LUT257_ROT90_hflip0.bin"
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < 
+2025/11/24 13:47:07 [1]	Run IOCD041-086:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:07 [1]	(CmdConsole) > copy "..\output\cam2_LUT257_ROT-90_hflip0.bin" "..\..\..\Station_Record\1110250337+20251124_01_46_30\2DLUT\1m_cam1_LUT257_ROT-90_hflip0.bin"
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < 
+2025/11/24 13:47:07 [1]	Run IOCD041-087:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:07 [1]	(CmdConsole) > copy "..\output\cam3_LUT257_ROT90_hflip0.bin" "..\..\..\Station_Record\1110250337+20251124_01_46_30\2DLUT\1m_cam2_LUT257_ROT90_hflip0.bin"
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < 
+2025/11/24 13:47:07 [1]	Run IOCD041-088:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:07 [1]	(CmdConsole) > copy "..\output\cam4_LUT257_ROT-90_hflip0.bin" "..\..\..\Station_Record\1110250337+20251124_01_46_30\2DLUT\1m_cam3_LUT257_ROT-90_hflip0.bin"
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < 
+2025/11/24 13:47:07 [1]	Run IOCD041-089:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:07 [1]	(CmdConsole) > copy "..\output\camview_anchors.txt" "..\..\..\Station_Record\1110250337+20251124_01_46_30\2DLUT\1m_camview_anchors.txt"
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < 
+2025/11/24 13:47:07 [1]	Run IOCD041-090:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:07 [1]	(CmdConsole) > move ..\output\cam1_LUT257_ROT90_hflip0.bin ..\..\..\\tftp_data\1m_cam0_LUT257_ROT90_hflip0.bin
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < 
+2025/11/24 13:47:07 [1]	Run IOCD041-091:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:07 [1]	(CmdConsole) > move ..\output\cam2_LUT257_ROT-90_hflip0.bin ..\..\..\\tftp_data\1m_cam1_LUT257_ROT-90_hflip0.bin
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < 
+2025/11/24 13:47:07 [1]	Run IOCD041-092:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:07 [1]	(CmdConsole) > move ..\output\cam3_LUT257_ROT90_hflip0.bin ..\..\..\\tftp_data\1m_cam2_LUT257_ROT90_hflip0.bin
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < 
+2025/11/24 13:47:07 [1]	Run IOCD041-093:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:07 [1]	(CmdConsole) > move ..\output\cam4_LUT257_ROT-90_hflip0.bin ..\..\..\\tftp_data\1m_cam3_LUT257_ROT-90_hflip0.bin
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < 
+2025/11/24 13:47:07 [1]	Run IOCD041-094:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:07 [1]	(CmdConsole) > move ..\output\camview_anchors.txt ..\..\..\\tftp_data\1m_camview_anchors.txt
+
+2025/11/24 13:47:07 [1]	(CmdConsole) < 
+2025/11/24 13:47:07 [1]	Run IOET160-095:Delay	Mode: 1, Retry: 3
+[13:47:07.330][PC] [Delay]++
+2025/11/24 13:47:07 [1]	> :Delay,"1000"
+2025/11/24 13:47:08 [1]	< 0
+[13:47:08.357][PC] [Delay]--
+2025/11/24 13:47:08 [1]	[PC] [Delay] ~~ TestTime:1.0275165 sec
+2025/11/24 13:47:08 [1]	Run IPIO023-096:copy 1m_2dlut to vsp	Mode: 1, Retry: 3
+2025/11/24 13:47:08 [1]	(LAN) > tftp -gr 1m_cam0_LUT257_ROT90_hflip0.bin 192.168.11.142
+
+2025/11/24 13:47:08 [1]	(LAN) < tftp -gr 1m_cam0_LUT257_ROT90_hflip0.bin 192.168.11.142
+1m_cam0_LUT257_ROT90 100% |************************************************************************************************************************************|  261k  0:00:00 ETA1m_cam0_LUT257_ROT90 100% |************************************************************************************************************************************|  261k  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:47:08 [1]	Run IOET160-097:Delay	Mode: 1, Retry: 3
+[13:47:08.863][PC] [Delay]++
+2025/11/24 13:47:08 [1]	> :Delay,"1000"
+2025/11/24 13:47:09 [1]	< 0
+[13:47:09.868][PC] [Delay]--
+2025/11/24 13:47:09 [1]	[PC] [Delay] ~~ TestTime:1.0046721 sec
+2025/11/24 13:47:09 [1]	Run IPIO023-098:copy 1m_2dlut to vsp	Mode: 1, Retry: 3
+2025/11/24 13:47:09 [1]	(LAN) > tftp -gr 1m_cam1_LUT257_ROT-90_hflip0.bin 192.168.11.142
+
+2025/11/24 13:47:10 [1]	(LAN) < tftp -gr 1m_cam1_LUT257_ROT-90_hflip0.bin 192.168.11.142
+1m_cam1_LUT257_ROT-9  90% |***********************************************************************************************************************             |  235k  0:00:00 ETA1m_cam1_LUT257_ROT-9 100% |************************************************************************************************************************************|  261k  0:00:00 ETA1m_cam1_LUT257_ROT-9 100% |************************************************************************************************************************************|  261k  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:47:10 [1]	Run IOET160-099:Delay	Mode: 1, Retry: 3
+[13:47:10.374][PC] [Delay]++
+2025/11/24 13:47:10 [1]	> :Delay,"1000"
+2025/11/24 13:47:11 [1]	< 0
+[13:47:11.384][PC] [Delay]--
+2025/11/24 13:47:11 [1]	[PC] [Delay] ~~ TestTime:1.0102033 sec
+2025/11/24 13:47:11 [1]	Run IPIO023-100:copy 1m_2dlut to vsp	Mode: 1, Retry: 3
+2025/11/24 13:47:11 [1]	(LAN) > tftp -gr 1m_cam2_LUT257_ROT90_hflip0.bin 192.168.11.142
+
+2025/11/24 13:47:11 [1]	(LAN) < tftp -gr 1m_cam2_LUT257_ROT90_hflip0.bin 192.168.11.142
+1m_cam2_LUT257_ROT90 100% |************************************************************************************************************************************|  261k  0:00:00 ETA1m_cam2_LUT257_ROT90 100% |************************************************************************************************************************************|  261k  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:47:11 [1]	Run IOET160-101:Delay	Mode: 1, Retry: 3
+[13:47:11.892][PC] [Delay]++
+2025/11/24 13:47:11 [1]	> :Delay,"1000"
+2025/11/24 13:47:12 [1]	< 0
+[13:47:12.901][PC] [Delay]--
+2025/11/24 13:47:12 [1]	[PC] [Delay] ~~ TestTime:1.0087929 sec
+2025/11/24 13:47:12 [1]	Run IPIO023-102:copy 1m_2dlut to vsp	Mode: 1, Retry: 3
+2025/11/24 13:47:12 [1]	(LAN) > tftp -gr 1m_cam3_LUT257_ROT-90_hflip0.bin 192.168.11.142
+
+2025/11/24 13:47:13 [1]	(LAN) < tftp -gr 1m_cam3_LUT257_ROT-90_hflip0.bin 192.168.11.142
+1m_cam3_LUT257_ROT-9  83% |*************************************************************************************************************                       |  217k  0:00:00 ETA1m_cam3_LUT257_ROT-9 100% |************************************************************************************************************************************|  261k  0:00:00 ETA1m_cam3_LUT257_ROT-9 100% |************************************************************************************************************************************|  261k  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:47:13 [1]	Run IOET160-103:Delay	Mode: 1, Retry: 3
+[13:47:13.409][PC] [Delay]++
+2025/11/24 13:47:13 [1]	> :Delay,"1000"
+2025/11/24 13:47:14 [1]	< 0
+[13:47:14.418][PC] [Delay]--
+2025/11/24 13:47:14 [1]	[PC] [Delay] ~~ TestTime:1.0091857 sec
+2025/11/24 13:47:14 [1]	Run IPIO023-104:copy 1m_2dlut to vsp	Mode: 1, Retry: 3
+2025/11/24 13:47:14 [1]	(LAN) > tftp -gr 1m_camview_anchors.txt 192.168.11.142
+
+2025/11/24 13:47:14 [1]	(LAN) < tftp -gr 1m_camview_anchors.txt 192.168.11.142
+1m_camview_anchors.t 100% |************************************************************************************************************************************|   624  0:00:00 ETA1m_camview_anchors.t 100% |************************************************************************************************************************************|   624  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:47:14 [1]	Run IOET160-105:Delay	Mode: 1, Retry: 3
+[13:47:14.481][PC] [Delay]++
+2025/11/24 13:47:14 [1]	> :Delay,"1000"
+2025/11/24 13:47:15 [1]	< 0
+[13:47:15.491][PC] [Delay]--
+2025/11/24 13:47:15 [1]	[PC] [Delay] ~~ TestTime:1.0100515 sec
+2025/11/24 13:47:15 [1]	Run OTCH013-106:Disconnect CMD	Mode: 1, Retry: 3
+[13:47:15.491][PC] [Disconnect CMD]++
+2025/11/24 13:47:15 [1]	> :Disconnect,"CmdConsole"
+2025/11/24 13:47:15 [1]	< 0
+[13:47:15.491][PC] [Disconnect CMD]--
+2025/11/24 13:47:15 [1]	[PC] [Disconnect CMD] ~~ TestTime:0 sec
+2025/11/24 13:47:15 [1]	Run IOET160-107:Delay	Mode: 1, Retry: 3
+[13:47:15.491][PC] [Delay]++
+2025/11/24 13:47:15 [1]	> :Delay,"100"
+2025/11/24 13:47:15 [1]	< 0
+[13:47:15.619][PC] [Delay]--
+2025/11/24 13:47:15 [1]	[PC] [Delay] ~~ TestTime:0.1280924 sec
+2025/11/24 13:47:15 [1]	IOET160-107:@STEP011@get 2DLUT and write to vsp_1m Test is Pass ! 		----- 32.2326775 Sec.
+2025/11/24 13:47:15 [1]	DUT Test Completed !        ----- 32.2326775 Sec.
+2025/11/24 13:47:15 [1]	Execute Phase 5 Test.
+2025/11/24 13:47:15 [1]	Do @STEP013@4cam snapshot
+2025/11/24 13:47:15 [1]	Run B7PL011-162:4cam snapshot yuv	Mode: 1, Retry: 3
+2025/11/24 13:47:15 [1]	(LAN) > diag -s hdr_snapshot 2 4 1
+
+2025/11/24 13:47:25 [1]	(LAN) < diag -s hdr_snapshot 2 4 1
+exposure 0
+gain 0
+iq_enable 1
+init_4cam 0
+snapshot_type 1 enc_type 1
+g_shdr 1 
+g_fps 30
+ipp_out_fmt 420
+g_en_sub 0
+g_en_sub2 0
+g_shdr 1
+ofs_max[0] = 0, vsp_ovlp_w[0] is change to 208
+ofs_max[1] = 0, vsp_ovlp_w[1] is change to 176
+ofs_max[2] = 0, vsp_ovlp_w[2] is change to 208
+ofs_max[3] = 0, vsp_ovlp_w[3] is change to 176
+
+
+ vsp_vpe_out1 (4585032, 3840), blend_num 4, tbl_sz 257 
+ ovlp_sz w(208, 176, 208, 176), h 3840 
+ vsp_vpe_out2_ (1536, 3840) 
+ vsp_out (7680, 3840) 
+
+
+HDAL: Version: v3.400.0
+fusion w = 208, h = 3840, va = 0x7fb87ab000, temp_va = 0x7fb886e000
+fusion_pa[0]= 0x139a8e000, va[0] = 0x7fb87ab000
+fusion w = 176, h = 3840, va = 0x7fb8706000, temp_va = 0x7fb87ab000
+fusion_pa[1]= 0x139d62000, va[1] = 0x7fb8706000
+fusion w = 208, h = 3840, va = 0x7fb8643000, temp_va = 0x7fb8706000
+fusion_pa[2]= 0x139906000, va[2] = 0x7fb8643000
+fusion w = 176, h = 3840, va = 0x7fb859e000, temp_va = 0x7fb8643000
+fusion_pa[3]= 0x139bda000, va[3] = 0x7fb859e000
+dce isp_id = 1
+fusion w = 208, h = 3840, va = 0x7fb84db000, temp_va = 0x7fb859e000
+fusion_pa[0]= 0x1225b7000, va[0] = 0x7fb84db000
+fusion w = 176, h = 3840, va = 0x7fb8436000, temp_va = 0x7fb84db000
+fusion_pa[1]= 0x122e28000, va[1] = 0x7fb8436000
+fusion w = 208, h = 3840, va = 0x7fb8373000, temp_va = 0x7fb8436000
+fusion_pa[2]= 0x123699000, va[2] = 0x7fb8373000
+fusion w = 176, h = 3840, va = 0x7fb82ce000, temp_va = 0x7fb8373000
+fusion_pa[3]= 0x123f0a000, va[3] = 0x7fb82ce000
+dce isp_id = 1
+video_proc_path = 0x24000101, dim = 3840, 2160
+video_proc_path = 0x24010101, dim = 3840, 2160
+video_proc_path = 0x24020101, dim = 3840, 2160
+video_proc_path = 0x24030101, dim = 3840, 2160
+video_proc_path = 0x24040101, dim = 7680, 3840
+video_proc_path = 0x24050101, dim = 1920, 960
+video_proc_path = 0x24070101, dim = 7680, 3840
+
+video_path_config.max_mem.rotate = 0
+enc_type=1
+
+video_path_config.max_mem.rotate = 0
+enc_type=1
+
+video_path_config.max_mem.rotate = 0
+enc_type=1
+
+video_path_config.max_mem.rotate = 0
+enc_type=1
+
+video_path_config.max_mem.rotate = 0
+enc_type=1
+
+video_path_config.max_mem.rotate = 0
+enc_type=1
+
+video_path_config.max_mem.rotate = 0
+enc_type=2
+
+video_path_config.max_mem.rotate = 0
+enc_type=1
+
+Load IQ setting!
+load /mnt/app/isp/isp_imx678_0_hdr.cfg 
+----------------------------------------
+SET Auto AE 
+----------------------------------------
+SET Auto AE 
+----------------------------------------
+SET Auto AE 
+----------------------------------------
+SET Auto AE 
+frame_mask = 0xf
+
+pull_thread....
+gfx_scl_thd1....
+Enter q to exit
+id = 0, awb_stitch id = 0x9a673401 
+id = 0, ae_stitch id = 0x9a673401 
+id = 3, awb_stitch id = 0x9a673401 
+id = 3, ae_stitch id = 0x9a673401 
+id = 6, awb_stitch id = 0x9a673401 
+id = 6, ae_stitch id = 0x9a673401 
+id = 9, awb_stitch id = 0x9a673401 
+id = 9, ae_stitch id = 0x9a673401 
+gfx_scl_thd0....
+
+dump main bitstream to file (/mnt/sd/vsp_sensor1.dat) ....
+
+dump sub  bitstream to file (/mnt/sd/vsp_sensor2.dat) ....
+
+dump sub  bitstream to file (/mnt/sd/vsp_sensor3.dat) ....
+
+dump sub  bitstream to file (/mnt/sd/vsp_sensor4.dat) ....
+
+dump sub  bitstream to file (/mnt/sd/vsp_out_stream1.dat) ....
+
+dump sub  bitstream to file (/mnt/sd/vsp_out_stream2.dat) ....
+
+dump sub  bitstream to file (/mnt/sd/vsp_out_stream3.dat) ....
+
+if you want to stop, enter "q" to exit !!
+
+load /mnt/app/isp/isp_imx678_0_ecs0.cfg 
+load /mnt/app/isp/isp_imx678_0_ecs1.cfg 
+load /mnt/app/isp/isp_imx678_0_ecs2.cfg 
+load /mnt/app/isp/isp_imx678_0_ecs3.cfg 
+
+Enable vsp mode
+
+vsp_pull_out_thread yuv snapshot 
+pa x17cf2200 va xa55cf000 vaddr xa55cf000
+ptry 0x7fa55cf000 Y len 29491200
+UV len 14745600
+
+vsp_pull_out_thread yuv snapshot 
+pa x1d154200 va xa55cf000 vaddr xa55cf000
+ptry 0x7fa55cf000 Y len 29491200
+UV len 14745600
+
+vsp_pull_out_thread yuv snapshot 
+pa x1fb85200 va xa55cf000 vaddr xa55cf000
+ptry 0x7fa55cf000 Y len 29491200
+UV len 14745600
+
+vsp_pull_out_thread yuv snapshot 
+pa x1d154200 va xa55cf000 vaddr xa55cf000
+ptry 0x7fa55cf000 Y len 29491200
+UV len 14745600
+
+vsp_pull_out_thread yuv snapshot 
+pa x17cf2200 va xa55cf000 vaddr xa55cf000
+ptry 0x7fa55cf000 Y len 29491200
+UV len 14745600
+
+vsp_pull_out_thread yuv snapshot 
+pa x1d154200 va xa55cf000 vaddr xa55cf000
+ptry 0x7fa55cf000 Y len 29491200
+UV len 14745600
+
+vsp_pull_out_thread yuv snapshot 
+pa x1a723200 va xa55cf000 vaddr xa55cf000
+
+Uninit vsp process
+exit flow
+ptry 0x7fa55cf000 Y len 29491200
+UV len 14745600
+pull_out error = -56!! blk=0x0
+release_all_que_frames
+[5001] main close fail=-30 
+[5007] main close fail=-30 
+[5016] main close fail=-30 
+[5023] main close fail=-30 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+root@NOKIA360Camera-Valo360:/var/vsp$ 
+2025/11/24 13:47:25 [1]	Run IOET160-163:Delay	Mode: 1, Retry: 3
+[13:47:25.955][PC] [Delay]++
+2025/11/24 13:47:25 [1]	> :Delay,"1000"
+2025/11/24 13:47:26 [1]	< 0
+[13:47:26.967][PC] [Delay]--
+2025/11/24 13:47:26 [1]	[PC] [Delay] ~~ TestTime:1.0120054 sec
+2025/11/24 13:47:26 [1]	Run OTCH013-164:Disconnect CMD	Mode: 1, Retry: 3
+[13:47:26.967][PC] [Disconnect CMD]++
+2025/11/24 13:47:26 [1]	> :Disconnect,"CmdConsole"
+2025/11/24 13:47:26 [1]	< 0
+[13:47:26.967][PC] [Disconnect CMD]--
+2025/11/24 13:47:26 [1]	[PC] [Disconnect CMD] ~~ TestTime:0 sec
+2025/11/24 13:47:26 [1]	Run IOET160-165:Delay	Mode: 1, Retry: 3
+[13:47:26.967][PC] [Delay]++
+2025/11/24 13:47:26 [1]	> :Delay,"100"
+2025/11/24 13:47:27 [1]	< 0
+[13:47:27.080][PC] [Delay]--
+2025/11/24 13:47:27 [1]	[PC] [Delay] ~~ TestTime:0.1169949 sec
+2025/11/24 13:47:27 [1]	Run OTCH013-166:Connect CMD	Mode: 1, Retry: 3
+[13:47:27.084][PC] [Connect CMD]++
+2025/11/24 13:47:27 [1]	> :Connect,"CmdConsole"
+2025/11/24 13:47:27 [1]	< 0
+[13:47:27.102][PC] [Connect CMD]--
+2025/11/24 13:47:27 [1]	[PC] [Connect CMD] ~~ TestTime:0.0181775 sec
+2025/11/24 13:47:27 [1]	Run IOCD041-167:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:27 [1]	(CmdConsole) > Tool\\tftpd64.exe
+
+2025/11/24 13:47:27 [1]	(CmdConsole) < 
+2025/11/24 13:47:27 [1]	Run IOET160-168:Delay	Mode: 1, Retry: 3
+[13:47:27.102][PC] [Delay]++
+2025/11/24 13:47:27 [1]	> :Delay,"500"
+2025/11/24 13:47:27 [1]	< 0
+[13:47:27.624][PC] [Delay]--
+2025/11/24 13:47:27 [1]	[PC] [Delay] ~~ TestTime:0.5218632 sec
+2025/11/24 13:47:27 [1]	Run B7PL011-169:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:27 [1]	(LAN) > cd /mnt/usr
+
+2025/11/24 13:47:27 [1]	(LAN) < cd /mnt/usr
+root@NOKIA360Camera-Valo360:/mnt/usr$ 
+root@NOKIA360Camera-Valo360:/mnt/usr$ 
+2025/11/24 13:47:27 [1]	Run IPIO023-170:copy 4cam yuv to PC	Mode: 1, Retry: 3
+2025/11/24 13:47:27 [1]	(LAN) > tftp -pl dump_4cam_bs_snap_hdr_0.yuv 192.168.11.142 -b 50000
+
+2025/11/24 13:47:30 [1]	(LAN) < tftp -pl dump_4cam_bs_snap_hdr_0.yuv 192.168.11.142 -b 50000
+dump_4cam_bs_snap_hd  20% |***************************                                                                                                         | 8912k  0:00:03 ETAdump_4cam_bs_snap_hd  53% |**********************************************************************                                                              | 22.4M  0:00:01 ETAdump_4cam_bs_snap_hd  86% |******************************************************************************************************************                  | 36.4M  0:00:00 ETAdump_4cam_bs_snap_hd 100% |************************************************************************************************************************************| 42.1M  0:00:00 ETAdump_4cam_bs_snap_hd 100% |************************************************************************************************************************************| 42.1M  0:00:00 ETAdump_4cam_bs_snap_hd 100% |************************************************************************************************************************************| 42.1M  0:00:00 ETA
+root@NOKIA360Camera-Valo360:/mnt/usr$ 
+root@NOKIA360Camera-Valo360:/mnt/usr$ 
+2025/11/24 13:47:30 [1]	Run IOET160-171:Delay	Mode: 1, Retry: 3
+[13:47:30.735][PC] [Delay]++
+2025/11/24 13:47:30 [1]	> :Delay,"1000"
+2025/11/24 13:47:31 [1]	< 0
+[13:47:31.745][PC] [Delay]--
+2025/11/24 13:47:31 [1]	[PC] [Delay] ~~ TestTime:1.0101939 sec
+2025/11/24 13:47:31 [1]	Run IOCD041-172:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:31 [1]	(CmdConsole) > move tftp_data\dump_4cam_bs_snap_hdr_0.yuv Station_Record\1110250337+20251124_01_46_30\4cam\4cam.yuv
+
+2025/11/24 13:47:31 [1]	(CmdConsole) < 
+2025/11/24 13:47:31 [1]	Run IOET160-173:Delay	Mode: 1, Retry: 3
+[13:47:31.745][PC] [Delay]++
+2025/11/24 13:47:31 [1]	> :Delay,"500"
+2025/11/24 13:47:32 [1]	< 0
+[13:47:32.257][PC] [Delay]--
+2025/11/24 13:47:32 [1]	[PC] [Delay] ~~ TestTime:0.5122112 sec
+2025/11/24 13:47:32 [1]	Run IOCD041-174:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:32 [1]	(CmdConsole) > cd Station_Record\1110250337+20251124_01_46_30\4cam
+
+2025/11/24 13:47:32 [1]	(CmdConsole) < 
+2025/11/24 13:47:32 [1]	Run IOCD041-175:4cam yuv to png	Mode: 1, Retry: 3
+2025/11/24 13:47:32 [1]	(CmdConsole) > ffmpeg -s 7680x3840 -pix_fmt nv12 -i 4cam.yuv 4cam.png 2>&1
+
+2025/11/24 13:47:32 [1]	(CmdConsole) < 
+D:\IQC stitch test2 _AOCI\Station_Record\1110250337+20251124_01_46_30\4cam>ffmpeg -s 7680x3840 -pix_fmt nv12 -i 4cam.yuv 4cam.png 2>&1
+ffmpeg version 2024-06-09-git-94f2274a8b-full_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers
+  built with gcc 13.2.0 (Rev5, Built by MSYS2 project)
+  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-libsnappy --enable-zlib --enable-librist --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-libbluray --enable-libcaca --enable-sdl2 --enable-libaribb24 --enable-libaribcaption --enable-libdav1d --enable-libdavs2 --enable-libuavs3d --enable-libxevd --enable-libzvbi --enable-librav1e --enable-libsvtav1 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxavs2 --enable-libxeve --enable-libxvid --enable-libaom --enable-libjxl --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-frei0r --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-liblensfun --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-libshaderc --enable-vulkan --enable-libplacebo --enable-opencl --enable-libcdio --enable-libgme --enable-libmodplug --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libshine --enable-libtheora --enable-libtwolame --enable-libvo-amrwbenc --enable-libcodec2 --enable-libilbc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-ladspa --enable-libbs2b --enable-libflite --enable-libmysofa --enable-librubberband --enable-libsoxr --enable-chromaprint
+  libavutil      59. 21.100 / 59. 21.100
+  libavcodec     61.  7.100 / 61.  7.100
+  libavformat    61.  3.104 / 61.  3.104
+  libavdevice    61.  2.100 / 61.  2.100
+  libavfilter    10.  2.102 / 10.  2.102
+  libswscale      8.  2.100 /  8.  2.100
+  libswresample   5.  2.100 /  5.  2.100
+  libpostproc    58.  2.100 / 58.  2.100
+[rawvideo @ 0000021c89561cc0] Estimating duration from bitrate, this may be inaccurate
+Input #0, rawvideo, from '4cam.yuv':
+  Duration: 00:00:00.04, start: 0.000000, bitrate: 8847360 kb/s
+  Stream #0:0: Video: rawvideo (NV12 / 0x3231564E), nv12, 7680x3840, 8847360 kb/s, 25 tbr, 25 tbn
+Stream mapping:
+  Stream #0:0 -> #0:0 (rawvideo (native) -> png (native))
+Press [q] to stop, [?] for help
+Output #0, image2, to '4cam.png':
+  Metadata:
+    encoder         : Lavf61.3.104
+  Stream #0:0: Video: png, rgb24(pc, gbr/unknown/unknown, progressive), 7680x3840, q=2-31, 200 kb/s, 25 fps, 25 tbn
+      Metadata:
+        encoder         : Lavc61.7.100 png
+frame=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    
+2025/11/24 13:47:32 [1]	Run IOET160-176:Delay	Mode: 1, Retry: 3
+[13:47:32.831][PC] [Delay]++
+2025/11/24 13:47:32 [1]	> :Delay,"2000"
+2025/11/24 13:47:34 [1]	< 0
+[13:47:34.836][PC] [Delay]--
+2025/11/24 13:47:34 [1]	[PC] [Delay] ~~ TestTime:2.0050062 sec
+2025/11/24 13:47:34 [1]	Run B7PL011-177:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:34 [1]	(LAN) > rm dump_4cam_bs_snap_hdr_0.yuv
+
+2025/11/24 13:47:34 [1]	(LAN) < rm dump_4cam_bs_snap_hdr_0.yuv
+root@NOKIA360Camera-Valo360:/mnt/usr$ 
+2025/11/24 13:47:34 [1]	Run IOCD041-178:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:34 [1]	(CmdConsole) > del 4cam.yuv
+
+2025/11/24 13:47:34 [1]	(CmdConsole) < 
+2025/11/24 13:47:34 [1]	IOCD041-178:@STEP013@4cam snapshot Test is Pass ! 		----- 19.1052954 Sec.
+2025/11/24 13:47:34 [1]	DUT Test Completed !        ----- 19.1690787 Sec.
+2025/11/24 13:47:34 [1]	Execute Phase 6 Test.
+2025/11/24 13:47:35 [1]	Do @STEP015@Color check
+2025/11/24 13:47:35 [1]	Run OTCH013-179:Disconnect CMD	Mode: 1, Retry: 3
+[13:47:35.026][PC] [Disconnect CMD]++
+2025/11/24 13:47:35 [1]	> :Disconnect,"CmdConsole"
+2025/11/24 13:47:35 [1]	< 0
+[13:47:35.026][PC] [Disconnect CMD]--
+2025/11/24 13:47:35 [1]	[PC] [Disconnect CMD] ~~ TestTime:0 sec
+2025/11/24 13:47:35 [1]	Run IOET160-180:Delay	Mode: 1, Retry: 3
+[13:47:35.026][PC] [Delay]++
+2025/11/24 13:47:35 [1]	> :Delay,"100"
+2025/11/24 13:47:35 [1]	< 0
+[13:47:35.152][PC] [Delay]--
+2025/11/24 13:47:35 [1]	[PC] [Delay] ~~ TestTime:0.1268064 sec
+2025/11/24 13:47:35 [1]	Run OTCH013-181:Connect CMD	Mode: 1, Retry: 3
+[13:47:35.152][PC] [Connect CMD]++
+2025/11/24 13:47:35 [1]	> :Connect,"CmdConsole"
+2025/11/24 13:47:35 [1]	< 0
+[13:47:35.168][PC] [Connect CMD]--
+2025/11/24 13:47:35 [1]	[PC] [Connect CMD] ~~ TestTime:0.0156616 sec
+2025/11/24 13:47:35 [1]	Run IOET160-182:Delay	Mode: 1, Retry: 3
+[13:47:35.168][PC] [Delay]++
+2025/11/24 13:47:35 [1]	> :Delay,"500"
+2025/11/24 13:47:35 [1]	< 0
+[13:47:35.693][PC] [Delay]--
+2025/11/24 13:47:35 [1]	[PC] [Delay] ~~ TestTime:0.5244309 sec
+2025/11/24 13:47:35 [1]	Run IPIO00E-183:4cam check blemish	Mode: 1, Retry: 3
+2025/11/24 13:47:35 [1]	(CmdConsole) > Tool\Blemish_EYEtest\Blemish_EYEtest.exe Station_Record\1110250337+20251124_01_46_30\4cam\4cam.png 2>&1
+
+2025/11/24 13:47:35 [1]	(CmdConsole) < 
+2025/11/24 13:47:35 [1]	Run IOET160-184:Delay	Mode: 1, Retry: 3
+[13:47:35.693][PC] [Delay]++
+2025/11/24 13:47:35 [1]	> :Delay,"10000"
+2025/11/24 13:47:45 [1]	< 0
+[13:47:45.707][PC] [Delay]--
+2025/11/24 13:47:45 [1]	[PC] [Delay] ~~ TestTime:10.014064 sec
+2025/11/24 13:47:45 [1]	Run IOCD041-185:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:47:45 [1]	> :ShowConfirmBox,"顏色是否正常?","是;否"
+2025/11/24 13:47:52 [1]	< 是
+2025/11/24 13:47:52 [1]	IOCD041-185:@STEP015@Color check Test is Pass ! 		----- 17.9728167 Sec.
+2025/11/24 13:47:52 [1]	DUT Test Completed !        ----- 18.0031899 Sec.
+2025/11/24 13:47:53 [1]	Execute Phase 7 Test.
+2025/11/24 13:47:53 [1]	Do @STEP017@Blemish test
+2025/11/24 13:47:53 [1]	Run OTCH013-186:Disconnect CMD	Mode: 1, Retry: 3
+[13:47:53.094][PC] [Disconnect CMD]++
+2025/11/24 13:47:53 [1]	> :Disconnect,"CmdConsole"
+2025/11/24 13:47:53 [1]	< 0
+[13:47:53.113][PC] [Disconnect CMD]--
+2025/11/24 13:47:53 [1]	[PC] [Disconnect CMD] ~~ TestTime:0.0195741 sec
+2025/11/24 13:47:53 [1]	Run IOET160-187:Delay	Mode: 1, Retry: 3
+[13:47:53.113][PC] [Delay]++
+2025/11/24 13:47:53 [1]	> :Delay,"100"
+2025/11/24 13:47:53 [1]	< 0
+[13:47:53.221][PC] [Delay]--
+2025/11/24 13:47:53 [1]	[PC] [Delay] ~~ TestTime:0.1074264 sec
+2025/11/24 13:47:53 [1]	Run OTCH013-188:Connect CMD	Mode: 1, Retry: 3
+[13:47:53.221][PC] [Connect CMD]++
+2025/11/24 13:47:53 [1]	> :Connect,"CmdConsole"
+2025/11/24 13:47:53 [1]	< 0
+[13:47:53.247][PC] [Connect CMD]--
+2025/11/24 13:47:53 [1]	[PC] [Connect CMD] ~~ TestTime:0.0259771 sec
+2025/11/24 13:47:53 [1]	Run IOET160-189:Delay	Mode: 1, Retry: 3
+[13:47:53.247][PC] [Delay]++
+2025/11/24 13:47:53 [1]	> :Delay,"500"
+2025/11/24 13:47:53 [1]	< 0
+[13:47:53.762][PC] [Delay]--
+2025/11/24 13:47:53 [1]	[PC] [Delay] ~~ TestTime:0.5217464 sec
+2025/11/24 13:47:53 [1]	Run IPIO00E-190:4cam check blemish	Mode: 1, Retry: 3
+2025/11/24 13:47:53 [1]	(CmdConsole) > cd Tool\20250303_1730_Blemish_forATS
+
+2025/11/24 13:47:53 [1]	(CmdConsole) < 
+2025/11/24 13:47:53 [1]	Run IOET160-191:Delay	Mode: 1, Retry: 3
+[13:47:53.770][PC] [Delay]++
+2025/11/24 13:47:53 [1]	> :Delay,"500"
+2025/11/24 13:47:54 [1]	< 0
+[13:47:54.287][PC] [Delay]--
+2025/11/24 13:47:54 [1]	[PC] [Delay] ~~ TestTime:0.5169926 sec
+2025/11/24 13:47:54 [1]	Run IPIO00E-192:4cam check blemish	Mode: 1, Retry: 3
+2025/11/24 13:47:54 [1]	(CmdConsole) > 20250303_1730_Blemish_forATS.exe ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/ ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/
+
+2025/11/24 13:48:14 [1]	(CmdConsole) < 20250303_1730_Blemish_forATS.exe ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/ ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/
+..\..\Station_Record\1110250337+20251124_01_46_30\4cam/4cam.png
+select輪廓面積1:
+select輪廓面積1: 121
+select輪廓位置1: 4717 733
+blemish_count=1
+
+D:\IQC stitch test2 _AOCI\Tool\20250303_1730_Blemish_forATS>
+2025/11/24 13:48:14 [1]	CmdConsole@20250303_1730_Blemish_forATS.exe ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/ ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/
+ executes fail. Reply="20250303_1730_Blemish_forATS.exe ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/ ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/
+..\..\Station_Record\1110250337+20251124_01_46_30\4cam/4cam.png
+select輪廓面積1:
+select輪廓面積1: 121
+select輪廓位置1: 4717 733
+blemish_count=1
+
+D:\IQC stitch test2 _AOCI\Tool\20250303_1730_Blemish_forATS>" doesn't match @blemish_count=0
+2025/11/24 13:48:14 [1]	Run IPIO00E-192:4cam check blemish	Mode: 1, Retry: 2
+2025/11/24 13:48:14 [1]	(CmdConsole) > 20250303_1730_Blemish_forATS.exe ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/ ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/
+
+2025/11/24 13:48:25 [1]	(CmdConsole) < 20250303_1730_Blemish_forATS.exe ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/ ..\..\Station_Record\1110250337+20251124_01_46_30\4cam/
+..\..\Station_Record\1110250337+20251124_01_46_30\4cam/4cam.bmp
+select輪廓面積1:
+select輪廓面積1: 249
+select輪廓位置1: 4717 731
+select輪廓面積2:
+select輪廓面積2: 421
+select輪廓位置2: 4725 723
+blemish_count=2
+..\..\Station_Record\1110250337+20251124_01_46_30\4cam/4cam.png
+select輪廓面積1:
+select輪廓面積1: 121
+select輪廓位置1: 4717 733
+blemish_count=1
+..\..\Station_Record\1110250337+20251124_01_46_30\4cam/4cam_RESULT_roi.jpg
+blemish_count=0
+
+2025/11/24 13:48:25 [1]	IPIO00E-192:@STEP017@Blemish test Test is Pass ! 		----- 32.7276325 Sec.
+2025/11/24 13:48:25 [1]	DUT Test Completed !        ----- 32.7276325 Sec.
+2025/11/24 13:48:25 [1]	All Test Completed !        ----- 115.6928643 Sec.
+2025/11/24 13:48:25 [1]	TotalCount:22-YR:86%
+2025/11/24 13:48:25 [1]	Report name: IQC_4camstitching2test_1110250337_2025-11-24_13-48-25.ct
+2025/11/24 13:48:25 [1]	Execute Phase 97 Test.
+2025/11/24 13:48:25 [1]	Do @STEP019@Disconnection
+2025/11/24 13:48:25 [1]	Run B7PL011-193:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:25 [1]	(LAN) > cd /mnt/usr
+
+2025/11/24 13:48:26 [1]	(LAN) < cd /mnt/usr
+root@NOKIA360Camera-Valo360:/mnt/usr$ 
+root@NOKIA360Camera-Valo360:/mnt/usr$ 
+2025/11/24 13:48:26 [1]	Run B7PL011-194:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(LAN) > rm dump_4cam_bs_snap_hdr_0.yuv
+
+2025/11/24 13:48:26 [1]	(LAN) < rm dump_4cam_bs_snap_hdr_0.yuv
+rm: can't remove 'dump_4cam_bs_snap_hdr_0.yuv': No such file or directory
+root@NOKIA360Camera-Valo360:/mnt/usr$ 
+root@NOKIA360Camera-Valo360:/mnt/usr$ 
+2025/11/24 13:48:26 [1]	Run OTCH013-195:Disconnect CMD	Mode: 1, Retry: 3
+[13:48:26.107][PC] [Disconnect CMD]++
+2025/11/24 13:48:26 [1]	> :Disconnect,"CmdConsole"
+2025/11/24 13:48:26 [1]	< 0
+[13:48:26.107][PC] [Disconnect CMD]--
+2025/11/24 13:48:26 [1]	[PC] [Disconnect CMD] ~~ TestTime:0 sec
+2025/11/24 13:48:26 [1]	Run IOET160-196:Delay	Mode: 1, Retry: 3
+[13:48:26.107][PC] [Delay]++
+2025/11/24 13:48:26 [1]	> :Delay,"100"
+2025/11/24 13:48:26 [1]	< 0
+[13:48:26.218][PC] [Delay]--
+2025/11/24 13:48:26 [1]	[PC] [Delay] ~~ TestTime:0.1117407 sec
+2025/11/24 13:48:26 [1]	Run OTCH013-197:Connect CMD	Mode: 1, Retry: 3
+[13:48:26.218][PC] [Connect CMD]++
+2025/11/24 13:48:26 [1]	> :Connect,"CmdConsole"
+2025/11/24 13:48:26 [1]	< 0
+[13:48:26.234][PC] [Connect CMD]--
+2025/11/24 13:48:26 [1]	[PC] [Connect CMD] ~~ TestTime:0.0158689 sec
+2025/11/24 13:48:26 [1]	Run IOCD041-198:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > cd Tool\Stitching_2DLUT_Gen_Tool\exe
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-199:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del AdjustCrop_Block_0.png AdjustCrop_Block_1.png AdjustCrop_Block_2.png AdjustCrop_Block_3.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-200:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del AdjustCrop_EachBlock_0.png AdjustCrop_EachBlock_1.png AdjustCrop_EachBlock_2.png AdjustCrop_EachBlock_3.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-201:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del AdjustCrop_stitched.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-202:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del bestCrop_Block_0.png bestCrop_Block_1.png bestCrop_Block_2.png bestCrop_Block_3.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-203:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del bestCrop_EachBlock_0.png bestCrop_EachBlock_1.png bestCrop_EachBlock_2.png bestCrop_EachBlock_3.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-204:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del bestCrop_stitched.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-205:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del FitCrop_Block(Scaled)_0.png FitCrop_Block(Scaled)_1.png FitCrop_Block(Scaled)_2.png FitCrop_Block(Scaled)_3.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-206:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del FitCrop_EachBlock(Scaled)_0.png FitCrop_EachBlock(Scaled)_1.png FitCrop_EachBlock(Scaled)_2.png FitCrop_EachBlock(Scaled)_3.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-207:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del FitCrop_stitched(Scaled).png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-208:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del Global_Block_0.png Global_Block_1.png Global_Block_2.png Global_Block_3.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-209:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del "Raw Project Stitched.png"
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-210:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del CheckStitched.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+
+2025/11/24 13:48:26 [1]	Run IOCD041-211:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > cd ..\input
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOCD041-212:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del cam0-a1.yuv cam1-a1.yuv cam2-a1.yuv cam3-a1.yuv
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOET160-213:Delay	Mode: 1, Retry: 3
+[13:48:26.250][PC] [Delay]++
+2025/11/24 13:48:26 [1]	> :Delay,"100"
+2025/11/24 13:48:26 [1]	< 0
+[13:48:26.377][PC] [Delay]--
+2025/11/24 13:48:26 [1]	[PC] [Delay] ~~ TestTime:0.1271057 sec
+2025/11/24 13:48:26 [1]	Run IOCD041-214:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del new_cal_data_0x.png new_cal_data_1x.png new_cal_data_2x.png new_cal_data_3x.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOET160-215:Delay	Mode: 1, Retry: 3
+[13:48:26.377][PC] [Delay]++
+2025/11/24 13:48:26 [1]	> :Delay,"100"
+2025/11/24 13:48:26 [1]	< 0
+[13:48:26.490][PC] [Delay]--
+2025/11/24 13:48:26 [1]	[PC] [Delay] ~~ TestTime:0.1124282 sec
+2025/11/24 13:48:26 [1]	Run IOCD041-216:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del new_cal_data_0.png new_cal_data_1.png new_cal_data_2.png new_cal_data_3.png
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run IOET160-217:Delay	Mode: 1, Retry: 3
+[13:48:26.490][PC] [Delay]++
+2025/11/24 13:48:26 [1]	> :Delay,"100"
+2025/11/24 13:48:26 [1]	< 0
+[13:48:26.602][PC] [Delay]--
+2025/11/24 13:48:26 [1]	[PC] [Delay] ~~ TestTime:0.1142826 sec
+2025/11/24 13:48:26 [1]	Run IOCD041-218:TRY_TEXT	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	(CmdConsole) > del new_cal_data_0.yml new_cal_data_1.yml new_cal_data_2.yml new_cal_data_3.yml
+
+2025/11/24 13:48:26 [1]	(CmdConsole) < 
+2025/11/24 13:48:26 [1]	Run OTCH013-219:Disconnect CMD	Mode: 1, Retry: 3
+[13:48:26.609][PC] [Disconnect CMD]++
+2025/11/24 13:48:26 [1]	> :Disconnect,"CmdConsole"
+2025/11/24 13:48:26 [1]	< 0
+[13:48:26.611][PC] [Disconnect CMD]--
+2025/11/24 13:48:26 [1]	[PC] [Disconnect CMD] ~~ TestTime:0.002566 sec
+2025/11/24 13:48:26 [1]	Run RVRF067-220:LAN disconnection	Mode: 1, Retry: 3
+2025/11/24 13:48:26 [1]	> :Disconnect,"LAN"
+2025/11/24 13:48:26 [1]	< 0
+2025/11/24 13:48:26 [1]	Run IOET160-221:Delay	Mode: 1, Retry: 3
+[13:48:26.617][PC] [Delay]++
+2025/11/24 13:48:26 [1]	> :Delay,"1000"
+2025/11/24 13:48:27 [1]	< 0
+[13:48:27.627][PC] [Delay]--
+2025/11/24 13:48:27 [1]	[PC] [Delay] ~~ TestTime:1.0099676 sec
+2025/11/24 13:48:27 [1]	Run OTFX054-222:Close Message	Mode: 3, Retry: 3
+[13:48:27.627][PC] [Close Message]++
+2025/11/24 13:48:27 [1]	> :CloseMessage
+2025/11/24 13:48:27 [1]	< 0
+[13:48:27.627][PC] [Close Message]--
+2025/11/24 13:48:27 [1]	[PC] [Close Message] ~~ TestTime:0 sec
+2025/11/24 13:48:27 [1]	OTFX054-222:@STEP019@Disconnection Test is Pass ! 		----- 1.6634705 Sec.
+2025/11/24 13:48:27 [1]	Change color at 97 phase... Status:True... Error:PASS
+2025/11/24 13:48:27 [1]	All phase Total Test Time !        ----- 140.4940737 Sec.
+2025/11/24 13:48:27 [1]	DUT Test Completed !        ----- 1.7902625 Sec.
