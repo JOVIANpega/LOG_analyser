@@ -106,18 +106,7 @@ class ExcelWriter:
         
         # 儲存檔案
         try:
-            # 設定工作簿屬性以避免Excel警告
-            wb.properties.creator = "PEGA Log Analyzer"
-            wb.properties.title = "PASS Log Analysis"
-            wb.properties.description = "PASS log analysis results"
-            wb.properties.subject = "Log Analysis"
-            wb.properties.keywords = "LOG,PASS,Analysis"
-            
-            # 設定安全屬性
-            wb.security.lockStructure = False
-            wb.security.lockWindows = False
-            
-            self._safe_save_workbook(wb, output_path)
+            wb.save(output_path)
         finally:
             try:
                 wb.close()
@@ -254,6 +243,23 @@ class ExcelWriter:
         except Exception:
             return 'Sheet'
 
+    def _extract_isn_from_filename(self, filename: str) -> str:
+        """從檔名嘗試提取 ISN (WE開頭 或 純數字10碼以上)"""
+        try:
+            if not filename: return ""
+            # 常見格式 1+4cam...-WE2536...-... 或 ...-1110250497-...
+            parts = filename.split('-')
+            for part in parts:
+                # 匹配 WE 開頭
+                if part.startswith('WE') and len(part) > 8:
+                    return part
+                # 匹配純數字 (長度 9-15)
+                if part.isdigit() and 9 <= len(part) <= 15:
+                    return part
+            return ""
+        except:
+            return ""
+
     def export_pass_fail_workbooks(self, folder_path: str, pass_logs: list, fail_logs: list):
         """
         輸出兩個活頁簿：
@@ -380,7 +386,10 @@ class ExcelWriter:
         # 先建立各 LOG 原始工作表，並記錄 sheet 名稱
         sheet_map = {}
         for entry in logs:
-            sheet_name_base = self._sanitize_sheet_title(entry.get('file_name', 'LOG'))
+            fname = entry.get('file_name', 'LOG')
+            isn = self._extract_isn_from_filename(fname)
+            # 優先使用 ISN 作為 Sheet 名稱，若無則使用檔名
+            sheet_name_base = self._sanitize_sheet_title(isn if isn else fname)
             sheet_name = self._unique_sheet_name(wb, sheet_name_base)
             sheet_map[entry.get('file_name')] = sheet_name
             ws2 = wb.create_sheet(title=sheet_name)
@@ -608,18 +617,7 @@ class ExcelWriter:
                     )
         
         try:
-            # 設定工作簿屬性以避免Excel警告
-            wb.properties.creator = "PEGA Log Analyzer"
-            wb.properties.title = "PASS Log Analysis"
-            wb.properties.description = "PASS log analysis results"
-            wb.properties.subject = "Log Analysis"
-            wb.properties.keywords = "LOG,PASS,Analysis"
-            
-            # 設定安全屬性
-            wb.security.lockStructure = False
-            wb.security.lockWindows = False
-            
-            self._safe_save_workbook(wb, output_path)
+            wb.save(output_path)
         finally:
             try:
                 wb.close()
@@ -650,7 +648,10 @@ class ExcelWriter:
         # 先建立各 LOG 原始工作表
         sheet_map = {}
         for entry in logs:
-            sheet_name_base = self._sanitize_sheet_title(entry.get('file_name', 'LOG'))
+            fname = entry.get('file_name', 'LOG')
+            isn = self._extract_isn_from_filename(fname)
+            # 優先使用 ISN 作為 Sheet 名稱，若無則使用檔名
+            sheet_name_base = self._sanitize_sheet_title(isn if isn else fname)
             sheet_name = self._unique_sheet_name(wb, sheet_name_base)
             sheet_map[entry.get('file_name')] = sheet_name
             ws2 = wb.create_sheet(title=sheet_name)
@@ -843,18 +844,7 @@ class ExcelWriter:
                         )
             
             try:
-                # 設定工作簿屬性以避免Excel警告
-                wb.properties.creator = "PEGA Log Analyzer"
-                wb.properties.title = "FAIL Log Analysis"
-                wb.properties.description = "FAIL log analysis results"
-                wb.properties.subject = "Log Analysis"
-                wb.properties.keywords = "LOG,FAIL,Analysis"
-                
-                # 設定安全屬性
-                wb.security.lockStructure = False
-                wb.security.lockWindows = False
-                
-                self._safe_save_workbook(wb, output_path)
+                wb.save(output_path)
             finally:
                 try:
                     wb.close()
@@ -988,14 +978,9 @@ class ExcelWriter:
                         line = line.strip()
                         if not line:
                             continue
-                        line_lower = line.lower()
-                        # 尋找關鍵錯誤
-                        if any(keyword in line_lower for keyword in [
-                            'is fail', 'segmentation fault', 'core dumped', 
-                            'executes fail', "doesn't match", 'timeout', 'exception'
-                        ]):
-                            if line not in error_details:
-                                error_details.append(line)
+                        # 不再過濾關鍵字，因為回應中可能包含關鍵數值 (如 AVE_SNR = 28.8...)
+                        if line not in error_details:
+                            error_details.append(line)
             
             # 組合詳細摘要
             summary_parts = []

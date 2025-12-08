@@ -75,20 +75,18 @@ def build_left_panel(parent, app):
     # 添加 tooltip
     _create_tooltip(btn_folder, "選擇包含多個 LOG 檔案的資料夾\n自動分析所有 .log 檔案")
     
-    # 壓縮檔選擇（整合單一檔案和資料夾選擇）
-    btn_compressed = tk.Button(file_frame, text="📦 讀取壓縮檔LOG", 
+    # 壓縮檔處理按鈕（整合單一檔案和資料夾功能）
+    btn_compressed = tk.Button(file_frame, text="📦 選擇壓縮檔/資料夾", 
                               command=app._select_compressed_files, bg='#FF9800', fg='white')
     btn_compressed.pack(fill=tk.X, pady=2)
     app.font_scaler.register(btn_compressed)
-    # 添加 tooltip
-    _create_tooltip(btn_compressed, "讀取壓縮檔中的 LOG 檔案\n支援單一檔案、多個檔案或資料夾\n支援 .zip, .7z, .rar 格式")
+    _create_tooltip(btn_compressed, "選擇壓縮檔或壓縮檔資料夾\n支援 .zip, .7z, .rar 格式\n可選擇單一檔案、多個檔案或資料夾")
     
     # CSV檔案整理按鈕
     btn_csv = tk.Button(file_frame, text="📊 CSV檔案整理", 
                        command=app.start_csv_processing, bg='#FF9800', fg='white')
     btn_csv.pack(fill=tk.X, pady=2)
     app.font_scaler.register(btn_csv)
-    # 添加 tooltip
     _create_tooltip(btn_csv, "選擇目錄自動搜尋CSV檔案並整理\n自動調整欄寬，PASS/FAIL顏色標記")
     
     # 清除結果按鈕
@@ -99,7 +97,6 @@ def build_left_panel(parent, app):
     # 添加 tooltip
     _create_tooltip(btn_clear, "清除所有分析結果\n重置介面到初始狀態")
     
-    # 左側按鈕：加粗與hover
     try:
         from ui_components import make_bold, apply_button_hover
         make_bold(btn_single)
@@ -110,15 +107,13 @@ def build_left_panel(parent, app):
         apply_button_hover(btn_single, hover_bg="#66BB6A", hover_fg='white', normal_bg='#4CAF50', normal_fg='white')
         apply_button_hover(btn_folder, hover_bg="#64B5F6", hover_fg='white', normal_bg='#2196F3', normal_fg='white')
         apply_button_hover(btn_compressed, hover_bg="#FFB74D", hover_fg='white', normal_bg='#FF9800', normal_fg='white')
-        apply_button_hover(btn_compressed_folder, hover_bg="#FFB74D", hover_fg='white', normal_bg='#FB8C00', normal_fg='white')
         apply_button_hover(btn_csv, hover_bg="#FFB74D", hover_fg='white', normal_bg='#FF9800', normal_fg='white')
         apply_button_hover(btn_clear,  hover_bg="#EF5350", hover_fg='white', normal_bg='#F44336', normal_fg='white')
         
         # 重新添加 tooltip（因為 hover 效果可能覆蓋了事件綁定）
         _create_tooltip(btn_single, "選擇單一 LOG 檔案進行分析\n支援 .log 格式")
         _create_tooltip(btn_folder, "選擇包含多個 LOG 檔案的資料夾\n自動分析所有 .log 檔案")
-        _create_tooltip(btn_compressed, "讀取壓縮檔中的 LOG 檔案\n支援 .zip, .7z, .rar 格式")
-        _create_tooltip(btn_compressed_folder, "選擇含多個壓縮檔的資料夾\n自動遞迴展開內嵌壓縮並分析 .log")
+        _create_tooltip(btn_compressed, "選擇壓縮檔或壓縮檔資料夾\n支援 .zip, .7z, .rar 格式\n可選擇單一檔案、多個檔案或資料夾")
         _create_tooltip(btn_csv, "選擇目錄自動搜尋CSV檔案並整理\n自動調整欄寬，PASS/FAIL顏色標記")
         _create_tooltip(btn_clear, "清除所有分析結果\n重置介面到初始狀態")
     except Exception:

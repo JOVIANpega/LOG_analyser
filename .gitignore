@@ -1,11 +1,27 @@
 # Python
 __pycache__/
+<<<<<<< HEAD
 *.py[cod]
 *$py.class
 *.so
 .Python
 build/
 develop-eggs/
+=======
+*.pyc
+*.pyo
+
+__pycache__/
+MINE/
+*.exe
+*.7z
+
+
+
+# PyInstaller build directories
+build/
+build_*/
+>>>>>>> 3f570f8bd7b4d8fef1b1355ebaa580a957dfc5cd
 dist/
 downloads/
 eggs/
