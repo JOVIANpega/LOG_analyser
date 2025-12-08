@@ -759,11 +759,12 @@ class EnhancedLogAnalyzerApp:
                 self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮檔)", fg='orange')
             
             # 儲存選擇的路徑到設定
+            # 儲存選擇的路徑到設定
             self.settings['last_compressed_path'] = compressed_path
             self._save_settings_silent()
             
-            # 開始分析
-            self._analyze_enhanced_log()
+            # 開始分析 (必須回到主執行緒執行，因為會更新UI)
+            self.root.after(0, self._analyze_enhanced_log)
             
             # 註冊清理函數（分析完成後清理暫存檔案）
             self.temp_cleanup_path = temp_dir
