@@ -1,0 +1,108 @@
+2025/11/24 15:28:45 [1]	System Version is 1.1.8.64.
+2025/11/24 15:28:45 [1]	Script File is VALO360_TestFlow_AOCI_4cam_stitching_test2_251120_cacnel3m5m.xlsx.
+2025/11/24 15:28:45 [1]	Script Version is 2511201453055.
+2025/11/24 15:28:45 [1]	Script Creator is jovian_li.
+2025/11/24 15:28:45 [1]	Utility Version is 1.0.9.20.
+2025/11/24 15:28:45 [1]	DeviceID is 822221.
+2025/11/24 15:28:45 [1]	SFIS is off.
+2025/11/24 15:28:45 [1]	MiniCloud2 is on.
+2025/11/24 15:28:45 [1]	FTP is off.
+2025/11/24 15:28:45 [1]	Active IPs:
+乙太網路:[107C610761E9]#192.168.11.142#
+藍牙網路連線:[C85EA9CB03AD]#169.254.255.118#
+2025/11/24 15:28:45 [1]	Script has 1 phase cases
+2025/11/24 15:28:45 [1]	Script has 97 phase cases
+****************************************************************************************************
+2025/11/24 15:28:45 [1]	Execute Phase 0 Test.
+2025/11/24 15:28:45 [1]	Do @STEP002@START
+2025/11/24 15:28:45 [1]	Run IOET160-000:Delay	Mode: 0, Retry: 3
+[15:28:45.506][PC] [Delay]++
+2025/11/24 15:28:45 [1]	> :Delay,"20000"
+2025/11/24 15:29:05 [1]	< 0
+[15:29:05.531][PC] [Delay]--
+2025/11/24 15:29:05 [1]	[PC] [Delay] ~~ TestTime:20.0253636 sec
+2025/11/24 15:29:05 [1]	Run IOLE015-001:pingcheck	Mode: 0, Retry: 3
+2025/11/24 15:29:05 [1]	> :Utility.Ping,"192.168.11.143","5000","192.168.11.142","5000"
+2025/11/24 15:29:06 [1]	< 0
+2025/11/24 15:29:06 [1]	Run FWCS002-002:LAN disconnection	Mode: 1, Retry: 3
+2025/11/24 15:29:06 [1]	> :Disconnect,"LAN"
+2025/11/24 15:29:06 [1]	< 0
+2025/11/24 15:29:06 [1]	Run SCSC001-003:Delay	Mode: 1, Retry: 3
+2025/11/24 15:29:06 [1]	> :Delay,"500"
+2025/11/24 15:29:07 [1]	< 0
+2025/11/24 15:29:07 [1]	Run FWCS002-004:LAN connection	Mode: 1, Retry: 3
+2025/11/24 15:29:07 [1]	> :Connect,"LAN"
+2025/11/24 15:29:07 [1]	< 0
+2025/11/24 15:29:07 [1]	Run SCSC001-005:Delay	Mode: 1, Retry: 3
+2025/11/24 15:29:07 [1]	> :Delay,"500"
+2025/11/24 15:29:08 [1]	< 0
+2025/11/24 15:29:08 [1]	Run OTCH013-006:Disconnect CMD	Mode: 1, Retry: 3
+[15:29:08.160][PC] [Disconnect CMD]++
+2025/11/24 15:29:08 [1]	> :Disconnect,"CmdConsole"
+2025/11/24 15:29:08 [1]	< 0
+[15:29:08.160][PC] [Disconnect CMD]--
+2025/11/24 15:29:08 [1]	[PC] [Disconnect CMD] ~~ TestTime:0 sec
+2025/11/24 15:29:08 [1]	Run IOET160-007:Delay	Mode: 1, Retry: 3
+[15:29:08.160][PC] [Delay]++
+2025/11/24 15:29:08 [1]	> :Delay,"100"
+2025/11/24 15:29:08 [1]	< 0
+[15:29:08.271][PC] [Delay]--
+2025/11/24 15:29:08 [1]	[PC] [Delay] ~~ TestTime:0.1145675 sec
+2025/11/24 15:29:08 [1]	Run OTCH013-008:Connect CMD	Mode: 1, Retry: 3
+[15:29:08.274][PC] [Connect CMD]++
+2025/11/24 15:29:08 [1]	> :Connect,"CmdConsole"
+2025/11/24 15:29:08 [1]	< 0
+[15:29:08.297][PC] [Connect CMD]--
+2025/11/24 15:29:08 [1]	[PC] [Connect CMD] ~~ TestTime:0.0227953 sec
+2025/11/24 15:29:08 [1]	Run B7PL011-009:get cam0 eeprom	Mode: 1, Retry: 3
+2025/11/24 15:29:08 [1]	(LAN) > diag -g eep sn 0
+
+2025/11/24 15:29:18 [1]	(LAN) < diag -g eep sn 0
+diag: command of getting eep sn 0 was failed!
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 15:29:18 [1]	LAN@diag -g eep sn 0
+ executes fail. Reply="diag -g eep sn 0
+diag: command of getting eep sn 0 was failed!
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ " doesn't match @cam0 SN
+2025/11/24 15:29:18 [1]	Run B7PL011-009:get cam0 eeprom	Mode: 1, Retry: 2
+2025/11/24 15:29:18 [1]	(LAN) > diag -g eep sn 0
+
+2025/11/24 15:29:28 [1]	(LAN) < diag -g eep sn 0
+diag: command of getting eep sn 0 was failed!
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 15:29:28 [1]	LAN@diag -g eep sn 0
+ executes fail. Reply="diag -g eep sn 0
+diag: command of getting eep sn 0 was failed!
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ " doesn't match @cam0 SN
+2025/11/24 15:29:28 [1]	Run B7PL011-009:get cam0 eeprom	Mode: 1, Retry: 1
+2025/11/24 15:29:28 [1]	(LAN) > diag -g eep sn 0
+
+2025/11/24 15:29:38 [1]	(LAN) < diag -g eep sn 0
+diag: command of getting eep sn 0 was failed!
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 15:29:38 [1]	LAN@diag -g eep sn 0
+ executes fail. Reply="diag -g eep sn 0
+diag: command of getting eep sn 0 was failed!
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ " doesn't match @cam0 SN
+2025/11/24 15:29:38 [1]	Run B7PL011-009:get cam0 eeprom	Mode: 1, Retry: 0
+2025/11/24 15:29:38 [1]	(LAN) > diag -g eep sn 0
+
+2025/11/24 15:29:48 [1]	(LAN) < diag -g eep sn 0
+diag: command of getting eep sn 0 was failed!
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ 
+2025/11/24 15:29:48 [1]	LAN@diag -g eep sn 0
+ executes fail. Reply="diag -g eep sn 0
+diag: command of getting eep sn 0 was failed!
+root@NOKIA360Camera-Valo360:/root$ 
+root@NOKIA360Camera-Valo360:/root$ " doesn't match @cam0 SN
+2025/11/24 15:29:48 [1]	LAN@diag -g eep sn 0
+ executes fail. 
+2025/11/24 15:29:48 [1]	AFFW57:get cam0 eeprom is Fail ! <ErrorCode: AFFW57>     ----- 62.8284728 Sec.
+2025/11/24 15:29:48 [1]	DUT Test Completed !        ----- 62.8284728 Sec.
