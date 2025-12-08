@@ -1531,404 +1531,231 @@ class EnhancedLogAnalyzerApp:
             print(f"更新搜尋計數時發生錯誤: {e}")
     
     def _analyze_enhanced_log(self):
-        """分析log檔案並更新增強版GUI顯示"""
+        """分析log檔案並更新增強版GUI顯示 (Entry Point)"""
         if not self.current_log_path:
             messagebox.showwarning("警告", "請先選擇log檔案或資料夾")
             return
             
-        # 清空現有內容
+        # 1. 準備UI：清空現有內容、顯示進度條
         self.pass_tree_enhanced.clear()
         self.fail_tree_enhanced.clear()
         self.log_text_enhanced.clear()
 
-        # 顯示分析進度
         filename = os.path.basename(self.current_log_path)
-        self._show_progress("正在分析LOG檔案", f"分析檔案: {filename}")
+        self._show_progress("正在分析LOG檔案", f"準備分析: {filename}")
         
+        # 2. 啟動背景執行緒進行Heavy Lifting
+        import threading
+        t = threading.Thread(target=self._run_analysis_background, daemon=True)
+        t.start()
+
+    def _run_analysis_background(self):
+        """背景執行緒：執行耗時的解析工作"""
         try:
             if self.current_mode == 'single':
-                self._analyze_enhanced_single_file()
+                self._bg_analyze_single()
             else:
-                self._analyze_enhanced_multiple_files()
-            
-            # 分析完成後關閉進度條
-            self.root.after(100, self._close_progress)
-                
+                self._bg_analyze_multiple()
         except Exception as e:
-            self._close_progress()
-            messagebox.showerror("分析錯誤", f"分析過程中發生錯誤：\n{str(e)}")
-    
-    def _analyze_enhanced_single_file(self):
-        """分析單一檔案（增強版）"""
-        # 更新進度：開始解析
-        self._update_progress("正在解析LOG檔案內容...")
+            # 發生錯誤，回主執行緒報錯
+            self.root.after(0, lambda: self._handle_analysis_error(e))
+
+    def _handle_analysis_error(self, e):
+        """回主執行緒顯示錯誤"""
+        self._close_progress()
+        messagebox.showerror("分析錯誤", f"分析過程中發生錯誤：\n{str(e)}")
+
+    def _thread_safe_update_progress(self, msg, value=None, max_value=None):
+        """執行緒安全的進度更新"""
+        self.root.after(0, lambda: self._update_progress(msg))
+        if value is not None and max_value is not None:
+             self.root.after(0, lambda: self._progress_set_determinate(max_value))
+             self.root.after(0, lambda: self._progress_set_value(value, max_value))
+
+    def _bg_analyze_single(self):
+        """背景：單檔分析"""
+        self._thread_safe_update_progress("正在解析LOG檔案內容...")
         
+        # Heavy Parsing
         result = self.log_parser.parse_log_file(self.current_log_path)
-        pass_items = result['pass_items']
-        fail_items = result['fail_items']
-        raw_lines = result['raw_lines']
-        last_fail = result['last_fail']
-        fail_line_idx = result['fail_line_idx']
         
-        # 更新進度：處理PASS項目
-        self._update_progress(f"處理PASS項目 ({len(pass_items)} 個)...")
-        
-        # Tab1: PASS - 顯示所有通過的測項
-        for idx, item in enumerate(pass_items, 1):
-            full_response = item.get('full_response', '')
-            has_retry = item.get('has_retry_but_pass', False)  # 使用 has_retry_but_pass 屬性
-            self.pass_tree_enhanced.insert_pass_item(
-                (item['step_name'], item['command'], item['response'], item['result']),
-                step_number=idx,
-                full_response=full_response,
-                has_retry=has_retry
-            )
-        
-        # 更新進度：處理FAIL項目
-        self._update_progress(f"處理FAIL項目 ({len(fail_items)} 個)...")
-        
-        # Tab2: FAIL - 顯示所有FAIL區塊
-        for idx, item in enumerate(fail_items):
-            is_main_fail = item.get('is_main_fail', False)
-            full_response = item.get('full_response', '')
-            self.fail_tree_enhanced.insert_fail_item(
-                (item['step_name'], item['command'], item['response'], item['retry'], item['error']),
-                full_response=full_response,
-                is_main_fail=is_main_fail
-            )
-        
-        # 更新進度：處理原始LOG
-        self._update_progress("處理原始LOG內容...")
-        
-        # Tab3: 原始LOG，標紅錯誤行並自動跳轉
-        if raw_lines:
-            # 將raw_lines轉換為字符串
-            log_content = '\n'.join(raw_lines)
-            self.log_text_enhanced.insert_log_with_highlighting(log_content, {
-                'fail_line_idx': fail_line_idx,
-                'pass_items': pass_items,
-                'fail_items': fail_items
-            })
-            
-            # 如果有錯誤行，跳轉到錯誤位置
-            if fail_line_idx is not None and fail_line_idx < len(raw_lines):
-                self.log_text_enhanced.highlight_error_block(fail_line_idx + 1, fail_line_idx + 1)
-                self.log_text_enhanced.text.see(f"{fail_line_idx + 1}.0")
-        
-        # 更新進度：完成分析
-        self._update_progress("分析完成！")
-        
-        # 自動切換到相關Tab
-        if fail_items:
-            self.notebook.select(self.tab_fail)
-            # 延遲切換到原始LOG標籤頁並聚焦錯誤位置
-            self.root.after(2000, self._switch_to_log_and_focus_error)
-        else:
-            self.notebook.select(self.tab_pass)
-        
-        # 根據分析結果動態顯示/隱藏標籤頁
-        self._update_tab_visibility(pass_items, fail_items)
-    
-    def _update_tab_visibility(self, pass_items, fail_items):
-        """根據分析結果動態顯示/隱藏標籤頁"""
+        # Parsing Done, Schedule UI Update on Main Thread
+        self.root.after(0, lambda: self._ui_render_single(result))
+
+    def _ui_render_single(self, result):
+        """主執行緒：渲染單檔結果"""
         try:
-            # 如果沒有FAIL項目，隱藏FAIL標籤頁
-            if not fail_items:
-                # 檢查FAIL標籤頁是否存在於notebook中
-                fail_tab_index = None
-                for i in range(self.notebook.index("end")):
-                    if self.notebook.tab(i, "text") == "❌ FAIL測項":
-                        fail_tab_index = i
-                        break
-                
-                if fail_tab_index is not None:
-                    # 隱藏FAIL標籤頁
-                    self.notebook.forget(fail_tab_index)
-                    print("已隱藏FAIL標籤頁（無FAIL項目）")
+            pass_items = result['pass_items']
+            fail_items = result['fail_items']
+            raw_lines = result['raw_lines']
+            fail_line_idx = result['fail_line_idx']
+
+            self._update_progress(f"處理PASS項目 ({len(pass_items)} 個)...")
+            for idx, item in enumerate(pass_items, 1):
+                full_response = item.get('full_response', '')
+                has_retry = item.get('has_retry_but_pass', False)
+                self.pass_tree_enhanced.insert_pass_item(
+                    (item['step_name'], item['command'], item['response'], item['result']),
+                    step_number=idx,
+                    full_response=full_response,
+                    has_retry=has_retry
+                )
+
+            self._update_progress(f"處理FAIL項目 ({len(fail_items)} 個)...")
+            for item in fail_items:
+                is_main_fail = item.get('is_main_fail', False)
+                full_response = item.get('full_response', '')
+                self.fail_tree_enhanced.insert_fail_item(
+                    (item['step_name'], item['command'], item['response'], item['retry'], item['error']),
+                    full_response=full_response,
+                    is_main_fail=is_main_fail
+                )
+
+            self._update_progress("處理原始LOG內容...")
+            if raw_lines:
+                log_content = '\n'.join(raw_lines)
+                self.log_text_enhanced.insert_log_with_highlighting(log_content, {
+                    'fail_line_idx': fail_line_idx,
+                    'pass_items': pass_items,
+                    'fail_items': fail_items
+                })
+                if fail_line_idx is not None and fail_line_idx < len(raw_lines):
+                    self.log_text_enhanced.highlight_error_block(fail_line_idx + 1, fail_line_idx + 1)
+                    self.log_text_enhanced.text.see(f"{fail_line_idx + 1}.0")
+
+            self._update_progress("分析完成！")
+            
+            if fail_items:
+                self.notebook.select(self.tab_fail)
+                self.root.after(2000, self._switch_to_log_and_focus_error)
             else:
-                # 如果有FAIL項目，確保FAIL標籤頁存在
-                fail_tab_exists = False
-                for i in range(self.notebook.index("end")):
-                    if self.notebook.tab(i, "text") == "❌ FAIL測項":
-                        fail_tab_exists = True
-                        break
-                
-                if not fail_tab_exists:
-                    # 重新添加FAIL標籤頁
-                    self._build_enhanced_fail_tab()
-                    print("已重新顯示FAIL標籤頁")
-        
-        except Exception as e:
-            print(f"更新標籤頁可見性時發生錯誤: {e}")
-    
-    def _show_file_preview(self, file_path, file_type):
-        """顯示檔案預覽視窗"""
-        try:
-            import os
-            import zipfile
-            from datetime import datetime
+                self.notebook.select(self.tab_pass)
             
-            # 創建預覽視窗
-            preview_window = tk.Toplevel(self.root)
-            preview_window.title("檔案預覽")
-            preview_window.geometry("600x400")
-            preview_window.resizable(True, True)
-            
-            # 主框架
-            main_frame = tk.Frame(preview_window)
-            main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-            
-            # 檔案基本資訊
-            filename = os.path.basename(file_path)
-            file_size = os.path.getsize(file_path)
-            file_size_mb = file_size / (1024 * 1024)
-            mod_time = datetime.fromtimestamp(os.path.getmtime(file_path))
-            
-            # 標題
-            title_label = tk.Label(main_frame, text=f"📄 {filename}", 
-                                 font=('Arial', 14, 'bold'))
-            title_label.pack(pady=(0, 10))
-            
-            # 基本資訊框架
-            info_frame = tk.Frame(main_frame)
-            info_frame.pack(fill=tk.X, pady=(0, 10))
-            
-            tk.Label(info_frame, text=f"檔案類型: {file_type.upper()}", 
-                   font=('Arial', 10)).pack(anchor='w')
-            tk.Label(info_frame, text=f"檔案大小: {file_size_mb:.2f} MB", 
-                   font=('Arial', 10)).pack(anchor='w')
-            tk.Label(info_frame, text=f"修改時間: {mod_time.strftime('%Y-%m-%d %H:%M:%S')}", 
-                   font=('Arial', 10)).pack(anchor='w')
-            tk.Label(info_frame, text=f"完整路徑: {file_path}", 
-                   font=('Arial', 9), fg='gray').pack(anchor='w')
-            
-            # 內容預覽
-            content_frame = tk.Frame(main_frame)
-            content_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
-            
-            tk.Label(content_frame, text="內容預覽:", 
-                   font=('Arial', 11, 'bold')).pack(anchor='w')
-            
-            # 創建文字區域顯示內容
-            text_frame = tk.Frame(content_frame)
-            text_frame.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
-            
-            text_widget = tk.Text(text_frame, wrap=tk.WORD, height=10)
-            scrollbar = tk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
-            text_widget.configure(yscrollcommand=scrollbar.set)
-            
-            text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-            
-            # 根據檔案類型顯示不同內容
-            if file_type == 'log':
-                self._preview_log_content(file_path, text_widget)
-            elif file_type == 'compressed':
-                self._preview_compressed_content(file_path, text_widget)
-            
-            # 按鈕框架
-            button_frame = tk.Frame(main_frame)
-            button_frame.pack(fill=tk.X, pady=(10, 0))
-            
-            tk.Button(button_frame, text="確認開啟", 
-                     command=lambda: self._confirm_open_file(preview_window, file_path),
-                     bg='#4CAF50', fg='white', font=('Arial', 10)).pack(side=tk.RIGHT, padx=(5, 0))
-            
-            tk.Button(button_frame, text="取消", 
-                     command=preview_window.destroy,
-                     bg='#f44336', fg='white', font=('Arial', 10)).pack(side=tk.RIGHT)
-            
-            # 讓文字區域不可編輯
-            text_widget.config(state=tk.DISABLED)
+            self._update_tab_visibility(pass_items, fail_items)
             
         except Exception as e:
-            print(f"顯示檔案預覽時發生錯誤: {e}")
-            # 如果預覽失敗，直接繼續處理
-            return True
-    
-    def _preview_log_content(self, file_path, text_widget):
-        """預覽LOG檔案內容"""
-        try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.readlines()[:50]  # 只讀取前50行
-                content = ''.join(lines)
-                text_widget.insert(tk.END, content)
-                
-                if len(lines) == 50:
-                    text_widget.insert(tk.END, "\n... (顯示前50行，完整內容將在分析時載入)")
-        except Exception as e:
-            text_widget.insert(tk.END, f"無法讀取檔案內容: {e}")
-    
-    def _preview_compressed_content(self, file_path, text_widget):
-        """預覽壓縮檔案內容"""
-        try:
-            file_ext = os.path.splitext(file_path)[1].lower()
-            
-            if file_ext == '.zip':
-                with zipfile.ZipFile(file_path, 'r') as zip_file:
-                    file_list = zip_file.namelist()
-                    text_widget.insert(tk.END, f"ZIP檔案包含 {len(file_list)} 個檔案:\n\n")
-                    
-                    # 顯示前20個檔案
-                    for i, filename in enumerate(file_list[:20]):
-                        file_info = zip_file.getinfo(filename)
-                        text_widget.insert(tk.END, f"  📄 {filename} ({file_info.file_size} bytes)\n")
-                    
-                    if len(file_list) > 20:
-                        text_widget.insert(tk.END, f"\n... 還有 {len(file_list) - 20} 個檔案")
-                        
-            elif file_ext == '.7z':
-                # 檢查是否安裝了py7zr
-                try:
-                    import py7zr
-                    with py7zr.SevenZipFile(file_path, mode='r') as archive:
-                        file_list = archive.getnames()
-                        text_widget.insert(tk.END, f"7Z檔案包含 {len(file_list)} 個檔案:\n\n")
-                        
-                        # 顯示前20個檔案
-                        for i, filename in enumerate(file_list[:20]):
-                            text_widget.insert(tk.END, f"  📄 {filename}\n")
-                        
-                        if len(file_list) > 20:
-                            text_widget.insert(tk.END, f"\n... 還有 {len(file_list) - 20} 個檔案")
-                except ImportError:
-                    text_widget.insert(tk.END, f"7Z檔案預覽需要安裝 py7zr 套件\n")
-                    text_widget.insert(tk.END, f"請執行: pip install py7zr\n\n")
-                    text_widget.insert(tk.END, f"檔案大小: {os.path.getsize(file_path) / (1024*1024):.2f} MB")
-                    
-            elif file_ext == '.rar':
-                text_widget.insert(tk.END, f"RAR檔案預覽功能尚未實現\n")
-                text_widget.insert(tk.END, f"檔案大小: {os.path.getsize(file_path) / (1024*1024):.2f} MB")
-            else:
-                text_widget.insert(tk.END, f"不支援的壓縮格式: {file_ext}")
-                
-        except Exception as e:
-            text_widget.insert(tk.END, f"無法讀取壓縮檔案內容: {e}")
-    
-    def _confirm_open_file(self, preview_window, file_path):
-        """確認開啟檔案"""
-        preview_window.destroy()
-        # 這裡可以添加額外的確認邏輯
-        return True
-    
-    def _analyze_enhanced_multiple_files(self):
-        """分析多個檔案（增強版）"""
-        # 逐檔案解析，按照檔名是否含 PASS 分類
+            self._handle_analysis_error(e)
+        finally:
+            self.root.after(100, self._close_progress)
+
+    def _bg_analyze_multiple(self):
+        """背景：多檔資料夾分析"""
         folder = self.current_log_path
         
-        # 先計算總檔案數
-        total_files = 0
+        # 1. Scan files
+        log_files = []
         for root, dirs, files in os.walk(folder):
             for fn in files:
                 if fn.lower().endswith('.log'):
-                    total_files += 1
+                    log_files.append(os.path.join(root, fn))
         
-        # 設定進度條為確定模式
-        self._progress_set_determinate(total_files)
-        self._update_progress(f"準備分析 {total_files} 個LOG檔案...")
+        total_files = len(log_files)
+        self._thread_safe_update_progress(f"準備分析 {total_files} 個LOG檔案...", 0, total_files)
         
-        # 顯示將被處理的 .log 檔清單預覽
         try:
-            self._show_log_file_preview(folder)
-        except Exception:
+            # 預覽 (Optional: call back to main thread or skip)
+            # self.root.after(0, lambda: self._show_log_file_preview(folder))
+            pass 
+        except: 
             pass
-        
+
         pass_logs = []
         fail_logs = []
-        processed_files = 0
         
-        for root, dirs, files in os.walk(folder):
-            for fn in files:
-                if not fn.lower().endswith('.log'):
-                    continue
-                
-                processed_files += 1
-                path = os.path.join(root, fn)
-                
-                # 更新進度
-                self._update_progress(f"分析檔案 {processed_files}/{total_files}: {fn}")
-                self._progress_set_value(processed_files, total_files)
-                
-                res = self.log_parser.parse_log_file(path)
-                # 擷取必要資訊供 Excel 與 Summary Tab 使用
-                entry = {
-                    'file_path': path,
-                    'file_name': os.path.basename(path),
-                    'raw_lines': res.get('raw_lines') or [],
-                    'ui_annotations': res.get('ui_annotations') or [],
-                    'pass_items': res.get('pass_items') or [],
-                    'fail_items': res.get('fail_items') or [],
-                    'summary': self._extract_file_summary(res, path),
-                    'step_marks': self._build_step_marks(res.get('raw_lines') or [])
-                }
-                if 'PASS' in fn.upper():
-                    pass_logs.append(entry)
-                else:
-                    # 記錄第一個 FAIL 原因到 summary，使用統一的錯誤提取邏輯
-                    if res.get('fail_items'):
-                        # 使用統一的錯誤提取邏輯
-                        main_error = self._extract_main_fail_reason_from_items(res['fail_items'])
-                        entry['summary']['FAIL原因'] = main_error
-                    fail_logs.append(entry)
-                    
-        # 為左側視窗添加LOG分類顯示
-        self._display_folder_analysis_preview(pass_logs, fail_logs)
+        # 2. Iterate & Parse
+        for i, path in enumerate(log_files, 1):
+            fn = os.path.basename(path)
+            self._thread_safe_update_progress(f"分析檔案 {i}/{total_files}: {fn}", i, total_files)
+            
+            res = self.log_parser.parse_log_file(path)
+            
+            # Pack data
+            entry = {
+                'file_path': path,
+                'file_name': fn,
+                'raw_lines': res.get('raw_lines') or [],
+                'ui_annotations': res.get('ui_annotations') or [],
+                'pass_items': res.get('pass_items') or [],
+                'fail_items': res.get('fail_items') or [],
+                'summary': self._extract_file_summary(res, path),
+                'step_marks': self._build_step_marks(res.get('raw_lines') or [])
+            }
+            
+            if 'PASS' in fn.upper():
+                pass_logs.append(entry)
+            else:
+                if res.get('fail_items'):
+                    main_error = self._extract_main_fail_reason_from_items(res['fail_items'])
+                    entry['summary']['FAIL原因'] = main_error
+                fail_logs.append(entry)
         
-        # 將 pass/fail 測項分別展示於 PASS/FAIL 標籤頁（聚合）
-        for idx, entry in enumerate(pass_logs, 1):
-            for j, item in enumerate(entry['pass_items'], 1):
-                self.pass_tree_enhanced.insert_pass_item(
-                    (item['step_name'], item['command'], item['response'], item['result']),
-                    step_number=j,
-                    full_response=item.get('full_response', ''),
-                    has_retry=item.get('has_retry_but_pass', False)
-                )
-        for entry in fail_logs:
-            for item in entry['fail_items']:
-                self.fail_tree_enhanced.insert_fail_item(
-                    (item['step_name'], item['command'], item['response'], item['retry'], item['error']),
-                    full_response=item.get('full_response', ''),
-                    is_main_fail=item.get('is_main_fail', False)
-                )
-        # 為資料夾分析添加原始LOG顯示功能
-        if fail_logs:
-            # 合併所有FAIL LOG的內容到原始LOG標籤頁
-            all_raw_lines = []
-            all_fail_items = []
-            all_pass_items = []
-            fail_line_idx = None
-            
-            for entry in fail_logs:
-                all_raw_lines.extend(entry.get('raw_lines', []))
-                all_fail_items.extend(entry.get('fail_items', []))
-                all_pass_items.extend(entry.get('pass_items', []))
-            
-            # 在原始LOG標籤頁顯示合併的內容
-            if all_raw_lines:
-                log_content = '\n'.join(all_raw_lines)
-                self.log_text_enhanced.insert_log_with_highlighting(log_content, {
-                    'fail_line_idx': fail_line_idx,
-                    'pass_items': all_pass_items,
-                    'fail_items': all_fail_items
-                })
-            
-            # 自動切換到原始LOG標籤頁
-            self.notebook.select(self.tab_log)
-        
-        # 匯出 Excel：PASS匯總/FAIL匯總，放同資料夾
+        # All parsed. Send to UI.
+        self.root.after(0, lambda: self._ui_render_multiple(pass_logs, fail_logs, total_files, folder))
+
+    def _ui_render_multiple(self, pass_logs, fail_logs, total_files, folder):
+        """主執行緒：渲染多檔結果 & 匯出 Excel"""
         try:
-            # 在 LOG 目錄下建立 LOG集總整理 子目錄
-            out_dir = build_output_dir(folder, 'LOG集總整理')
-            pass_path, fail_path = self.excel_writer.export_pass_fail_workbooks(out_dir, pass_logs, fail_logs)
-            # 清空 PASS/FAIL 顯示內容（多檔案只產報表，不保留清單）
-            self.pass_tree_enhanced.clear()
-            self.fail_tree_enhanced.clear()
-            # 完成提示 + 開啟資料夾（黑底紅字）
-            self._show_open_folder_prompt(out_dir, total_files, len(pass_logs), len(fail_logs), pass_path, fail_path)
+            self._display_folder_analysis_preview(pass_logs, fail_logs)
+
+            # 更新 TreeViews for preview (aggregated)
+            for idx, entry in enumerate(pass_logs, 1):
+                for j, item in enumerate(entry['pass_items'], 1):
+                    self.pass_tree_enhanced.insert_pass_item(
+                        (item['step_name'], item['command'], item['response'], item['result']),
+                        step_number=j,
+                        full_response=item.get('full_response', ''),
+                        has_retry=item.get('has_retry_but_pass', False)
+                    )
+            for entry in fail_logs:
+                for item in entry['fail_items']:
+                    self.fail_tree_enhanced.insert_fail_item(
+                        (item['step_name'], item['command'], item['response'], item['retry'], item['error']),
+                        full_response=item.get('full_response', ''),
+                        is_main_fail=item.get('is_main_fail', False)
+                    )
+            
+            # Raw LOG merging
+            if fail_logs:
+                all_raw_lines = []
+                all_fail_items = []
+                all_pass_items = []
+                for entry in fail_logs:
+                    all_raw_lines.extend(entry.get('raw_lines', []))
+                    all_fail_items.extend(entry.get('fail_items', []))
+                    all_pass_items.extend(entry.get('pass_items', []))
+                
+                if all_raw_lines:
+                    log_content = '\n'.join(all_raw_lines)
+                    self.log_text_enhanced.insert_log_with_highlighting(log_content, {
+                        'fail_line_idx': None,
+                        'pass_items': all_pass_items,
+                        'fail_items': all_fail_items
+                    })
+                self.notebook.select(self.tab_log)
+
+            # Export Excel
+            try:
+                out_dir = build_output_dir(folder, 'LOG集總整理')
+                pass_path, fail_path = self.excel_writer.export_pass_fail_workbooks(out_dir, pass_logs, fail_logs)
+                
+                # Clear Trees after export (as per original logic for multi-file)
+                self.pass_tree_enhanced.clear()
+                self.fail_tree_enhanced.clear()
+                
+                self._show_open_folder_prompt(out_dir, total_files, len(pass_logs), len(fail_logs), pass_path, fail_path)
+            except Exception as e:
+                messagebox.showerror("匯出失敗", f"產生Excel時發生錯誤：\n{e}")
+
         except Exception as e:
-            messagebox.showerror("匯出失敗", f"產生Excel時發生錯誤：\n{e}")
-        # 自動切到匯總報表（取消）
-        # self.notebook.select(self.tab_summary)
+            self._handle_analysis_error(e)
+        finally:
+            self.root.after(100, self._close_progress)
+
+    # 為了保持兼容性，原有的單檔/多檔入口如果被其他地方調用，可以保留或作廢。
+    # 上面的 _analyze_enhanced_log 已經取代了它們的調用邏輯。
+    # 以下兩個僅保留空殼或改名以避免誤用，或者直接移除。
+    # 這裡選擇直接移除舊方法內容，避免重複代碼。
+
 
     def _display_folder_analysis_preview(self, pass_logs, fail_logs):
         """在左側視窗顯示資料夾分析預覽"""
