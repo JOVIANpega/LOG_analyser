@@ -393,12 +393,8 @@ class EnhancedLogAnalyzerApp:
             # 先清除現有結果，避免誤導
             self._clear_enhanced_results()
             
-            # 顯示檔案預覽，並傳入確認後的回呼函數
-            self._show_file_preview(
-                file_path, 
-                'log', 
-                on_confirm=lambda: self._start_analysis_after_preview(file_path)
-            )
+            # 直接開始分析
+            self.root.after(100, lambda: self._start_analysis_after_preview(file_path))
             
     def _start_analysis_after_preview(self, file_path):
         """檔案預覽確認後執行的分析流程"""
@@ -472,13 +468,9 @@ class EnhancedLogAnalyzerApp:
             self._clear_enhanced_results()
             
             if len(file_paths) == 1:
-                # 單一檔案：顯示預覽後直接處理
-                # 單一檔案：顯示預覽後直接處理
-                self._show_file_preview(
-                    file_paths[0], 
-                    'compressed',
-                    on_confirm=lambda: self._process_single_compressed_file(file_paths[0])
-                )
+                # 單一檔案：直接處理（不顯示預覽視窗）
+                self.root.after(100, lambda: self._process_single_compressed_file(file_paths[0]))
+
             else:
                 # 多個檔案：顯示選擇視窗
                 self._show_compressed_selection_window(file_paths)
@@ -791,7 +783,23 @@ class EnhancedLogAnalyzerApp:
         try:
             import zipfile
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_to)
+                file_list = zip_ref.namelist()
+                total_files = len(file_list)
+                
+                # 設定進度條為確定模式
+                self._safe_update_progress_mode('determinate')
+                self._safe_update_progress_max(total_files)
+                
+                for idx, member in enumerate(file_list, 1):
+                    # 檢查取消
+                    if self._cancel_flag:
+                        break
+                        
+                    # 更新進度
+                    if idx % 5 == 0 or idx == total_files:  # 減少UI更新頻率避免卡頓
+                        self._safe_update_progress(idx, total_files, f"解壓縮中 ({idx}/{total_files}): {member}")
+                    
+                    zip_ref.extract(member, extract_to)
         except Exception as e:
             error_msg = f"ZIP檔案解壓縮失敗: {str(e)}\n\n檔案: {zip_path}\n\n可能的原因:\n"
             error_msg += "• 檔案損壞或格式不正確\n"
@@ -810,6 +818,10 @@ class EnhancedLogAnalyzerApp:
         """解壓縮 7Z 檔案（多種方式嘗試）"""
         try:
             import py7zr
+            
+            # 設定進度條為不確定模式（因為py7zr不支援細粒度回調）
+            self._safe_update_progress_mode('indeterminate')
+            self._safe_update_progress_text("正在解壓縮 7Z 檔案 (請稍候)...")
             
             # 方法1：標準解壓縮
             try:
@@ -855,16 +867,6 @@ class EnhancedLogAnalyzerApp:
             error_msg += "• 檢查檔案是否被密碼保護"
             
             messagebox.showerror("7Z解壓縮失敗", error_msg)
-            raise
-
-    def _extract_rar(self, rar_path, extract_to):
-        """解壓縮 RAR 檔案"""
-        try:
-            import rarfile
-            with rarfile.RarFile(rar_path) as rf:
-                rf.extractall(extract_to)
-        except ImportError:
-            messagebox.showerror("錯誤", "需要安裝 rarfile 套件來支援 RAR 格式\n請執行：pip install rarfile")
             raise
         except Exception as e:
             error_msg = f"RAR檔案解壓縮失敗: {str(e)}\n\n檔案: {rar_path}\n\n可能的原因:\n"
@@ -1629,16 +1631,37 @@ class EnhancedLogAnalyzerApp:
         # 更新進度：完成分析
         self._update_progress("分析完成！")
         
-        # 自動切換到相關Tab
-        if fail_items:
-            self.notebook.select(self.tab_fail)
-            # 延遲切換到原始LOG標籤頁並聚焦錯誤位置
-            self.root.after(2000, self._switch_to_log_and_focus_error)
-        else:
-            self.notebook.select(self.tab_pass)
-        
         # 根據分析結果動態顯示/隱藏標籤頁
         self._update_tab_visibility(pass_items, fail_items)
+
+        # 自動切換到相關Tab
+        if fail_items:
+            try:
+                self.notebook.select(self.tab_fail)
+                # 延遲切換到原始LOG標籤頁並聚焦錯誤位置
+                self.root.after(2000, self._switch_to_log_and_focus_error)
+                
+                # 如果是FAIL Log，彈出顯示主要錯誤原因 (Priority Error)
+                if last_fail:
+                    error_msg = last_fail.get('error', 'Unknown Error')
+                    cmd = last_fail.get('command', 'Unknown Command')
+                    step = last_fail.get('step_name', 'Unknown Step')
+                    
+                    # 判斷是否為 "doesn't match" 的重點錯誤
+                    is_match_error = "doesn't match" in str(error_msg).lower() or "doesn't match" in str(last_fail.get('full_log', '')).lower()
+                    
+                    priority_text = "主要錯誤 (RETEST Logic)" if is_match_error else "主要錯誤"
+                    
+                    details = f"Step: {step}\nCommand: {cmd}\nError: {error_msg}"
+                    messagebox.showinfo(priority_text, details)
+                    
+            except Exception as e:
+                print(f"切換到FAIL分頁或顯示錯誤失敗: {e}")
+        else:
+            try:
+                self.notebook.select(self.tab_pass)
+            except Exception:
+                pass
     
     def _update_tab_visibility(self, pass_items, fail_items):
         """根據分析結果動態顯示/隱藏標籤頁"""
@@ -1901,6 +1924,23 @@ class EnhancedLogAnalyzerApp:
             self._progress_set_value(value, maximum)
             self._update_progress(message)
         self.root.after(0, _update)
+
+    def _safe_update_progress_mode(self, mode):
+        """執行緒安全的進度條模式切換"""
+        def _update():
+            if mode == 'indeterminate':
+                self._progress_set_indeterminate()
+            else:
+                self._progress_set_determinate(100) # Default to 100, will be updated
+        self.root.after(0, _update)
+
+    def _safe_update_progress_text(self, message):
+        """執行緒安全的進度文字更新"""
+        self.root.after(0, lambda: self._update_progress(message))
+
+    def _safe_update_progress_max(self, maximum):
+        """執行緒安全的進度最大值更新"""
+        self.root.after(0, lambda: self.progress_bar.configure(maximum=maximum) if hasattr(self, 'progress_bar') else None)
 
     def _on_analysis_complete(self, folder, pass_logs, fail_logs, total_files):
         """分析完成後的UI更新（主執行緒執行）"""

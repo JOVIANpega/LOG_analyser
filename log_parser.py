@@ -335,8 +335,24 @@ class LogParser:
         # 處理"未找到指令"的集合
         self._consolidate_no_command_steps(pass_items, no_command_steps)
         
-        # 找到主要FAIL
-        last_fail = fail_items[0] if fail_items else None
+        # 找到主要FAIL (Logic: Priority 1: Last "doesn't match", Priority 2: Last generic FAIL)
+        
+        last_fail = None
+        
+        # 1. 尋找所有包含 "doesn't match" 的錯誤
+        match_fails = [
+            item for item in fail_items 
+            if "doesn't match" in str(item.get('error', '')).lower() 
+            or "doesn't match" in str(item.get('full_log', '')).lower()
+        ]
+        
+        if match_fails:
+            # 如果有 doesn't match，取最後一個 (RETEST logic)
+            last_fail = match_fails[-1]
+        elif fail_items:
+            # 如果沒有，取最後一個普通的 FAIL/ERROR
+            last_fail = fail_items[-1]
+            
         fail_line_idx = last_fail.get('raw_idx', 0) if last_fail else None
         
         return {
