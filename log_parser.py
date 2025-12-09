@@ -335,23 +335,75 @@ class LogParser:
         # 處理"未找到指令"的集合
         self._consolidate_no_command_steps(pass_items, no_command_steps)
         
-        # 找到主要FAIL (Logic: Priority 1: Last "doesn't match", Priority 2: Last generic FAIL)
+        # 找到主要FAIL (Logic: Improved 4-Level Priority)
+        # Priority 1: Last "doesn't match"
+        # Priority 2: Last "is Fail"
+        # Priority 3: Last "FAIL"
+        # Priority 4: Last "ERROR"
+        # Fallback: Last item
         
         last_fail = None
         
-        # 1. 尋找所有包含 "doesn't match" 的錯誤
-        match_fails = [
-            item for item in fail_items 
-            if "doesn't match" in str(item.get('error', '')).lower() 
-            or "doesn't match" in str(item.get('full_log', '')).lower()
-        ]
+        # Helper to filter items containing a keyword (case-insensitive checks where appropriate)
+        def filter_items(items, keyword, case_sensitive=False):
+            matches = []
+            for item in items:
+                err_str = str(item.get('error', ''))
+                full_str = str(item.get('full_log', ''))
+                
+                if case_sensitive:
+                    if keyword in err_str or keyword in full_str:
+                        matches.append(item)
+                else:
+                    if keyword.lower() in err_str.lower() or keyword.lower() in full_str.lower():
+                        matches.append(item)
+            return matches
+
+        # 1. doesn't match
+        matches = filter_items(fail_items, "doesn't match", case_sensitive=False)
+        if matches:
+            last_fail = matches[-1]
         
-        if match_fails:
-            # 如果有 doesn't match，取最後一個 (RETEST logic)
-            last_fail = match_fails[-1]
-        elif fail_items:
-            # 如果沒有，取最後一個普通的 FAIL/ERROR
+        # 2. is Fail (case sensitive "is Fail" based on user example, but safe to ignore case if consistent)
+        # User example: "Imtest is Fail !"
+        if not last_fail:
+            matches = filter_items(fail_items, "is Fail", case_sensitive=False)
+            if matches:
+                last_fail = matches[-1]
+
+        # 3. FAIL (Generic)
+        if not last_fail:
+            matches = filter_items(fail_items, "FAIL", case_sensitive=False) # 'FAIL' is usually upper case in logs, but let's be broad
+            if matches:
+                last_fail = matches[-1]
+
+        # 4. ERROR (Generic)
+        if not last_fail:
+            matches = filter_items(fail_items, "ERROR", case_sensitive=False)
+            if matches:
+                last_fail = matches[-1]
+                
+        # 5. Fallback
+        if not last_fail and fail_items:
             last_fail = fail_items[-1]
+
+        # === CRITICAL FIX: Extract Precise Error Text ===
+        # Ensure the 'error' field contains the specific line that triggered the priority match,
+        # not just the last error line in the step (which might be "All Test Aborted").
+        if last_fail:
+            target_keywords = ["doesn't match", "is Fail", "FAIL", "ERROR"]
+            # Check full_log for the highest priority keyword that is present
+            for keyword in target_keywords:
+                # Find all lines in this step containing the keyword
+                matching_lines = [
+                    line for line in last_fail.get('full_log', []) 
+                    if keyword.lower() in str(line).lower()
+                ]
+                
+                if matching_lines:
+                    # Update 'error' to the LAST matching line (RETEST logic)
+                    last_fail['error'] = matching_lines[-1].strip()
+                    break # Stop after finding the highest priority keyword match
             
         fail_line_idx = last_fail.get('raw_idx', 0) if last_fail else None
         

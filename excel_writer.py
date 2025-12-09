@@ -985,46 +985,77 @@ class ExcelWriter:
             # 組合詳細摘要
             summary_parts = []
             
-            # 主要錯誤原因
+            # 主要錯誤原因 (來自 main_enhanced.py 的 prioritized selection)
             main_error = (entry.get('summary') or {}).get('FAIL原因', '')
-            if main_error:
+            
+            # === STRICT PRIORITY FILTERING ===
+            # 如果主要錯誤是 "doesn't match" 或 "is Fail"，僅顯示該錯誤，忽略其他雜訊
+            is_priority_error = main_error and (
+                "doesn't match" in main_error.lower() or 
+                "is fail" in main_error.lower()
+            )
+            
+            if is_priority_error:
                 summary_parts.append(f"===============錯誤原因====================")
                 summary_parts.append("")
                 
-                # 突出顯示 "doesn't match" 錯誤
                 if "doesn't match" in main_error.lower():
                     summary_parts.append("🔴 突出錯誤 (doesn't match):")
-                    summary_parts.append(main_error)
-                else:
-                    summary_parts.append(main_error)
+                
+                summary_parts.append(main_error)
+                
+                # 僅附加執行指令 (為了方便對照)
+                if commands:
+                    # 嘗試找到與該錯誤相關的指令
+                    related_cmd = None
+                    for item in fail_items:
+                        if item.get('error') == main_error:
+                            related_cmd = item.get('command')
+                            break
+                    if related_cmd:
+                        summary_parts.append(f"執行指令: {related_cmd}")
+                
+                return '\n'.join(summary_parts)
+                
+            # === Fallback: Generic Reporting (for generic FAIL/ERROR) ===
+            if main_error:
+                summary_parts.append(f"===============錯誤原因====================")
+                summary_parts.append("")
+                summary_parts.append(main_error)
                 
                 summary_parts.append("")
                 summary_parts.append("=" * 50)
                 summary_parts.append("")
             
-            # 嚴重錯誤
+            # 嚴重錯誤 (Filtered)
             if critical_errors:
-                for error in critical_errors[:5]:  # 最多顯示5個嚴重錯誤
-                    summary_parts.append(error)
-                summary_parts.append("")
+                unique_critical = []
+                for error in critical_errors[:5]:
+                    if error != main_error and error not in unique_critical:
+                        unique_critical.append(error)
+                if unique_critical:
+                    for error in unique_critical:
+                        summary_parts.append(error)
+                    summary_parts.append("")
             
             # HERR 錯誤
             if herr_errors:
-                for error in herr_errors[:10]:  # 最多顯示10個HERR錯誤
-                    summary_parts.append(error)
+                for error in herr_errors[:5]:
+                    if error != main_error:
+                        summary_parts.append(error)
                 summary_parts.append("")
             
             # 其他錯誤詳情
             if error_details:
-                for detail in error_details[:5]:  # 最多顯示5個錯誤詳情
+                for detail in error_details[:3]:
                     if detail != main_error and detail not in summary_parts:
                         summary_parts.append(detail)
                 summary_parts.append("")
             
             # 執行指令
             if commands:
-                unique_commands = list(dict.fromkeys(commands))  # 去重
-                for cmd in unique_commands[:3]:  # 最多顯示3個指令
+                unique_commands = list(dict.fromkeys(commands))
+                for cmd in unique_commands[:3]:
                     summary_parts.append(f"執行指令: {cmd}")
             
             return '\n'.join(summary_parts) if summary_parts else "未知錯誤"

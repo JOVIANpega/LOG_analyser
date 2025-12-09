@@ -1905,9 +1905,17 @@ class EnhancedLogAnalyzerApp:
                 if 'PASS' in fn.upper():
                     pass_logs.append(entry)
                 else:
-                    if res.get('fail_items'):
+                    # 使用 log_parser 已經計算好的 last_fail (包含正確的優先級邏輯)
+                    if res.get('last_fail'):
+                        last_fail_item = res['last_fail']
+                        main_error = last_fail_item.get('error', 'Unknown Error')
+                        # 如果需要可以加上指令名稱: f"{last_fail_item.get('command','')}: {main_error}"
+                        entry['summary']['FAIL原因'] = main_error
+                    elif res.get('fail_items'):
+                        # Fallback
                         main_error = self._extract_main_fail_reason_from_items(res['fail_items'])
                         entry['summary']['FAIL原因'] = main_error
+                    
                     fail_logs.append(entry)
             
             # 分析完成，呼叫主執行緒更新UI
