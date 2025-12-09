@@ -393,20 +393,26 @@ class EnhancedLogAnalyzerApp:
             # 先清除現有結果，避免誤導
             self._clear_enhanced_results()
             
-            # 顯示檔案預覽
-            self._show_file_preview(file_path, 'log')
+            # 顯示檔案預覽，並傳入確認後的回呼函數
+            self._show_file_preview(
+                file_path, 
+                'log', 
+                on_confirm=lambda: self._start_analysis_after_preview(file_path)
+            )
             
-            self.current_mode = 'single'
-            self.current_log_path = file_path
-            filename = os.path.basename(file_path)
-            self.file_info_label.config(text=f"已選擇：{filename}", fg='green')
-            
-            # 儲存選擇的路徑到設定
-            self.settings['last_log_path'] = file_path
-            self._save_settings_silent()
-            
-            # 自動開始分析（enhanced）
-            self._analyze_enhanced_log()
+    def _start_analysis_after_preview(self, file_path):
+        """檔案預覽確認後執行的分析流程"""
+        self.current_mode = 'single'
+        self.current_log_path = file_path
+        filename = os.path.basename(file_path)
+        self.file_info_label.config(text=f"已選擇：{filename}", fg='green')
+        
+        # 儲存選擇的路徑到設定
+        self.settings['last_log_path'] = file_path
+        self._save_settings_silent()
+        
+        # 自動開始分析（enhanced）
+        self._analyze_enhanced_log()
     
     def _select_folder(self):
         """選擇資料夾"""
@@ -467,8 +473,12 @@ class EnhancedLogAnalyzerApp:
             
             if len(file_paths) == 1:
                 # 單一檔案：顯示預覽後直接處理
-                self._show_file_preview(file_paths[0], 'compressed')
-                self._process_single_compressed_file(file_paths[0])
+                # 單一檔案：顯示預覽後直接處理
+                self._show_file_preview(
+                    file_paths[0], 
+                    'compressed',
+                    on_confirm=lambda: self._process_single_compressed_file(file_paths[0])
+                )
             else:
                 # 多個檔案：顯示選擇視窗
                 self._show_compressed_selection_window(file_paths)
@@ -1662,7 +1672,7 @@ class EnhancedLogAnalyzerApp:
         except Exception as e:
             print(f"更新標籤頁可見性時發生錯誤: {e}")
     
-    def _show_file_preview(self, file_path, file_type):
+    def _show_file_preview(self, file_path, file_type, on_confirm=None):
         """顯示檔案預覽視窗"""
         try:
             import os
@@ -1726,18 +1736,6 @@ class EnhancedLogAnalyzerApp:
                 self._preview_log_content(file_path, text_widget)
             elif file_type == 'compressed':
                 self._preview_compressed_content(file_path, text_widget)
-            
-            # 按鈕框架
-            button_frame = tk.Frame(main_frame)
-            button_frame.pack(fill=tk.X, pady=(10, 0))
-            
-            tk.Button(button_frame, text="確認開啟", 
-                     command=lambda: self._confirm_open_file(preview_window, file_path),
-                     bg='#4CAF50', fg='white', font=('Arial', 10)).pack(side=tk.RIGHT, padx=(5, 0))
-            
-            tk.Button(button_frame, text="取消", 
-                     command=preview_window.destroy,
-                     bg='#f44336', fg='white', font=('Arial', 10)).pack(side=tk.RIGHT)
             
             # 讓文字區域不可編輯
             text_widget.config(state=tk.DISABLED)
@@ -1806,10 +1804,15 @@ class EnhancedLogAnalyzerApp:
         except Exception as e:
             text_widget.insert(tk.END, f"無法讀取壓縮檔案內容: {e}")
     
-    def _confirm_open_file(self, preview_window, file_path):
+    def _confirm_open_file(self, preview_window, file_path, callback=None):
         """確認開啟檔案"""
         preview_window.destroy()
-        # 這裡可以添加額外的確認邏輯
+        
+        # 執行確認後的回呼函數
+        if callback:
+            # 確保在主執行緒中稍微延遲執行，讓視窗有時間關閉
+            self.root.after(100, callback)
+            
         return True
     
     def _analyze_enhanced_multiple_files(self):
