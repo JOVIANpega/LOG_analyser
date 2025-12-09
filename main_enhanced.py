@@ -475,14 +475,18 @@ class EnhancedLogAnalyzerApp:
     def _process_single_compressed_file(self, file_path):
         """處理單一壓縮檔案"""
         # 背景處理壓縮檔案
+        self._cancel_flag = False  # 重置取消標誌
         self._show_progress("正在處理壓縮檔", os.path.basename(file_path))
         def _bg():
             try:
                 if self._cancel_flag:
                     return
+                # _process_compressed_file 將負責接續分析或關閉進度條
                 self._process_compressed_file(file_path)
-            finally:
+            except Exception as e:
+                print(f"背景處理錯誤: {e}")
                 self.root.after(0, self._close_progress)
+                
         import threading
         threading.Thread(target=_bg, daemon=True).start()
 
@@ -705,6 +709,7 @@ class EnhancedLogAnalyzerApp:
             # 檢查取消狀態
             if self._cancel_flag:
                 shutil.rmtree(temp_dir, ignore_errors=True)
+                self.root.after(0, self._close_progress)
                 return
             
             # 解壓縮
@@ -719,11 +724,13 @@ class EnhancedLogAnalyzerApp:
             else:
                 messagebox.showerror("錯誤", "不支援的壓縮格式")
                 shutil.rmtree(temp_dir, ignore_errors=True)
+                self.root.after(0, self._close_progress)
                 return
 
             # 檢查取消狀態
             if self._cancel_flag:
                 shutil.rmtree(temp_dir, ignore_errors=True)
+                self.root.after(0, self._close_progress)
                 return
 
             # 遞迴展開內嵌壓縮檔
@@ -736,6 +743,7 @@ class EnhancedLogAnalyzerApp:
             # 檢查取消狀態
             if self._cancel_flag:
                 shutil.rmtree(temp_dir, ignore_errors=True)
+                self.root.after(0, self._close_progress)
                 return
             
             # 搜尋 LOG 檔案
@@ -743,6 +751,7 @@ class EnhancedLogAnalyzerApp:
             
             if not log_files:
                 messagebox.showwarning("警告", "壓縮檔中未找到 .log 檔案")
+                self.root.after(0, self._close_progress)
                 return
             
             # 根據檔案數量決定處理模式
@@ -759,11 +768,11 @@ class EnhancedLogAnalyzerApp:
                 self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮檔)", fg='orange')
             
             # 儲存選擇的路徑到設定
-            # 儲存選擇的路徑到設定
             self.settings['last_compressed_path'] = compressed_path
             self._save_settings_silent()
             
             # 開始分析 (必須回到主執行緒執行，因為會更新UI)
+            # 注意：這裡不關閉進度條，由 _analyze_enhanced_log 接手更新進度
             self.root.after(0, self._analyze_enhanced_log)
             
             # 註冊清理函數（分析完成後清理暫存檔案）
@@ -774,6 +783,7 @@ class EnhancedLogAnalyzerApp:
             # 清理暫存目錄
             if 'temp_dir' in locals() and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir, ignore_errors=True)
+            self.root.after(0, self._close_progress)
 
     def _extract_zip(self, zip_path, extract_to):
         """解壓縮 ZIP 檔案"""
