@@ -12,8 +12,10 @@ import os
 
 def main():
     """主程式入口點（僅增強版）"""
-    from main_enhanced import main_enhanced as main_enhanced_func
-    main_enhanced_func()
+    from app.main_app import EnhancedLogAnalyzerApp
+    root = tk.Tk()
+    app = EnhancedLogAnalyzerApp(root)
+    root.mainloop()
 
 if __name__ == '__main__':
     main() 
