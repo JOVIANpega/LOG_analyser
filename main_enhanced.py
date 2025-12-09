@@ -956,6 +956,19 @@ class EnhancedLogAnalyzerApp:
                     self._cleanup_temp_files()
                 except Exception as e:
                     print(f"背景清理失敗: {e}")
+            threading.Thread(target=_bg, daemon=True).start()
+        except Exception as e:
+            print(f"啟動背景清理失敗: {e}")
+
+    def _on_search_change(self, event):
+        """搜尋內容改變時的即時搜尋"""
+        try:
+            print("搜尋內容改變事件觸發")
+            # 如果輸入超過2個字元就開始搜尋
+            search_text = self.search_var.get().strip()
+            print(f"搜尋文字：'{search_text}'")
+            if len(search_text) >= 2:
+                self._search_next()
             elif len(search_text) == 0:
                 self._clear_search()
         except Exception as e:
