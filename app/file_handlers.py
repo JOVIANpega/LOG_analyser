@@ -10,6 +10,8 @@ from tkinter import filedialog, messagebox
 import threading
 import tempfile
 import shutil
+import shutil
+from .dialogs import show_mixed_content_dialog, show_smart_select_dialog
 
 
 class FileHandlerMixin:
@@ -36,32 +38,71 @@ class FileHandlerMixin:
             # 如果出現任何錯誤，使用當前工作目錄
             return os.getcwd()
     
-    def _select_file(self):
-        """選擇單一檔案"""
-        # 優先使用上次選擇的路徑，如果沒有則使用預設路徑
+    def _select_files_unified(self):
+        """統一的檔案選擇功能（支援 Log 與 壓縮檔，支援多選）"""
         if self.settings.get('last_log_path') and os.path.exists(self.settings.get('last_log_path')):
             default_dir = os.path.dirname(self.settings.get('last_log_path'))
         else:
             default_dir = self._get_default_directory()
         
-        file_path = filedialog.askopenfilename(
-            title="選擇Log檔案", 
-            filetypes=[("Log檔案", "*.log"), ("所有檔案", "*.*")],
+        file_paths = filedialog.askopenfilenames(
+            title="選擇檔案 (Log 或 壓縮檔)", 
+            filetypes=[
+                ("支援的檔案", "*.log;*.zip;*.7z;*.rar"),
+                ("Log檔案", "*.log"), 
+                ("壓縮檔案", "*.zip;*.7z;*.rar"),
+                ("所有檔案", "*.*")
+            ],
             initialdir=default_dir
         )
-        if file_path:
-            # 先清除現有結果，避免誤導
+        
+        if not file_paths:
+            return
+
+        # 儲存路徑設定 (取第一個檔案的目錄)
+        self.settings['last_log_path'] = file_paths[0]
+        self._save_settings_silent()
+
+        # 檢查是否包含壓縮檔
+        has_archives = any(self._is_archive_file(f) for f in file_paths)
+        
+        if has_archives:
+            # 如果包含壓縮檔，走壓縮檔處理流程
+            # 清除現有結果
             self._clear_enhanced_results()
             
-            # 直接開始分析
-            self.root.after(100, lambda: self._start_analysis_after_preview(file_path))
+            if len(file_paths) == 1:
+                # 單一壓縮檔 -> 直接解壓處理
+                 self.root.after(100, lambda: self._process_single_compressed_file(file_paths[0]))
+            else:
+                # 多個檔 -> 走壓縮檔多選流程 (需確保此方法存在或邏輯正確)
+                # 這裡可以直接複用 _show_compressed_selection_window 或是直接處理
+                # 為了簡化，直接視為多個壓縮檔處理
+                 self._show_compressed_selection_window(list(file_paths))
+        else:
+            # 全是 Log 檔案
+            self._clear_enhanced_results()
             
+            if len(file_paths) == 1:
+                # 單一 Log
+                self.root.after(100, lambda: self._start_analysis_after_preview(file_paths[0]))
+            else:
+                # 多個 Log
+                self.current_mode = 'multi'
+                self.current_log_path = list(file_paths)
+                
+                self.file_info_label.config(text=f"已選擇：{len(file_paths)} 個檔案", fg='blue')
+                
+                # 自動開始分析
+                self._analyze_enhanced_log()
+
     def _start_analysis_after_preview(self, file_path):
         """檔案預覽確認後執行的分析流程"""
         self.current_mode = 'single'
         self.current_log_path = file_path
         filename = os.path.basename(file_path)
-        self.file_info_label.config(text=f"已選擇：{filename}", fg='green')
+        if hasattr(self, 'file_info_label'):
+             self.file_info_label.config(text=f"已選擇：{filename}", fg='green')
         
         # 儲存選擇的路徑到設定
         self.settings['last_log_path'] = file_path
@@ -70,36 +111,360 @@ class FileHandlerMixin:
         # 自動開始分析（enhanced）
         self._analyze_enhanced_log()
     
-    def _select_folder(self):
-        """選擇資料夾"""
-        # 優先使用上次選擇的路徑，如果沒有則使用預設路徑
+    def _select_folder_unified(self):
+        """
+        統一的資料夾選擇功能（智慧模式）
+        改用 File Dialog 讓使用者可以看到檔案，再決定是要處理選取的檔案還是所在的資料夾
+        """
+        # 優先使用上次選擇的路徑
         if self.settings.get('last_folder_path') and os.path.exists(self.settings.get('last_folder_path')):
             default_dir = self.settings.get('last_folder_path')
+        elif self.settings.get('last_log_path') and os.path.exists(self.settings.get('last_log_path')):
+            default_dir = os.path.dirname(self.settings.get('last_log_path'))
         else:
             default_dir = self._get_default_directory()
-        
-        # 先讓使用者看到所有內容物（僅視覺，實際只處理 .log）
-        folder_path = filedialog.askdirectory(
-            title="選擇Log資料夾",
+            
+        # 使用 askopenfilenames 讓使用者能看到內容
+        file_paths = filedialog.askopenfilenames(
+            title="請選擇資料夾內的任一檔案以識別資料夾 (Log/壓縮檔)",
+            filetypes=[
+                ("支援的檔案", "*.log;*.zip;*.7z;*.rar"),
+                ("Log檔案", "*.log"),
+                ("壓縮檔案", "*.zip;*.7z;*.rar"),
+                ("所有檔案", "*.*")
+            ],
             initialdir=default_dir
         )
-        if folder_path:
-            # 先清除現有結果，避免誤導
-            self._clear_enhanced_results()
+        
+        if not file_paths:
+            # 使用者取消，或是因為資料夾是空的選不到。
+            # 給予一個 fallback 選項
+            fallback = messagebox.askyesno(
+                "提示", 
+                "未選擇檔案。\n\n如果您想選擇一個『空資料夾』或『不包含支援檔案的資料夾』（例如只包含子資料夾），\n請點擊【是】使用傳統資料夾選擇器。\n\n點擊【否】取消操作。"
+            )
+            if fallback:
+                self._select_folder_classic(initial_dir=default_dir)
+            return
+
+        # 取得所在資料夾
+        folder_path = os.path.dirname(file_paths[0])
+        
+        # 儲存路徑
+        self.settings['last_folder_path'] = folder_path
+        self._save_settings_silent()
+
+        # 如果選了多個檔案，或單個檔案，詢問意圖
+        action = show_smart_select_dialog(self.root, list(file_paths), folder_path)
+        
+        if action == 'files':
+            # 僅處理選定的檔案 (轉發給 _select_files_unified 的邏輯處理)
+            # 這裡我們需要根據檔案類型分流
+            has_archives = any(self._is_archive_file(f) for f in file_paths)
             
+            if has_archives:
+                # 走壓縮檔邏輯
+                # 這裡假設如果混合，就全部視為壓縮檔處理流程（支援解壓）
+                # 或是過濾出壓縮檔？
+                # 如果使用者明確選了 "Files"，我們就把這些檔案當作要解壓的對象
+                archives = [f for f in file_paths if self._is_archive_file(f)]
+                logs = [f for f in file_paths if f.lower().endswith('.log')]
+                
+                if archives and not logs:
+                    self._process_selected_archives_direct(archives, folder_path)
+                elif logs and not archives:
+                     # 純 Log
+                     self._process_selected_logs_direct(logs)
+                else:
+                    # 混合：優先處理壓縮檔，或是都處理？
+                    # 簡化：只處理壓縮檔
+                    if archives:
+                         self._process_selected_archives_direct(archives, folder_path)
+                    
+            else:
+                 # 純 Log 檔案
+                 self._process_selected_logs_direct(list(file_paths))
+
+        elif action == 'folder':
+            # 掃描整個資料夾 (呼叫經典邏輯，傳入路徑)
+            self._select_folder_classic(target_path=folder_path)
+            
+    def _process_selected_logs_direct(self, file_paths):
+        """直接處理選定的 LOG 檔案列表"""
+        self._clear_enhanced_results()
+        if len(file_paths) == 1:
+            self.root.after(100, lambda: self._start_analysis_after_preview(file_paths[0]))
+        else:
+            self.current_mode = 'multi'
+            self.current_log_path = list(file_paths)
+            self.file_info_label.config(text=f"已選擇：{len(file_paths)} 個檔案", fg='blue')
+            self._analyze_enhanced_log()
+
+    def _select_folder_classic(self, target_path=None, initial_dir=None):
+        """
+        經典資料夾選擇功能（接收路徑或彈出 blind dialog）
+        原本的 _select_folder_unified 改名為此
+        """
+        if target_path:
+            folder_path = target_path
+        else:
+            # 優先使用上次選擇的路徑
+            if initial_dir:
+                default_dir = initial_dir
+            elif self.settings.get('last_folder_path') and os.path.exists(self.settings.get('last_folder_path')):
+                default_dir = self.settings.get('last_folder_path')
+            else:
+                default_dir = self._get_default_directory()
+            
+            folder_path = filedialog.askdirectory(
+                title="選擇資料夾 (傳統模式 - 自動識別內容)",
+                initialdir=default_dir
+            )
+        
+        if not folder_path:
+            return
+
+        # 儲存設定
+        self.settings['last_folder_path'] = folder_path
+        self._save_settings_silent()
+
+        if hasattr(self, 'file_info_label'):
+            self.file_info_label.config(text=f"正在掃描資料夾... {folder_path}", fg='blue')
+            self.root.update_idletasks() # 強制更新UI
+
+        # 掃描資料夾內容
+        log_files = []
+        archive_files = []
+        
+        for root, dirs, files in os.walk(folder_path):
+            # 檢查是否有取消（雖然這裡是同步的，但如果是大資料夾這會卡頓）
+            # 最理想是放到線程中，暫時先保持簡單，但增加UI回饋
+            for f in files:
+                if f.lower().endswith('.log'):
+                    log_files.append(os.path.join(root, f))
+                elif self._is_archive_file(f):
+                    archive_files.append(os.path.join(root, f))
+        
+        has_logs = len(log_files) > 0
+        has_archives = len(archive_files) > 0
+        
+        if not has_logs and not has_archives:
+            messagebox.showwarning("提示", "此資料夾中找不到 Log 檔案或壓縮檔 (.zip/.7z/.rar)")
+            return
+            
+        # 決策邏輯
+        process_mode = 'unknown' # 'logs', 'archives'
+        
+        if has_archives:
+            # 使用自訂對話框讓使用者選擇
+            # 我們傳入 log_files 的數量，讓對話框決定是否顯示 "僅處理 Log" 按鈕
+            action_result = show_mixed_content_dialog(self.root, archive_files, len(log_files), folder_path)
+            
+            action = action_result['action']
+            if action == 'process_archives':
+                process_mode = 'archives_selected'
+                selected_archives_from_dialog = action_result['selected']
+            elif action == 'process_logs':
+                process_mode = 'logs'
+            else:
+                # Cancel
+                return
+        elif has_logs:
+             process_mode = 'logs'
+        else:
+             return
+
+        # 執行操作
+        self._clear_enhanced_results()
+        
+        if process_mode == 'logs':
             self.current_mode = 'multi'
             self.current_log_path = folder_path
-            
             foldername = os.path.basename(folder_path)
-            self.file_info_label.config(text=f"已選擇資料夾：{foldername}", fg='blue')
-            
-            # 儲存選擇的路徑到設定
-            self.settings['last_folder_path'] = folder_path
-            self._save_settings_silent()
-            
-            # 自動開始分析（enhanced）
+            self.file_info_label.config(text=f"已選擇資料夾：{foldername} (Log模式)", fg='blue')
             self._analyze_enhanced_log()
-    
+            
+        elif process_mode == 'archives':
+             # 舊路徑（無logs單純archives，或原本邏輯），這其實可以跟下面合併，但為了保險保留
+             self._process_compressed_folder_path(folder_path)
+             
+        elif process_mode == 'archives_selected':
+            # 使用者已經在對話框選好了，直接處理
+            self._process_selected_archives_direct(selected_archives_from_dialog, folder_path)
+
+    def _process_compressed_folder_path(self, folder_path):
+        """處理壓縮檔資料夾的實際邏輯 (從 _select_compressed_folder 分離出來)"""
+        # 讓使用者挑選要處理的壓縮檔
+        archives = []
+        for root, dirs, files in os.walk(folder_path):
+            for fn in files:
+                if self._is_archive_file(fn):
+                    archives.append(os.path.join(root, fn))
+        
+        if not archives:
+            return
+        
+        # 預覽並選擇
+        self._show_archive_preview(archives)
+        selected_archives = self._choose_archives_dialog(archives)
+        if not selected_archives:
+            return
+
+        # 更新UI顯示選中的壓縮檔名稱
+        if len(selected_archives) == 1:
+            display_name = os.path.basename(selected_archives[0])
+            if hasattr(self, 'file_info_label'):
+                self.file_info_label.config(text=f"已選擇壓縮檔：{display_name}", fg='blue')
+        else:
+            if hasattr(self, 'file_info_label'):
+                self.file_info_label.config(text=f"已選擇 {len(selected_archives)} 個壓縮檔", fg='blue')
+        self.root.update_idletasks()
+
+        # 背景處理
+        self._show_progress("請稍候", "正在準備處理壓縮資料夾...")
+        self.root.update_idletasks() # 確保視窗立即彈出
+        
+        def _bg():
+            temp_dir = None
+            try:
+                if self._cancel_flag: return
+                # 建立總暫存目錄
+                temp_dir = tempfile.mkdtemp(prefix="log_archives_")
+                extracted_root = os.path.join(temp_dir, "extracted")
+                os.makedirs(extracted_root, exist_ok=True)
+                
+                # 逐一解壓
+                total = len(selected_archives)
+                self.root.after(0, lambda: self._progress_set_determinate(total))
+                for idx, apath in enumerate(selected_archives, 1):
+                    if self._cancel_flag:
+                        try: shutil.rmtree(temp_dir, ignore_errors=True)
+                        except: pass
+                        return
+                        
+                    base = os.path.splitext(os.path.basename(apath))[0]
+                    target = os.path.join(extracted_root, f"{idx:03d}_{base}")
+                    os.makedirs(target, exist_ok=True)
+                    try:
+                        self._update_progress(f"解壓中 {idx}/{total}: {os.path.basename(apath)}")
+                        self._extract_archive(apath, target)
+                        self._extract_all_archives(target, max_depth=5)
+                    except Exception as e:
+                        print(f"解壓失敗（略過）：{apath} -> {e}")
+                        continue
+                    self.root.after(0, lambda i=idx, n=total: self._progress_set_value(i, n))
+                
+                # 搜尋 Log
+                log_files = self._find_log_files(extracted_root)
+                if not log_files:
+                    self.root.after(0, lambda: messagebox.showwarning("警告", "壓縮資料夾展開後未找到 .log 檔案"))
+                    return
+                
+                def _apply_result():
+                    if len(log_files) == 1:
+                        self.current_mode = 'single'
+                        self.current_log_path = log_files[0]
+                        filename = os.path.basename(log_files[0])
+                        self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮資料夾)", fg='orange')
+                    else:
+                        self.current_mode = 'multi'
+                        self.current_log_path = extracted_root
+                        self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮資料夾)", fg='orange')
+                        
+                    self._analyze_enhanced_log()
+                    
+                self.temp_cleanup_path = temp_dir
+                self.root.after(0, _apply_result)
+                
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\\n{e}"))
+                if temp_dir and os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+            finally:
+                self.root.after(0, self._close_progress)
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _process_selected_archives_direct(self, selected_archives, folder_path):
+        """處理已經選好的壓縮檔列表（跳過選擇對話框）"""
+        # 更新UI顯示選中的壓縮檔名稱
+        if len(selected_archives) == 1:
+            display_name = os.path.basename(selected_archives[0])
+            if hasattr(self, 'file_info_label'):
+                self.file_info_label.config(text=f"已選擇壓縮檔：{display_name}", fg='blue')
+        else:
+            if hasattr(self, 'file_info_label'):
+                self.file_info_label.config(text=f"已選擇 {len(selected_archives)} 個壓縮檔", fg='blue')
+        self.root.update_idletasks()
+
+        # 背景處理
+        self._show_progress("請稍候", "正在準備處理壓縮資料夾...")
+        self.root.update_idletasks() # 確保視窗立即彈出
+        
+        # 重用核心背景邏輯，但為了避免複製貼上太多代碼，這裡可以稍微重構
+        # 不過為了安全起見，我將邏輯與 _process_compressed_folder_path 共用的部分複製過來
+        # 因為 _process_compressed_folder_path 內部有 _choose_archives_dialog，難以簡單提取
+        
+        def _bg():
+            temp_dir = None
+            try:
+                if self._cancel_flag: return
+                # 建立總暫存目錄
+                temp_dir = tempfile.mkdtemp(prefix="log_archives_")
+                extracted_root = os.path.join(temp_dir, "extracted")
+                os.makedirs(extracted_root, exist_ok=True)
+                
+                # 逐一解壓
+                total = len(selected_archives)
+                self.root.after(0, lambda: self._progress_set_determinate(total))
+                for idx, apath in enumerate(selected_archives, 1):
+                    if self._cancel_flag:
+                        try: shutil.rmtree(temp_dir, ignore_errors=True)
+                        except: pass
+                        return
+                        
+                    base = os.path.splitext(os.path.basename(apath))[0]
+                    target = os.path.join(extracted_root, f"{idx:03d}_{base}")
+                    os.makedirs(target, exist_ok=True)
+                    try:
+                        self._update_progress(f"解壓中 {idx}/{total}: {os.path.basename(apath)}")
+                        self._extract_archive(apath, target)
+                        self._extract_all_archives(target, max_depth=5)
+                    except Exception as e:
+                        print(f"解壓失敗（略過）：{apath} -> {e}")
+                        continue
+                    self.root.after(0, lambda i=idx, n=total: self._progress_set_value(i, n))
+                
+                # 搜尋 Log
+                log_files = self._find_log_files(extracted_root)
+                if not log_files:
+                    self.root.after(0, lambda: messagebox.showwarning("警告", "壓縮資料夾展開後未找到 .log 檔案"))
+                    return
+                
+                def _apply_result():
+                    if len(log_files) == 1:
+                        self.current_mode = 'single'
+                        self.current_log_path = log_files[0]
+                        filename = os.path.basename(log_files[0])
+                        self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮資料夾)", fg='orange')
+                    else:
+                        self.current_mode = 'multi'
+                        self.current_log_path = extracted_root
+                        self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮資料夾)", fg='orange')
+                        
+                    self._analyze_enhanced_log()
+                    
+                self.temp_cleanup_path = temp_dir
+                self.root.after(0, _apply_result)
+                
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\\n{e}"))
+                if temp_dir and os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+            finally:
+                self.root.after(0, self._close_progress)
+        threading.Thread(target=_bg, daemon=True).start()
+
+    # 保留 _select_compressed_file 供內部調用或向下相容，但 UI 不再直接使用
     def _select_compressed_file(self):
         """選擇並處理壓縮檔案（支援多選）"""
         # 獲取預設目錄

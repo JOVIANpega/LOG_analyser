@@ -1,10 +1,6 @@
 @echo off
 echo ========================================
-<<<<<<< HEAD
 echo PEGA Log Analyzer V1.9.0 打包工具
-=======
-echo PEGA Log Analyzer V1.8.5 打包工具
->>>>>>> 3f570f8bd7b4d8fef1b1355ebaa580a957dfc5cd
 echo ========================================
 echo.
 
@@ -40,16 +36,13 @@ REM 使用PyInstaller打包（包含圖示）
 echo 正在執行PyInstaller...
 pyinstaller --onefile ^
     --noconsole ^
-<<<<<<< HEAD
     --name="PEGA_Log_Analyzer_V1.9.0" ^
-=======
-    --name="PEGA_Log_Analyzer_V1.8.5" ^
->>>>>>> 3f570f8bd7b4d8fef1b1355ebaa580a957dfc5cd
     --icon=assets/icon.ico ^
     --version-file=assets/version_info.txt ^
     --add-data="assets;assets" ^
     --add-data="docs;docs" ^
     --add-data="settings.json;." ^
+    --add-data="app;app" ^
     --hidden-import=tkinter ^
     --hidden-import=tkinter.ttk ^
     --hidden-import=tkinter.messagebox ^
@@ -65,17 +58,23 @@ pyinstaller --onefile ^
     --hidden-import=datetime ^
     --hidden-import=threading ^
     --hidden-import=webbrowser ^
-    --hidden-import=settings_loader ^
-    --hidden-import=log_parser ^
-    --hidden-import=ui_components ^
-    --hidden-import=ui_enhanced_fixed ^
-    --hidden-import=enhanced_settings ^
-    --hidden-import=enhanced_left_panel ^
-    --hidden-import=excel_writer ^
-<<<<<<< HEAD
-=======
-    --hidden-import=generate_documentation ^
->>>>>>> 3f570f8bd7b4d8fef1b1355ebaa580a957dfc5cd
+    --hidden-import=app.settings_loader ^
+    --hidden-import=app.log_parser ^
+    --hidden-import=app.ui_components ^
+    --hidden-import=app.ui_enhanced_fixed ^
+    --hidden-import=app.enhanced_settings ^
+    --hidden-import=app.enhanced_left_panel ^
+    --hidden-import=app.excel_writer ^
+    --hidden-import=app.csv_processor ^
+    --hidden-import=app.main_app ^
+    --hidden-import=app.main_app_full ^
+    --hidden-import=app.file_handlers ^
+    --hidden-import=app.config_manager ^
+    --hidden-import=app.progress_manager ^
+    --hidden-import=app.search_handler ^
+    --hidden-import=app.result_display ^
+    --hidden-import=app.analysis_engine ^
+    --hidden-import=app.ui_builder ^
     --hidden-import=py7zr ^
     --hidden-import=rarfile ^
     --collect-all=pandas ^
@@ -97,11 +96,7 @@ echo ========================================
 echo 打包完成！
 echo ========================================
 echo.
-<<<<<<< HEAD
 echo EXE檔案位置：dist\PEGA_Log_Analyzer_V1.9.0.exe
-=======
-echo EXE檔案位置：dist\PEGA_Log_Analyzer_V1.8.5.exe
->>>>>>> 3f570f8bd7b4d8fef1b1355ebaa580a957dfc5cd
 echo.
 
 REM 複製設定檔和HTML文件到dist目錄
@@ -112,15 +107,9 @@ if exist "SIGN.txt" copy "SIGN.txt" "dist\"
 echo 設定檔、HTML文件和加密檔案已複製到dist目錄
 
 REM 檢查檔案是否存在
-<<<<<<< HEAD
 if exist "dist\PEGA_Log_Analyzer_V1.9.0.exe" (
     echo 檔案大小：
     dir "dist\PEGA_Log_Analyzer_V1.9.0.exe" | findstr "PEGA_Log_Analyzer_V1.9.0.exe"
-=======
-if exist "dist\PEGA_Log_Analyzer_V1.8.5.exe" (
-    echo 檔案大小：
-    dir "dist\PEGA_Log_Analyzer_V1.8.5.exe" | findstr "PEGA_Log_Analyzer_V1.8.5.exe"
->>>>>>> 3f570f8bd7b4d8fef1b1355ebaa580a957dfc5cd
     echo.
     echo 是否要開啟dist目錄？
     set /p choice="請輸入 y 或 n: "

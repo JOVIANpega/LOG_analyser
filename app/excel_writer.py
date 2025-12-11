@@ -282,6 +282,73 @@ class ExcelWriter:
         self._build_fail_workbook(fail_path, fail_logs)
         return pass_path, fail_path
 
+    def _get_station_from_log(self, entry):
+        """嘗試從 LOG 中獲取 Station 資訊，若無則預設"""
+        # 可以遍歷 raw_lines 尋找 "Station ID:" 或類似字串
+        # 暫時回傳預設值或 "Unknown"
+        # 範例CSV顯示 "PQ Test", "Stitchig 1"
+        raw_lines = entry.get('raw_lines', [])
+        for line in raw_lines[:100]:
+             if "Station ID" in str(line):
+                  # 解析 Station ID
+                  pass
+        return "Unknown Station"
+
+    def _build_fail_list_sheet(self, wb, logs):
+        """建立 FAIL_LIST 工作表 (依使用者要求的 CSV 格式)"""
+        ws = wb.create_sheet("FAIL_LIST", 0) # 放在第一頁
+        
+        # 設定標題
+        headers = ['ISN', 'Station', 'FAIL Item', 'FAIL Reason', 'suggestion']
+        ws.append(headers)
+        
+        # 樣式設定
+        header_font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FFFFFF')
+        fill_blue = PatternFill('solid', fgColor='FF4472C4')
+        for col in range(1, len(headers) + 1):
+            cell = ws.cell(row=1, column=col)
+            cell.font = header_font
+            cell.fill = fill_blue
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            
+        # 填寫資料
+        for entry in logs:
+            # 判斷是否為 FAIL LOG (有 fail_items)
+            fail_items = entry.get('fail_items', [])
+            if not fail_items:
+                continue
+                
+            fname = entry.get('file_name', '')
+            isn = self._extract_isn_from_filename(fname)
+            station = self._get_station_from_log(entry)
+            suggestion = "請參閱 PEGA SOP" # 預設建議
+            
+            for item in fail_items:
+                # FAIL Item: 測項名稱 + 結果 (例如 "cam1 Imtest is Fail")
+                step_name = item.get('step_name', '')
+                result = item.get('result', '')
+                fail_item_str = f"{step_name}"
+                if result and result not in step_name:
+                     fail_item_str += f" {result}"
+                
+                # FAIL Reason: 詳細錯誤 (例如 "AVE_SNR=28... < 29.")
+                # 優先使用 error 欄位，如果沒有則用 response
+                reason = item.get('error', '')
+                if not reason or reason == 'FAIL':
+                    reason = item.get('response', '')
+                    
+                row_data = [
+                    self._sanitize_cell_text(isn),
+                    self._sanitize_cell_text(station),
+                    self._sanitize_cell_text(fail_item_str),
+                    self._sanitize_cell_text(reason),
+                    self._sanitize_cell_text(suggestion)
+                ]
+                ws.append(row_data)
+                
+        # 自動調整欄寬
+        self._auto_fit_columns(ws)
+
     def _format_filename_with_timestamp(self, base_name: str) -> str:
         """將檔名中的連續14位時間戳 YYYYMMDDHHMMSS 轉為 YYYY-MMDD-HHMMSS 格式。找不到則原樣回傳。"""
         try:
@@ -626,7 +693,15 @@ class ExcelWriter:
 
     def _build_fail_workbook(self, output_path: str, logs: list):
         wb = Workbook()
+        # 加入 FAIL_LIST sheet
+        self._build_fail_list_sheet(wb, logs)
+        
         ws = wb.active
+        if ws.title != 'FAIL_LIST':
+             ws = wb.create_sheet('Summary')
+        else:
+             ws = wb.create_sheet('Summary')
+
         ws.title = 'Summary'
         # 設定標籤顏色（紅色）
         try:
