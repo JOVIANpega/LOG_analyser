@@ -16,6 +16,31 @@ class ExcelWriter:
     def __init__(self):
         pass
 
+    def _insert_header_info(self, ws, header_info, start_row=4):
+        """插入置頂 Header 資訊 (綠底黑字)"""
+        if not header_info:
+            return start_row
+            
+        try:
+            lines = header_info.split('\n')
+            current_row = start_row
+            
+            for line in lines:
+                if not line.strip(): continue
+                
+                cell = ws.cell(row=current_row, column=1, value=self._sanitize_cell_text(line))
+                cell.number_format = '@'
+                cell.font = Font(name='Consolas', size=12, bold=True, color='FF000000') # 黑字
+                cell.fill = PatternFill('solid', fgColor='FF90EE90') # 淺綠色背景
+                cell.alignment = Alignment(horizontal='left', vertical='center')
+                current_row += 1
+                
+            # 空一行
+            return current_row + 1
+        except Exception as e:
+            print(f"插入 Header 失敗: {e}")
+            return start_row
+
     def _sanitize_cell_text(self, value: object) -> str:
         """清理欲寫入儲存格的文字：
         - 轉為字串
@@ -282,72 +307,164 @@ class ExcelWriter:
         self._build_fail_workbook(fail_path, fail_logs)
         return pass_path, fail_path
 
-    def _get_station_from_log(self, entry):
-        """嘗試從 LOG 中獲取 Station 資訊，若無則預設"""
-        # 可以遍歷 raw_lines 尋找 "Station ID:" 或類似字串
-        # 暫時回傳預設值或 "Unknown"
-        # 範例CSV顯示 "PQ Test", "Stitchig 1"
-        raw_lines = entry.get('raw_lines', [])
-        for line in raw_lines[:100]:
-             if "Station ID" in str(line):
-                  # 解析 Station ID
-                  pass
-        return "Unknown Station"
+    def _extract_station_from_filename_content(self, filename: str) -> str:
+        """從檔名提取 Station 名稱
+        規則範例: 1+4cam stitching1 test-1110... -> 4cam stitching1
+        去除前面的數字和+號，去除 test- 及其後面所有內容
+        """
+        try:
+            if not filename: return "Unknown Station"
+            
+            # 先去除副檔名
+            base = os.path.splitext(filename)[0]
+            
+            # 分割字串，尋找 "test" 或 "-"
+            # 策略：找到第一個 "test" (不分大小寫) 並截斷
+            match = re.search(r'(?i)test', base)
+            if match:
+                station_part = base[:match.start()]
+            else:
+                # 如果沒有 test，嘗試用第一個 "-" 分割，如果 "-" 後面是數字（雖然這可能切錯）
+                # 簡單起見，如果沒有 test，用第一個 "-"
+                parts = base.split('-')
+                station_part = parts[0]
+            
+            # 清理：去除前面的 "1+", "2+" 等數字加號組合，以及前後空白
+            # 例如 "1+4cam" -> "4cam", "12+Station" -> "Station"
+            station_part = re.sub(r'^\d+\+', '', station_part)
+            
+            clean_station = station_part.strip()
+            return clean_station if clean_station else "Unknown Station"
+            
+        except Exception:
+            return "Unknown Station"
+
 
     def _build_fail_list_sheet(self, wb, logs):
-        """建立 FAIL_LIST 工作表 (依使用者要求的 CSV 格式)"""
+        """建立 FAIL_LIST 工作表 (依使用者要求的 CSV 格式，並統計相同錯誤)"""
         ws = wb.create_sheet("FAIL_LIST", 0) # 放在第一頁
+        try:
+            ws.sheet_properties.tabColor = 'FFFF0000' # 紅色標籤
+        except Exception:
+            pass
         
-        # 設定標題
-        headers = ['ISN', 'Station', 'FAIL Item', 'FAIL Reason', 'suggestion']
+        # 設定標題 (新增 Count 欄位)
+        headers = ['ISN', 'Station', 'FAIL Item', 'FAIL Reason', 'suggestion', 'Count']
         ws.append(headers)
         
         # 樣式設定
-        header_font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FFFFFF')
+        header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+        content_font = Font(name='Calibri', size=11)
         fill_blue = PatternFill('solid', fgColor='FF4472C4')
+        center_align = Alignment(horizontal='center', vertical='center')
+        
         for col in range(1, len(headers) + 1):
             cell = ws.cell(row=1, column=col)
             cell.font = header_font
             cell.fill = fill_blue
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-            
-        # 填寫資料
+            cell.alignment = center_align
+        
+        # 1. 收集所有資料行與統計錯誤
+        pending_rows = []
+        error_counts = {}
+        
         for entry in logs:
-            # 判斷是否為 FAIL LOG (有 fail_items)
             fail_items = entry.get('fail_items', [])
             if not fail_items:
                 continue
                 
             fname = entry.get('file_name', '')
             isn = self._extract_isn_from_filename(fname)
-            station = self._get_station_from_log(entry)
-            suggestion = "請參閱 PEGA SOP" # 預設建議
+            station = self._extract_station_from_filename_content(fname)
+            suggestion = "請參閱 PEGA SOP"
             
             for item in fail_items:
-                # FAIL Item: 測項名稱 + 結果 (例如 "cam1 Imtest is Fail")
                 step_name = item.get('step_name', '')
                 result = item.get('result', '')
                 fail_item_str = f"{step_name}"
                 if result and result not in step_name:
                      fail_item_str += f" {result}"
                 
-                # FAIL Reason: 詳細錯誤 (例如 "AVE_SNR=28... < 29.")
-                # 優先使用 error 欄位，如果沒有則用 response
                 reason = item.get('error', '')
                 if not reason or reason == 'FAIL':
                     reason = item.get('response', '')
-                    
-                row_data = [
-                    self._sanitize_cell_text(isn),
-                    self._sanitize_cell_text(station),
-                    self._sanitize_cell_text(fail_item_str),
-                    self._sanitize_cell_text(reason),
-                    self._sanitize_cell_text(suggestion)
-                ]
-                ws.append(row_data)
                 
-        # 自動調整欄寬
-        self._auto_fit_columns(ws)
+                # 標準化錯誤原因以進行統計 (去除時間戳、錯誤碼等變動資訊)
+                # 使用 _extract_main_error_type (它已經包含在 _normalize_error_group 中，但直接調用更單純)
+                # 這裡使用 _normalize_error_group 可以得到更乾淨的分類
+                norm_key = self._normalize_error_group(reason)
+                error_counts[norm_key] = error_counts.get(norm_key, 0) + 1
+                
+                pending_rows.append({
+                    'isn': isn,
+                    'station': station,
+                    'item': fail_item_str,
+                    'reason': reason,
+                    'suggestion': suggestion,
+                    'norm_key': norm_key
+                })
+        
+        # 2. 寫入資料
+        for row_data in pending_rows:
+            count = error_counts.get(row_data['norm_key'], 0)
+            
+            row_values = [
+                self._sanitize_cell_text(row_data['isn']),
+                self._sanitize_cell_text(row_data['station']),
+                self._sanitize_cell_text(row_data['item']),
+                self._sanitize_cell_text(row_data['reason']),
+                self._sanitize_cell_text(row_data['suggestion']),
+                count
+            ]
+            ws.append(row_values)
+            
+            # Apply content font
+            current_row = ws.max_row
+            for col_idx, value in enumerate(row_values, 1):
+                cell = ws.cell(row=current_row, column=col_idx)
+                cell.font = content_font
+                if col_idx == 6: # Count column
+                    cell.alignment = center_align
+                else:
+                    cell.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left')
+                
+        # 強制自動調整欄寬
+        min_widths = {
+            1: 15, # ISN
+            2: 20, # Station
+            3: 30, # FAIL Item
+            4: 50, # FAIL Reason
+            5: 20, # suggestion
+            6: 10  # Count
+        }
+        
+        for col_idx, min_w in min_widths.items():
+            col_letter = get_column_letter(col_idx)
+            ws.column_dimensions[col_letter].width = min_w
+
+        # 根據內文調整 (如果有更長的)
+        for col in ws.columns:
+            max_len = 0
+            col_idx = col[0].column
+            col_letter = get_column_letter(col_idx)
+            
+            # 跳過 Reason 欄位因為它可能很長且已設定 wrap_text，太寬不好看
+            if col_idx == 4: 
+                continue
+                
+            for cell in col:
+                try:
+                    val = str(cell.value) if cell.value else ""
+                    # 考慮中文字寬度
+                    length = len(val.encode('utf-8')) * 0.5 
+                    if length > max_len:
+                        max_len = length
+                except:
+                    pass
+            
+            current_w = ws.column_dimensions[col_letter].width
+            new_w = min(max(current_w, max_len + 2), 80)
+            ws.column_dimensions[col_letter].width = new_w
 
     def _format_filename_with_timestamp(self, base_name: str) -> str:
         """將檔名中的連續14位時間戳 YYYYMMDDHHMMSS 轉為 YYYY-MMDD-HHMMSS 格式。找不到則原樣回傳。"""
@@ -446,8 +563,8 @@ class ExcelWriter:
             ws.sheet_properties.tabColor = 'FFFF0000'
         except Exception:
             pass
-        header_font = Font(name='Microsoft JhengHei', size=16, bold=True, color='FFFFFFFF')
-        normal_font = Font(name='Microsoft JhengHei', size=10)
+        header_font = Font(name='Calibri', size=16, bold=True, color='FFFFFFFF')
+        normal_font = Font(name='Calibri', size=10)
         center = Alignment(horizontal='center', vertical='center')
         deep_green = PatternFill('solid', fgColor='FF1B5E20')
         # 先建立各 LOG 原始工作表，並記錄 sheet 名稱
@@ -464,28 +581,34 @@ class ExcelWriter:
             # 在最上面添加回到 Summary 的連結
             summary_link_cell = ws2.cell(row=1, column=1, value='🔙 回到 Summary 頁面')
             summary_link_cell.number_format = '@'
-            summary_link_cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FF008000', underline='single')
+            summary_link_cell.font = Font(name='Calibri', size=11, bold=True, color='FF008000', underline='single')
             summary_link_cell.alignment = Alignment(horizontal='left', vertical='center')
             summary_link_cell.hyperlink = f"#'Summary'!A1"
             summary_link_cell.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
             ws2.row_dimensions[1].height = 20
             
             # 添加分隔線
-            ws2.cell(row=2, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
+            ws2.cell(row=2, column=1, value='─' * 50).font = Font(name='Calibri', size=10, color='FF808080')
             ws2.row_dimensions[2].height = 15
             
             # 檔名標題
             cell = ws2.cell(row=3, column=1, value=self._sanitize_cell_text(entry.get('file_name')))
-            cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FFFFFF')
+            cell.font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
             cell.fill = PatternFill('solid', fgColor='FF2ECC71')
             cell.number_format = '@'
+            
+            # 插入 Header Info (綠底黑字)
+            current_row = 4
+            header_info = entry.get('header_info', '')
+            if header_info:
+                current_row = self._insert_header_info(ws2, header_info, start_row=current_row)
             
             # 在最上面添加 PASS 步驟詳情
             pass_steps = entry.get('pass_items', [])
             if pass_steps:
                 pass_steps_text = self._build_pass_steps_summary(pass_steps)
                 pass_lines = pass_steps_text.split('\n')
-                current_row = 4
+                # current_row 已經由 _insert_header_info 更新
                 
                 for line in pass_lines:
                     if line.strip():
@@ -494,19 +617,19 @@ class ExcelWriter:
                         
                         # 設定不同行的樣式
                         if "===============PASS步驟詳情====================" in line:
-                            cell.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF008000')
+                            cell.font = Font(name='Calibri', size=12, bold=True, color='FF008000')
                         elif "✅ 步驟" in line:
-                            cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FF008000')
+                            cell.font = Font(name='Calibri', size=11, bold=True, color='FF008000')
                         elif "   執行指令:" in line:
-                            cell.font = Font(name='Microsoft JhengHei', size=11, color='FF0000FF')
+                            cell.font = Font(name='Calibri', size=11, color='FF0000FF')
                         elif "   回應:" in line:
-                            cell.font = Font(name='Microsoft JhengHei', size=11, color='FF000000')
+                            cell.font = Font(name='Calibri', size=11, color='FF000000')
                         elif "   執行時間:" in line:
-                            cell.font = Font(name='Microsoft JhengHei', size=11, color='FF666666')
+                            cell.font = Font(name='Calibri', size=11, color='FF666666')
                         elif "=" * 50 in line:
-                            cell.font = Font(name='Microsoft JhengHei', size=10)
+                            cell.font = Font(name='Calibri', size=10)
                         else:
-                            cell.font = Font(name='Microsoft JhengHei', size=11)
+                            cell.font = Font(name='Calibri', size=11)
                         
                         # 設定行高以顯示更多文字
                         ws2.row_dimensions[current_row].height = 25
@@ -516,20 +639,20 @@ class ExcelWriter:
                 
                 # 添加分隔線
                 ws2.cell(row=current_row, column=1, value=self._sanitize_cell_text("=" * 60)).number_format='@'
-                ws2.cell(row=current_row, column=1).font = Font(name='Microsoft JhengHei', size=10)
+                ws2.cell(row=current_row, column=1).font = Font(name='Calibri', size=10)
                 current_row += 1
                 
                 # 寫入原始LOG內容
-                self._write_raw_log_with_annotations(ws2, start_row=current_row, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=11), step_marks=entry.get('step_marks'))
+                self._write_raw_log_with_annotations(ws2, start_row=current_row, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Calibri', size=11), step_marks=entry.get('step_marks'))
             else:
                 # 沒有 PASS 步驟時，直接寫入原始LOG
-                self._write_raw_log_with_annotations(ws2, start_row=4, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=11), step_marks=entry.get('step_marks'))
+                self._write_raw_log_with_annotations(ws2, start_row=current_row, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Calibri', size=11), step_marks=entry.get('step_marks'))
             
             # 在最下面添加回到 Summary 的連結（只添加一個）
             bottom_link_row = ws2.max_row + 2
             bottom_summary_link_cell = ws2.cell(row=bottom_link_row, column=1, value='🔙 回到 Summary 頁面')
             bottom_summary_link_cell.number_format = '@'
-            bottom_summary_link_cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FF008000', underline='single')
+            bottom_summary_link_cell.font = Font(name='Calibri', size=11, bold=True, color='FF008000', underline='single')
             bottom_summary_link_cell.alignment = Alignment(horizontal='left', vertical='center')
             bottom_summary_link_cell.hyperlink = f"#'Summary'!A1"
             bottom_summary_link_cell.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
@@ -595,7 +718,7 @@ class ExcelWriter:
             r = ws.max_row + 1
             cell_name = ws.cell(row=r, column=1, value=self._sanitize_cell_text(display_name))
             cell_name.number_format='@'
-            cell_name.font = Font(name='Microsoft JhengHei', size=10, color='FF000000')
+            cell_name.font = Font(name='Calibri', size=10, color='FF000000')
             cell_name.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top', shrink_to_fit=True)
             # 備註與超連結
             sheet = sheet_map.get(entry.get('file_name'))
@@ -668,14 +791,14 @@ class ExcelWriter:
         # 更緊湊的欄寬
         self._auto_fit_columns(ws, min_widths={1: 30, 2: 12, 3: 15, 4: 8})
         
-        # 設定 Summary 頁面所有文字字體為 11
+        # 設定 Summary 頁面所有文字字體為 11 (Calibri)
         for row in ws.iter_rows():
             for cell in row:
                 if cell.value is not None:
-                    # 保留原有的字體屬性，只修改大小
+                    # 保留原有的字體屬性，只修改大小和名稱
                     current_font = cell.font
                     cell.font = Font(
-                        name='Microsoft JhengHei',
+                        name='Calibri',
                         size=11,
                         bold=current_font.bold,
                         italic=current_font.italic,
@@ -693,6 +816,10 @@ class ExcelWriter:
 
     def _build_fail_workbook(self, output_path: str, logs: list):
         wb = Workbook()
+        # 移除預設工作表
+        if wb.sheetnames:
+            wb.remove(wb.active)
+            
         # 加入 FAIL_LIST sheet
         self._build_fail_list_sheet(wb, logs)
         
@@ -708,8 +835,8 @@ class ExcelWriter:
             ws.sheet_properties.tabColor = 'FFFF0000'
         except Exception:
             pass
-        header_font = Font(name='Microsoft JhengHei', size=16, bold=True, color='FFFFFFFF')
-        normal_font = Font(name='Microsoft JhengHei', size=10)
+        header_font = Font(name='Calibri', size=16, bold=True, color='FFFFFFFF')
+        normal_font = Font(name='Calibri', size=10)
         center = Alignment(horizontal='center', vertical='center')
         deep_green = PatternFill('solid', fgColor='FF1B5E20')
         headers = ['檔名', '詳細錯誤原因']
@@ -731,24 +858,30 @@ class ExcelWriter:
             sheet_map[entry.get('file_name')] = sheet_name
             ws2 = wb.create_sheet(title=sheet_name)
             cell = ws2.cell(row=1, column=1, value=self._sanitize_cell_text(entry.get('file_name')))
-            cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FFFFFF')
+            cell.font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
             cell.fill = PatternFill('solid', fgColor='FFE74C3C')
             cell.number_format = '@'
             # 在最上面添加回到Summary的快速連結
             back_to_summary_top = ws2.cell(row=2, column=1, value='🔙 回到 Summary 頁面')
             back_to_summary_top.number_format='@'
-            back_to_summary_top.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF008000', underline='single')
+            back_to_summary_top.font = Font(name='Calibri', size=12, bold=True, color='FF008000', underline='single')
             back_to_summary_top.alignment = Alignment(horizontal='left')
             back_to_summary_top.hyperlink = f"#'Summary'!A1"
             back_to_summary_top.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
             
             # 添加分隔線
-            ws2.cell(row=3, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
+            ws2.cell(row=3, column=1, value='─' * 50).font = Font(name='Calibri', size=10, color='FF808080')
+            
+            # 插入 Header Info (綠底黑字)
+            current_row = 4
+            header_info = entry.get('header_info', '')
+            if header_info:
+                current_row = self._insert_header_info(ws2, header_info, start_row=current_row)
             
             # 顯示完整錯誤原因區塊
             detailed_error = self._build_detailed_error_summary(entry)
             error_lines = detailed_error.split('\n')
-            current_row = 4
+            # current_row 已經由 _insert_header_info 更新
             
             for line in error_lines:
                 if line.strip():
@@ -757,18 +890,18 @@ class ExcelWriter:
                     
                     # 設定不同行的樣式
                     if "===============錯誤原因====================" in line:
-                        cell.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF0000')
+                        cell.font = Font(name='Calibri', size=12, bold=True, color='FF0000')
                     elif "🔴 突出錯誤" in line:
-                        cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FF0000')
+                        cell.font = Font(name='Calibri', size=11, bold=True, color='FF0000')
                     elif "=" * 50 in line:
-                        cell.font = Font(name='Microsoft JhengHei', size=10)
+                        cell.font = Font(name='Calibri', size=10)
                     elif "執行指令:" in line:
-                        cell.font = Font(name='Microsoft JhengHei', size=11, color='FF0000FF')
+                        cell.font = Font(name='Calibri', size=11, color='FF0000FF')
                     elif any(keyword in line.lower() for keyword in ['is fail', 'executes fail', "doesn't match", 'all test aborted']):
-                        cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FF0000')
+                        cell.font = Font(name='Calibri', size=11, bold=True, color='FF0000')
                         cell.fill = PatternFill('solid', fgColor='FFFFFF99')  # 淺黃色背景
                     else:
-                        cell.font = Font(name='Microsoft JhengHei', size=11)
+                        cell.font = Font(name='Calibri', size=11)
                     
                     # 設定行高以顯示更多文字
                     ws2.row_dimensions[current_row].height = 25
@@ -785,11 +918,11 @@ class ExcelWriter:
             pass_steps = [str(i) for i, _ in enumerate(entry.get('pass_items') or [], 1)]
             ws2.cell(row=current_row, column=1, value=self._sanitize_cell_text('PASS步驟: ' + '，'.join(pass_steps) if pass_steps else 'PASS步驟: 無'))
             ws2.cell(row=current_row, column=1).number_format='@'
-            ws2.cell(row=current_row, column=1).font = Font(name='Microsoft JhengHei', size=11, color='FF008000')
+            ws2.cell(row=current_row, column=1).font = Font(name='Calibri', size=11, color='FF008000')
             start_row = current_row + 1
             
             # 寫入原始LOG內容，並標記錯誤行
-            self._write_raw_log_with_annotations(ws2, start_row=start_row, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Microsoft JhengHei', size=11), step_marks=entry.get('step_marks'))
+            self._write_raw_log_with_annotations(ws2, start_row=start_row, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Calibri', size=11), step_marks=entry.get('step_marks'))
             
             # 設定所有行的行高以顯示更多文字
             for row_num in range(1, ws2.max_row + 1):
@@ -819,7 +952,7 @@ class ExcelWriter:
             r = ws.max_row + 1
             cell_name = ws.cell(row=r, column=1, value=self._sanitize_cell_text(display_name))
             cell_name.number_format='@'
-            cell_name.font = Font(name='Microsoft JhengHei', size=10, color='FF000000')
+            cell_name.font = Font(name='Calibri', size=10, color='FF000000')
             cell_name.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top', shrink_to_fit=True)
             # 備註與超連結
             sheet = sheet_map.get(entry.get('file_name'))
@@ -838,14 +971,14 @@ class ExcelWriter:
             detailed_error = self._build_detailed_error_summary(entry)
             cell_reason = ws.cell(row=r, column=2, value=self._sanitize_cell_text(detailed_error))
             cell_reason.number_format='@'
-            cell_reason.font = Font(name='Microsoft JhengHei', size=11)
+            cell_reason.font = Font(name='Calibri', size=11)
             cell_reason.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left', shrink_to_fit=False)
             # 設定行高以顯示更多文字
             ws.row_dimensions[r].height = 120
             
             # 如果錯誤原因包含 "doesn't match"，用特殊格式突出顯示
             if "doesn't match" in detailed_error.lower():
-                cell_reason.font = Font(name='Microsoft JhengHei', size=11, bold=True, color='FFFF0000')
+                cell_reason.font = Font(name='Calibri', size=11, bold=True, color='FFFF0000')
                 cell_reason.fill = PatternFill('solid', fgColor='FFFFFF99')  # 淺黃色背景
             
             for c in range(1, 2+1):
@@ -860,14 +993,14 @@ class ExcelWriter:
                     ws.cell(row=r, column=2).border = ws.cell(row=r, column=2).border.copy(right=thick)
             # 表格底部：SHEET 快速連結
             link_title_row = ws.max_row + 2
-            ws.cell(row=link_title_row, column=1, value='工作表快速連結（點擊跳轉）').font = Font(name='Microsoft JhengHei', size=10, bold=True)
+            ws.cell(row=link_title_row, column=1, value='工作表快速連結（點擊跳轉）').font = Font(name='Calibri', size=10, bold=True)
             ws.cell(row=link_title_row, column=1).alignment = Alignment(horizontal='left')
             cur = link_title_row + 1
         
             # 添加回到Summary的快速連結
             back_to_summary = ws.cell(row=cur, column=1, value='🔙 回到 Summary 頁面')
             back_to_summary.number_format='@'
-            back_to_summary.font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FF008000', underline='single')
+            back_to_summary.font = Font(name='Calibri', size=12, bold=True, color='FF008000', underline='single')
             back_to_summary.alignment = Alignment(horizontal='left')
             back_to_summary.hyperlink = f"#'Summary'!A1"
             back_to_summary.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景

@@ -1753,6 +1753,9 @@ class EnhancedText:
         # Hover效果
         self.text.tag_configure('step_hover', background='#FFFF99')
         
+        # 置頂Header樣式 (綠底黑字，放大)
+        self.text.tag_configure('header_style', background='#90EE90', foreground='black', font=('Consolas', 14, 'bold'))
+        
         # 綁定點擊事件
         self.text.tag_bind('step_clickable', '<Button-1>', self._on_step_click)
         self.text.tag_bind('step_clickable', '<Enter>', self._on_step_hover)
@@ -1902,10 +1905,15 @@ class EnhancedText:
         # 恢復游標樣式
         self.text.config(cursor='xterm')
     
-    def insert_log_with_highlighting(self, log_content, test_results):
+    def insert_log_with_highlighting(self, log_content, test_results, header_content=None):
         """插入log內容並進行語法高亮"""
         self.text.delete('1.0', tk.END)
         self.step_positions.clear()
+        
+        # 插入置頂資訊 (Header)
+        if header_content:
+            self.text.insert(tk.INSERT, header_content + "\n", 'header_style')
+            self.text.insert(tk.INSERT, "\n") # 空一行
         
         if not log_content:
             return
@@ -1997,11 +2005,34 @@ class EnhancedText:
     
     def highlight_error_block(self, start_line, end_line):
         """高亮錯誤區塊"""
-        start_pos = f"{start_line}.0"
-        end_pos = f"{end_line}.end"
-        self.text.tag_add('error_block', start_pos, end_pos)
-        self.text.see(start_pos)
-    
+        # 如果有Header，行號會有偏移。
+        # 簡單做法：重新計算位置或是讓使用者直接看文字，不特別依賴行號跳轉的精確度
+        # 或者在插入 Header 時記錄行數
+        # 暫時假設 start_line 是 log 的行號，需要加上 Header 的行數
+        # 這裡先保持原樣，因為 EnhancedText 中行號是自己生成的，但 `see` 是看 index
+        # 如果上方插入了 Header，原始的 "1.0" 會變成 "HeaderLines + 1.0"
+        # 但我們下面是直接用 `start_line` 也就是 log 的行號去對應，Text widget 的行號是絕對的
+        # 所以如果插入 Header，log 的第一行可能變成第 6 行
+        # 因此這部分邏輯可能有問題，需要修正。
+        # 為了安全，暫時不修改 highlight_error_block，而是讓 insert 完後回傳 log 起始行？.
+        # 更好的方式： header 插入後，搜尋 "1    " 這樣的行號標記？
+        # 或者簡單點： header 不影響行號？ 不，Text widget 是連續的。
+        # 修正策略：讓 highlight_error_block 搜尋對應的 Log 行號標記
+        
+        start_pos = f"{start_line}.0" # 這是絕對行號，如果有 Header 這會錯
+        
+        # 尋找含有該行號的文字
+        # 格式是 "   1 "
+        search_str = f"{start_line:4d} "
+        found = self.text.search(search_str, '1.0', tk.END)
+        if found:
+            # found 就是該行的起始位置
+            self.text.tag_add('error_block', found, f"{found} lineend")
+            self.text.see(found)
+        else:
+            # Fallback
+             pass
+
     def focus_first_error_line(self):
         """聚焦到第一個錯誤行"""
         try:
@@ -2010,8 +2041,14 @@ class EnhancedText:
             lines = content.split('\n')
             
             # 尋找第一個包含錯誤關鍵字的行
+            # 注意：這裡 lines 包含了 Header 和行號
             for i, line in enumerate(lines):
                 line_lower = line.lower()
+                # 排除 Header 行 (通常 Header 沒有行號前綴)
+                # 我們可以檢查是否以數字開頭 (行號格式 "   1 ")
+                if not re.match(r'\s*\d+\s', line):
+                     continue
+
                 if (any(critical_error in line_lower for critical_error in [
                     'segmentation fault', 'core dumped', 'executes fail', 
                     "doesn't match", 'timeout', 'exception', 'wrong'
@@ -2020,6 +2057,7 @@ class EnhancedText:
                     line_num = i + 1
                     self.text.see(f"{line_num}.0")
                     self.text.mark_set(tk.INSERT, f"{line_num}.0")
+                    # 避免 Header 誤判，這一行必須包含行號
                     break
         except Exception as e:
             print(f"聚焦錯誤行失敗: {e}")
