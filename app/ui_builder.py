@@ -18,6 +18,20 @@ from .settings_loader import save_settings
 class UIBuilderMixin:
     """Mixin for handling UI construction in the Log Analyzer"""
     
+    def _build_status_bar(self):
+        """建立底部狀態列 (進度條與狀態文字)"""
+        self.status_frame = tk.Frame(self.root, relief=tk.SUNKEN, bd=1)
+        self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # 狀態文字標籤
+        self.status_label = tk.Label(self.status_frame, text="就緒", anchor='w')
+        self.status_label.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        # 此處預留進度條位置，初始隱藏或與 ProgressManager 連動
+        # ProgressManager 會動態配置它，或者我們先建立好
+        self.main_progress_bar = ttk.Progressbar(self.status_frame, orient=tk.HORIZONTAL, length=200, mode='determinate')
+        self.main_progress_bar.pack(side=tk.RIGHT, padx=5, pady=2)
+    
     def _build_enhanced_ui(self):
         """建立增強版UI"""
         # 主要分割視窗
@@ -38,6 +52,9 @@ class UIBuilderMixin:
         # 綁定分割視窗調整事件
         self.paned.bind('<ButtonRelease-1>', self._on_pane_adjust)
         self.paned.bind('<B1-Motion>', self._on_pane_adjust)  # 拖動時也保存
+        
+        # 建立狀態列
+        self._build_status_bar()
         
         # 設定初始面板寬度（使用after確保UI已建立）
         self.root.after(100, lambda: self._set_initial_pane_width(pane_width))
@@ -79,9 +96,14 @@ class UIBuilderMixin:
         top_frame = tk.Frame(parent)
         top_frame.pack(fill=tk.X, padx=5, pady=2)
         
-        # 檔案資訊標籤
-        self.file_info_label = tk.Label(top_frame, text="尚未選擇檔案", fg='gray', anchor='w')
-        self.file_info_label.pack(fill=tk.X)
+        # 狀態指示燈 (放在右側)
+        self.status_light = tk.Label(top_frame, text="●", fg='gray', font=('Arial', 24))
+        self.status_light.pack(side=tk.RIGHT, padx=5)
+        
+        # 檔案資訊標籤 (放在左側，佔滿剩餘空間)
+        # User requested black color for better visibility
+        self.file_info_label = tk.Label(top_frame, text="尚未選擇檔案", fg='black', anchor='w', font=('Arial', 10, 'bold'))
+        self.file_info_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.font_scaler.register(self.file_info_label)
         
         # 建立標籤頁

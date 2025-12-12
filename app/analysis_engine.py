@@ -37,8 +37,7 @@ class AnalysisEngineMixin:
             else:
                 self._analyze_enhanced_multiple_files()
             
-            # 分析完成後關閉進度條
-            self.root.after(100, self._close_progress)
+
                 
         except Exception as e:
             self._close_progress()
@@ -46,42 +45,96 @@ class AnalysisEngineMixin:
             traceback.print_exc()
     
     def _analyze_enhanced_single_file(self):
-        """分析單一檔案（增強版）"""
+        """分析單一檔案（增強版）- 啟動背景執行緒"""
         # 更新進度：開始解析
-        self._update_progress("正在解析LOG檔案內容...")
+        self._update_progress("正在啟動背景解析...")
+        threading.Thread(target=self._single_file_worker, daemon=True).start()
+
+    def _single_file_worker(self):
+        """背景執行緒：執行解析邏輯"""
+        try:
+            self._safe_update_progress_text("正在解析LOG檔案內容...")
+            
+            # CPU密集應操作
+            result = self.log_parser.parse_log_file(self.current_log_path)
+            
+            # 提取 Header 資訊
+            header_info = self._extract_log_header_info(result['raw_lines'])
+            
+            # 準備數據傳回主執行緒更新UI
+            data = {
+                'result': result,
+                'header_info': header_info
+            }
+            
+            # 調度 UI 更新
+            self.root.after(0, lambda: self._single_file_ui_update(data))
+            
+        except Exception as e:
+            self.root.after(0, lambda: messagebox.showerror("分析錯誤", f"解析過程中發生錯誤：\n{str(e)}"))
+            self.root.after(0, self._close_progress)
+            traceback.print_exc()
+
+    def _single_file_ui_update(self, data):
+        """主執行緒：啟動 UI 更新流程 (分步執行以保持介面響應)"""
+        # 啟動分步更新生成器
+        step_generator = self._single_file_ui_steps(data)
+        self._run_ui_update_step(step_generator)
+
+    def _run_ui_update_step(self, generator):
+        """執行下一個 UI 更新步驟"""
+        try:
+            # 執行下一步
+            next(generator)
+            # 排程下一步 (保留 50ms 給事件迴圈處理閃爍動畫)
+            self.root.after(50, lambda: self._run_ui_update_step(generator))
+        except StopIteration:
+            # 全部完成
+            self._close_progress()
+        except Exception as e:
+            messagebox.showerror("UI更新錯誤", f"更新顯示時發生錯誤：\n{str(e)}")
+            traceback.print_exc()
+            self._close_progress()
+
+    def _single_file_ui_steps(self, data):
+        """UI 更新步驟生成器"""
+        result = data['result']
+        header_info = data['header_info']
         
-        result = self.log_parser.parse_log_file(self.current_log_path)
         pass_items = result['pass_items']
         fail_items = result['fail_items']
         raw_lines = result['raw_lines']
         last_fail = result['last_fail']
         fail_line_idx = result['fail_line_idx']
         
-        # 提取 Header 資訊
-        header_info = self._extract_log_header_info(raw_lines)
-        
-        # 匯出 Markdown 報告 (包含 Header 資訊) - 用戶不需要
-        # self._export_markdown_report(header_info, pass_items, fail_items, last_fail)
-        
-        # 更新進度：處理PASS項目
-        self._update_progress(f"處理PASS項目 ({len(pass_items)} 個)...")
-        
-        # Tab1: PASS - 顯示所有通過的測項
+        # Step 1: Update Progress Text
+        self._update_progress(f"準備顯示結果...")
+        yield
+
+        # Step 2: PASS Items
+        self._update_progress(f"更新 PASS 列表 ({len(pass_items)} 筆)...")
         if hasattr(self, 'pass_tree_enhanced'):
-            for idx, item in enumerate(pass_items, 1):
-                full_response = item.get('full_response', '')
-                has_retry = item.get('has_retry_but_pass', False)  # 使用 has_retry_but_pass 屬性
-                self.pass_tree_enhanced.insert_pass_item(
-                    (item['step_name'], item['command'], item['response'], item['result']),
-                    step_number=idx,
-                    full_response=full_response,
-                    has_retry=has_retry
-                )
-        
-        # 更新進度：處理FAIL項目
-        self._update_progress(f"處理FAIL項目 ({len(fail_items)} 個)...")
-        
-        # Tab2: FAIL - 顯示所有FAIL區塊
+            # Clear existing items if needed? Assuming tree is cleared before analysis or we append.
+            # Usually we clear old results before analysis start. But let's assume cleanliness is handled elsewhere.
+            # Batch insertion: Insert 100 items at a time
+            batch_size = 100
+            for i in range(0, len(pass_items), batch_size):
+                batch = pass_items[i:i+batch_size]
+                for idx, item in enumerate(batch, 1 + i):
+                    full_response = item.get('full_response', '')
+                    has_retry = item.get('has_retry_but_pass', False)
+                    self.pass_tree_enhanced.insert_pass_item(
+                        (item['step_name'], item['command'], item['response'], item['result']),
+                        step_number=idx,
+                        full_response=full_response,
+                        has_retry=has_retry
+                    )
+                if len(pass_items) > 500: # Only yield inside loop if many items
+                     yield 
+        yield
+
+        # Step 3: FAIL Items
+        self._update_progress(f"更新 FAIL 列表 ({len(fail_items)} 筆)...")
         if hasattr(self, 'fail_tree_enhanced'):
             for idx, item in enumerate(fail_items):
                 is_main_fail = item.get('is_main_fail', False)
@@ -91,29 +144,28 @@ class AnalysisEngineMixin:
                     full_response=full_response,
                     is_main_fail=is_main_fail
                 )
-        
-        # 更新進度：處理原始LOG
-        self._update_progress("處理原始LOG內容...")
-        
-        # Tab3: 原始LOG，標紅錯誤行並自動跳轉
+        yield
+
+        # Step 4: Raw Logs
+        self._update_progress("更新原始 LOG 視圖...")
         if raw_lines and hasattr(self, 'log_text_enhanced'):
-            # 將raw_lines轉換為字符串
             log_content = '\n'.join(raw_lines)
             
-            # 使用新的支援 Header 的方法
+            # This is heavy. Assume insert_log_with_highlighting handles it or it blocks for a bit.
+            # We can't easily chunk text widget insertion without changing EnhancedText.
+            # But the yield before this gives a breath.
             self.log_text_enhanced.insert_log_with_highlighting(log_content, {
                 'fail_line_idx': fail_line_idx,
                 'pass_items': pass_items,
                 'fail_items': fail_items
             }, header_content=header_info)
             
-            # 如果有錯誤行，跳轉到錯誤位置
             if fail_line_idx is not None and fail_line_idx < len(raw_lines):
                 self.log_text_enhanced.highlight_error_block(fail_line_idx + 1, fail_line_idx + 1)
-                # self.log_text_enhanced.text.see(f"{fail_line_idx + 1}.0") # highlight_error_block 已處理
-        
-        # 更新進度：完成分析
-        self._update_progress("分析完成！")
+        yield
+
+        # Step 5: Finalize
+        self._update_progress("完成！")
         
         # 根據分析結果動態顯示/隱藏標籤頁
         if hasattr(self, '_update_tab_visibility'):
@@ -127,7 +179,7 @@ class AnalysisEngineMixin:
                 
                 # 延遲切換到原始LOG標籤頁並聚焦錯誤位置
                 if hasattr(self, '_switch_to_log_and_focus_error'):
-                    self.root.after(2000, self._switch_to_log_and_focus_error)
+                    self.root.after(500, self._switch_to_log_and_focus_error)
                 
                 # 如果是FAIL Log，彈出顯示主要錯誤原因 (Priority Error)
                 if last_fail:
@@ -135,11 +187,8 @@ class AnalysisEngineMixin:
                     cmd = last_fail.get('command', 'Unknown Command')
                     step = last_fail.get('step_name', 'Unknown Step')
                     
-                    # 判斷是否為 "doesn't match" 的重點錯誤
                     is_match_error = "doesn't match" in str(error_msg).lower() or "doesn't match" in str(last_fail.get('full_log', '')).lower()
-                    
                     priority_text = "主要錯誤 (RETEST Logic)" if is_match_error else "主要錯誤"
-                    
                     details = f"Step: {step}\nCommand: {cmd}\nError: {error_msg}"
                     messagebox.showinfo(priority_text, details)
                     
@@ -152,6 +201,8 @@ class AnalysisEngineMixin:
                     self.notebook.select(self.tab_pass)
             except Exception:
                 pass
+                    
+
 
     def _extract_log_header_info(self, raw_lines):
         """從 Log 內容提取置頂資訊"""

@@ -68,6 +68,12 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         self._build_enhanced_ui()
         self._apply_font_size()
         
+        # Connect Progress Manager to Status Bar
+        if hasattr(self, 'status_label') and hasattr(self, 'main_progress_bar'):
+            # Check if status_light exists (from UIBuilder)
+            status_light_widget = getattr(self, 'status_light', None)
+            self.progress_manager.set_widgets(self.status_label, self.main_progress_bar, status_light_widget)
+        
         # Events
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
 
@@ -144,13 +150,26 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         self.progress_manager.set_value(current, total)
         
     def _safe_update_progress_mode(self, mode):
+        """Thread-safe: Set progress mode"""
         if mode == 'determinate':
+             # Usually max is set separately, but we can ensure mode is correct
              pass 
         else:
-             self.progress_manager.set_indeterminate()
+             self.root.after(0, self.progress_manager.set_indeterminate)
 
     def _safe_update_progress_max(self, total):
-        self.progress_manager.set_determinate(total)
+        """Thread-safe: Set progress maximum"""
+        self.root.after(0, lambda: self.progress_manager.set_determinate(total))
+
+    def _safe_update_progress(self, current, total, text):
+        """Thread-safe: Update progress value and text"""
+        self.root.after(0, lambda: self.progress_manager.set_value(current, total))
+        if text:
+            self.root.after(0, lambda: self.progress_manager.update_progress(text))
+
+    def _safe_update_progress_text(self, text):
+        """Thread-safe: Update progress text only"""
+        self.root.after(0, lambda: self.progress_manager.update_progress(text))
 
     def _save_settings_silent(self):
         self.config_manager.save()

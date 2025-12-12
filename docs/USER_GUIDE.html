@@ -1,375 +1,440 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
+
 <head>
-<meta charset="utf-8" />
-<<<<<<< HEAD
-<title>PEGA Log Analyzer V1.9.0 - 操作說明（快速上手）</title>
-=======
-<title>PEGA Log Analyzer V1.8.5 - 操作說明（快速上手）</title>
->>>>>>> 3f570f8bd7b4d8fef1b1355ebaa580a957dfc5cd
-<style>
- body { 
-   font-family: 'Microsoft JhengHei', Arial, sans-serif; 
-   line-height: 1.7; 
-   margin: 26px; 
-   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-   min-height: 100vh;
- }
- 
- .container {
-   max-width: 1200px;
-   margin: 0 auto;
-   background: white;
-   padding: 30px;
-   border-radius: 15px;
-   box-shadow: 0 10px 30px rgba(0,0,0,0.1);
- }
- 
- h1 { 
-   color: #1b5e20; 
-   margin-bottom: 8px; 
-   text-align: center;
-   border-bottom: 3px solid #4caf50;
-   padding-bottom: 15px;
- }
- 
- h2 { 
-   color: #0d47a1; 
-   margin-top: 20px; 
-   border-left: 4px solid #2196f3;
-   padding-left: 15px;
- }
- 
- h3 {
-   color: #1565c0;
-   margin-top: 15px;
- }
- 
- ul, ol { margin-left: 22px; }
- 
- code, pre { 
-   background: #f5f5f5; 
-   padding: 8px 10px; 
-   border-radius: 4px; 
-   display: block; 
-   border-left: 3px solid #2196f3;
- }
- 
- .tip { 
-   background: #fff9c4; 
-   padding: 10px 12px; 
-   border-left: 4px solid #fbc02d; 
-   border-radius: 5px;
-   margin: 15px 0;
- }
- 
- .warn { 
-   background: #ffebee; 
-   padding: 10px 12px; 
-   border-left: 4px solid #e53935; 
-   border-radius: 5px;
-   margin: 15px 0;
- }
- 
- .kbd { 
-   border: 1px solid #ccc; 
-   padding: 1px 6px; 
-   border-radius: 4px; 
-   background: #fafafa; 
- }
- 
-
- 
- .toc {
-   background: #f8f9fa;
-   padding: 20px;
-   border-radius: 10px;
-   margin: 20px 0;
-   border: 1px solid #dee2e6;
- }
- 
- .toc h3 {
-   margin-top: 0;
-   color: #495057;
- }
- 
- .toc ul {
-   list-style: none;
-   padding-left: 0;
- }
- 
- .toc li {
-   margin: 8px 0;
-   padding: 5px 0;
- }
- 
- .toc a {
-   text-decoration: none;
-   color: #2196f3;
-   padding: 5px 10px;
-   border-radius: 5px;
-   transition: all 0.3s ease;
-   display: block;
- }
- 
- .toc a:hover {
-   background: #e3f2fd;
-   color: #1976d2;
-   transform: translateX(5px);
- }
- 
- .version-info {
-   text-align: center;
-   background: #e8f5e8;
-   padding: 15px;
-   border-radius: 10px;
-   margin: 20px 0;
-   border: 2px solid #4caf50;
- }
- 
- .highlight {
-   background: #fff3cd;
-   padding: 2px 4px;
-   border-radius: 3px;
-   font-weight: bold;
- }
- 
- .section {
-   margin: 30px 0;
-   padding: 20px;
-   border: 1px solid #e0e0e0;
-   border-radius: 10px;
-   background: #fafafa;
- }
- 
- .section:hover {
-   box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-   transform: translateY(-2px);
-   transition: all 0.3s ease;
- }
- 
- .btn {
-   display: inline-block;
-   padding: 8px 16px;
-   background: #2196f3;
-   color: white;
-   text-decoration: none;
-   border-radius: 5px;
-   margin: 5px;
-   transition: all 0.3s ease;
- }
- 
- .btn:hover {
-   background: #1976d2;
-   transform: translateY(-2px);
-   box-shadow: 0 5px 15px rgba(33, 150, 243, 0.3);
- }
- 
- .search-result {
-   background: #fff3cd;
-   border: 1px solid #ffeaa7;
-   border-radius: 5px;
-   padding: 10px;
-   margin: 10px 0;
-   display: none;
- }
- 
- .search-highlight {
-   background: #ffeb3b;
-   font-weight: bold;
-   padding: 1px 3px;
-   border-radius: 3px;
- }
-</style>
-</head>
-<body>
-<div class="container">
-  <h1>PEGA Log Analyzer V1.6.6 - 操作說明（快速上手）</h1>
-  
-  <div class="version-info">
-    <strong>版本：V1.6.6</strong> | 更新日期：2025年1月 | 適用於：Windows 10/11
-  </div>
-
-  <!-- 搜尋功能 -->
-  <div class="search-container">
-    <h3>🔍 快速搜尋</h3>
-    <input type="text" id="searchBox" class="search-box" placeholder="輸入關鍵字搜尋說明內容..." />
-    <div id="searchResults" class="search-result"></div>
-  </div>
-
-  <!-- 目錄導航 -->
-  <div class="toc">
-    <h3>📋 目錄導航</h3>
-    <ul>
-      <li><a href="#section1">一、左側按鈕區</a></li>
-      <li><a href="#section2">二、PASS 標籤頁</a></li>
-      <li><a href="#section3">三、FAIL 標籤頁</a></li>
-      <li><a href="#section4">四、原始LOG 標籤頁</a></li>
-      <li><a href="#section5">五、匯出 Excel</a></li>
-      <li><a href="#section6">六、常見問題</a></li>
-      <li><a href="#section7">七、新功能說明</a></li>
-<<<<<<< HEAD
-      <li><a href="#section8">八、V1.9.0 新功能</a></li>
-=======
-      <li><a href="#section8">八、V1.8.5 新功能</a></li>
->>>>>>> 3f570f8bd7b4d8fef1b1355ebaa580a957dfc5cd
-    </ul>
-  </div>
-
-  <p>此工具用於分析測試 LOG，並輸出 PASS/FAIL 匯總 Excel（僅針對 CENTIMANIA 格式）。以下只介紹最常用的按鈕與各標籤頁如何操作。</p>
-
-  <div class="section" id="section1">
-    <h2>一、左側按鈕區</h2>
-    <ul>
-      <li><strong>📁 選擇單一檔案</strong>：挑一個 <code>.log</code> 檔進行分析。完成後可在三個標籤頁（PASS / FAIL / 原始LOG）查看結果。</li>
-      <li><strong>📂 選擇資料夾</strong>：一次分析資料夾內所有 <code>.log</code> 檔，並自動在該資料夾下建立 <code>LOG集總整理/</code>，輸出
-          <code>PASS匯總.xlsx</code> 與 <code>FAIL匯總.xlsx</code>。完成時跳出白底提示窗，可一鍵開啟輸出資料夾。</li>
-      <li><strong>📦 讀取壓縮檔LOG</strong>：選擇 ZIP/7Z/RAR 壓縮檔案，自動解壓縮並分析其中的 LOG 檔案。支援多層目錄結構，會自動搜尋所有 <code>.log</code> 檔案。</li>
-      <li><strong>🗃️ 讀取多個壓縮檔</strong>：選擇包含多個壓縮檔的資料夾，會顯示所有壓縮檔清單供您勾選要處理的檔案。支援多層嵌套壓縮檔，可選擇性處理特定壓縮檔。</li>
-      <li><strong>🗑️ 清除結果</strong>：清空 PASS/FAIL/原始LOG 的畫面內容。</li>
-      <li><strong>🔍 搜尋功能</strong>：在搜尋框中輸入關鍵字，支援在 PASS、FAIL、原始LOG 標籤頁中搜尋。使用「下一個」和「上一個」按鈕導覽搜尋結果，或按 Ctrl+F 使用內建搜尋功能。</li>
-      <li><strong>📖 查看操作說明(HTML)</strong>：開啟本頁。</li>
-    </ul>
-    <p class="tip">左上「已選擇：檔案/資料夾」會顯示目前的選擇，字體大小跟「內容字體」聯動。</p>
-  </div>
-
-  <div class="section" id="section2">
-    <h2>二、PASS 標籤頁（✅ PASS測項）</h2>
-    <ul>
-      <li>顯示所有通過的測試步驟清單，欄位：<strong>Step Name / 指令 / 回應 / 結果</strong>。</li>
-      <li>內容字體可由左側「介面設定 → 內容字體」加減調整。</li>
-      <li>若需檢視完整原始內容，切到「📄 原始LOG」。</li>
-    </ul>
-  </div>
-
-  <div class="section" id="section3">
-    <h2>三、FAIL 標籤頁（❌ FAIL測項）</h2>
-    <ul>
-      <li>畫面上下分割：</li>
-      <ul>
-        <li><strong>上方表格</strong>：欄位為 <strong>Step Name / 指令 / 錯誤回應 / Retry次數 / 錯誤原因</strong>。</li>
-        <li><strong>下方區域</strong>：顯示詳細錯誤內容，含紅色標示的 <em>is Fail</em> 文字。</li>
-      </ul>
-      <li>點選上方任一列，會即時更新下方詳細內容。</li>
-      <li>打開檔案時會自動選取第一筆 FAIL 方便查看。</li>
-    </ul>
-  </div>
-
-  <div class="section" id="section4">
-    <h2>四、📄 原始LOG 標籤頁</h2>
-    <ul>
-      <li>顯示完整原始 LOG 文字。</li>
-      <li>若有錯誤行，會自動捲動到錯誤處並套用醒目標示。</li>
-    </ul>
-  </div>
-
-  <div class="section" id="section5">
-    <h2>五、匯出 Excel（僅「選擇資料夾」時自動執行）</h2>
-    <ul>
-      <li>輸出路徑：所選資料夾內的 <code>LOG集總整理/</code>。</li>
-      <li><strong>PASS匯總.xlsx</strong>：
-        <ul>
-          <li>Summary 工作表：
-            <ul>
-              <li>欄位：<strong>檔名</strong>、<strong>PASS項目</strong>（超過 25 筆會水平分欄為 PASS項目2、3…）。</li>
-              <li>相同 PASS 項目集合會合併成一組，檔名欄以換行列出所有對應檔名，包含 SFIS 與測試總秒數。</li>
-              <li>底部提供「工作表快速連結（點擊跳轉）」；僅此區有超連結與懸停預覽（約 400x500）。</li>
-            </ul>
-          </li>
-          <li>各 LOG 工作表：第 1 行檔名（綠底白字），第 2 行 PASS 項目清單，第 3 行起貼上原始 LOG。</li>
-        </ul>
-      </li>
-      <li><strong>FAIL匯總.xlsx</strong>：
-        <ul>
-          <li>Summary 工作表：欄位 <strong>檔名 / FAIL原因</strong>，原因取自單檔主錯（例如：<em>IPIO009-0580:Check Battery_tempture is Fail !</em>）。</li>
-          <li>各 LOG 工作表：第 1 行檔名（紅底白字），第 2 行主要錯誤原因，第 3 行 PASS 項目，第 4 行起為原始 LOG。</li>
-        </ul>
-      </li>
-    </ul>
-  </div>
-
-  <div class="section" id="section6">
-    <h2>六、常見問題</h2>
-    <ul>
-      <li>檔名是中文？→ 支援繁體中文檔名。</li>
-      <li>Excel 提示修復？→ 已做文字清理與格式保護；仍發生時，請先更新 Office 版本，並回報樣本 LOG。</li>
-      <li>看不到預覽視窗？→ 只有 Summary 底部的「工作表快速連結」具備懸停預覽。</li>
-    </ul>
-  </div>
-
-  <div class="section" id="section7">
-    <h2>七、新功能說明 (V1.6.6)</h2>
-    <ul>
-      <li><strong>🔍 彈出視窗搜尋功能</strong>：搜尋按鈕已更新為橘色背景，提升視覺辨識度</li>
-      <li><strong>📱 智能視窗定位</strong>：改善多視窗重疊問題，自動避免視窗重疊</li>
-      <li><strong>🎨 字體大小調整</strong>：支援介面字體大小動態調整，包含按鈕和彈出視窗</li>
-      <li><strong>⚡ 效能優化</strong>：改善視窗開啟速度和響應性</li>
-    </ul>
-    <p class="tip">新版本已解決視窗重疊問題，並提供更好的使用者體驗！</p>
-  </div>
-
-  <div class="section" id="section8">
-<<<<<<< HEAD
-    <h2>八、V1.9.0 新功能</h2>
-=======
-    <h2>八、V1.8.5 新功能</h2>
->>>>>>> 3f570f8bd7b4d8fef1b1355ebaa580a957dfc5cd
-    <h3>🗃️ 多選壓縮檔功能</h3>
-    <ul>
-      <li><strong>批次處理</strong>：選擇包含多個壓縮檔的資料夾</li>
-      <li><strong>選擇性解壓</strong>：顯示所有壓縮檔清單，可勾選要處理的檔案</li>
-      <li><strong>多層嵌套</strong>：支援壓縮檔內還有壓縮檔的複雜結構</li>
-      <li><strong>進度顯示</strong>：顯示解壓縮和分析進度百分比</li>
-      <li><strong>可取消操作</strong>：處理過程中可隨時取消</li>
-    </ul>
-    
-    <h3>🔍 搜尋功能</h3>
-    <ul>
-      <li><strong>跨標籤頁搜尋</strong>：支援在 PASS、FAIL、原始LOG 標籤頁中搜尋關鍵字</li>
-      <li><strong>內建 Ctrl+F</strong>：使用 Tkinter 內建搜尋功能，支援上下搜尋</li>
-      <li><strong>搜尋高亮</strong>：找到的匹配文字以黃底黑字高亮顯示</li>
-      <li><strong>循環搜尋</strong>：搜尋到末尾時自動從頭開始</li>
-    </ul>
-    
-    <h3>💡 Tooltip 提示功能</h3>
-    <ul>
-      <li><strong>全面覆蓋</strong>：所有按鈕和輸入欄位都有詳細說明</li>
-      <li><strong>智能顯示</strong>：滑鼠懸停時顯示，離開時隱藏</li>
-      <li><strong>多行支援</strong>：支援多行文字和自動換行</li>
-      <li><strong>位置追蹤</strong>：滑鼠移動時 Tooltip 跟隨顯示</li>
-    </ul>
-    
-    <h3>🔒 加密驗證功能</h3>
-    <ul>
-      <li><strong>檔案驗證</strong>：啟動時檢查 SIGN.txt 加密檔案</li>
-      <li><strong>內容驗證</strong>：驗證檔案內容是否包含授權字串</li>
-      <li><strong>安全啟動</strong>：只有通過驗證才能正常使用程式</li>
-      <li><strong>錯誤提示</strong>：驗證失敗時顯示明確的錯誤訊息</li>
-    </ul>
-  </div>
-
-  <div style="text-align: center; margin-top: 40px; padding: 20px; background: #f5f5f5; border-radius: 10px;">
-    <p><strong>如有問題或建議，請聯繫開發團隊</strong></p>
-    <p>© 2025 PEGA. All rights reserved.</p>
-  </div>
-</div>
-
-<script>
-// 平滑滾動到錨點
-document.querySelectorAll('.toc a').forEach(link => {
-  link.addEventListener('click', function(e) {
-    e.preventDefault();
-    const targetId = this.getAttribute('href').substring(1);
-    const targetElement = document.getElementById(targetId);
-    
-    if (targetElement) {
-      targetElement.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      });
+  <meta charset="utf-8" />
+  <title>PEGA Log Analyzer V1.9.0 - 操作說明（快速上手）</title>
+  <style>
+    body {
+      font-family: 'Microsoft JhengHei', Arial, sans-serif;
+      line-height: 1.7;
+      margin: 26px;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
     }
-  });
-});
-</script>
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      color: #1b5e20;
+      margin-bottom: 8px;
+      text-align: center;
+      border-bottom: 3px solid #4caf50;
+      padding-bottom: 15px;
+    }
+
+    h2 {
+      color: #0d47a1;
+      margin-top: 20px;
+      border-left: 4px solid #2196f3;
+      padding-left: 15px;
+    }
+
+    h3 {
+      color: #1565c0;
+      margin-top: 15px;
+    }
+
+    ul,
+    ol {
+      margin-left: 22px;
+    }
+
+    code,
+    pre {
+      background: #f5f5f5;
+      padding: 8px 10px;
+      border-radius: 4px;
+      display: block;
+      border-left: 3px solid #2196f3;
+    }
+
+    .tip {
+      background: #fff9c4;
+      padding: 10px 12px;
+      border-left: 4px solid #fbc02d;
+      border-radius: 5px;
+      margin: 15px 0;
+    }
+
+    .warn {
+      background: #ffebee;
+      padding: 10px 12px;
+      border-left: 4px solid #e53935;
+      border-radius: 5px;
+      margin: 15px 0;
+    }
+
+    .kbd {
+      border: 1px solid #ccc;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: #fafafa;
+    }
+
+
+
+    .toc {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+      border: 1px solid #dee2e6;
+    }
+
+    .toc h3 {
+      margin-top: 0;
+      color: #495057;
+    }
+
+    .toc ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .toc li {
+      margin: 8px 0;
+      padding: 5px 0;
+    }
+
+    .toc a {
+      text-decoration: none;
+      color: #2196f3;
+      padding: 5px 10px;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+      display: block;
+    }
+
+    .toc a:hover {
+      background: #e3f2fd;
+      color: #1976d2;
+      transform: translateX(5px);
+    }
+
+    .version-info {
+      text-align: center;
+      background: #e8f5e8;
+      padding: 15px;
+      border-radius: 10px;
+      margin: 20px 0;
+      border: 2px solid #4caf50;
+    }
+
+    .highlight {
+      background: #fff3cd;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-weight: bold;
+    }
+
+    .section {
+      margin: 30px 0;
+      padding: 20px;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      background: #fafafa;
+    }
+
+    .section:hover {
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      transform: translateY(-2px);
+      transition: all 0.3s ease;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 8px 16px;
+      background: #2196f3;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 5px;
+      transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+      background: #1976d2;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(33, 150, 243, 0.3);
+    }
+
+    .search-result {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 5px;
+      padding: 10px;
+      margin: 10px 0;
+      display: none;
+    }
+
+    .search-highlight {
+      background: #ffeb3b;
+      font-weight: bold;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>PEGA Log Analyzer V1.9.0 - 操作說明（快速上手）</h1>
+
+    <div class="version-info">
+      <strong>版本：V1.9.0</strong> | 更新日期：2025年12月 | 適用於：Windows 10/11
+    </div>
+
+    <!-- 搜尋功能 -->
+    <div class="search-container">
+      <h3>🔍 快速搜尋</h3>
+      <input type="text" id="searchBox" class="search-box" placeholder="輸入關鍵字搜尋說明內容..." />
+      <div id="searchResults" class="search-result"></div>
+    </div>
+
+    <!-- 目錄導航 -->
+    <div class="toc">
+      <h3>📋 目錄導航</h3>
+      <ul>
+        <li><a href="#section1">一、左側按鈕區</a></li>
+        <li><a href="#section2">二、PASS 標籤頁</a></li>
+        <li><a href="#section3">三、FAIL 標籤頁</a></li>
+        <li><a href="#section4">四、原始LOG 標籤頁</a></li>
+        <li><a href="#section5">五、匯出 Excel</a></li>
+        <li><a href="#section6">六、常見問題</a></li>
+        <li><a href="#section7">七、新功能說明</a></li>
+        <li><a href="#section8">八、V1.9.0 新功能</a></li>
+      </ul>
+    </div>
+
+    <p>此工具用於分析測試 LOG，並輸出 PASS/FAIL 匯總 Excel（僅針對 CENTIMANIA 格式）。以下只介紹最常用的按鈕與各標籤頁如何操作。</p>
+
+    <div class="section" id="section1">
+      <h2>一、左側按鈕區</h2>
+      <ul>
+        <li><strong>📁 選擇單一檔案</strong>：挑一個 <code>.log</code> 檔進行分析。完成後可在三個標籤頁（PASS / FAIL / 原始LOG）查看結果。</li>
+        <li><strong>📂 選擇資料夾</strong>：一次分析資料夾內所有 <code>.log</code> 檔，並自動在該資料夾下建立 <code>LOG集總整理/</code>，輸出
+          <code>PASS匯總.xlsx</code>、<code>FAIL匯總.xlsx</code> 與 <code>FAIL匯總_新版.xlsx</code> ⭐。完成時跳出白底提示窗，可一鍵開啟輸出資料夾。
+        </li>
+        <li><strong>📦 讀取壓縮檔LOG</strong>：選擇 ZIP/7Z/RAR 壓縮檔案，自動解壓縮並分析其中的 LOG 檔案。支援多層目錄結構，會自動搜尋所有 <code>.log</code> 檔案。
+        </li>
+        <li><strong>🗃️ 讀取多個壓縮檔</strong>：選擇包含多個壓縮檔的資料夾，會顯示所有壓縮檔清單供您勾選要處理的檔案。支援多層嵌套壓縮檔，可選擇性處理特定壓縮檔。</li>
+        <li><strong>🗑️ 清除結果</strong>：清空 PASS/FAIL/原始LOG 的畫面內容。</li>
+        <li><strong>🔍 搜尋功能</strong>：在搜尋框中輸入關鍵字，支援在 PASS、FAIL、原始LOG 標籤頁中搜尋。使用「下一個」和「上一個」按鈕導覽搜尋結果，或按 Ctrl+F 使用內建搜尋功能。
+        </li>
+        <li><strong>📖 查看操作說明(HTML)</strong>：開啟本頁。</li>
+      </ul>
+      <p class="tip">左上「已選擇：檔案/資料夾」會顯示目前的選擇，字體大小跟「內容字體」聯動。</p>
+    </div>
+
+    <div class="section" id="section2">
+      <h2>二、PASS 標籤頁（✅ PASS測項）</h2>
+      <ul>
+        <li>顯示所有通過的測試步驟清單，欄位：<strong>Step Name / 指令 / 回應 / 結果</strong>。</li>
+        <li>內容字體可由左側「介面設定 → 內容字體」加減調整。</li>
+        <li>若需檢視完整原始內容，切到「📄 原始LOG」。</li>
+      </ul>
+    </div>
+
+    <div class="section" id="section3">
+      <h2>三、FAIL 標籤頁（❌ FAIL測項）</h2>
+      <ul>
+        <li>畫面上下分割：</li>
+        <ul>
+          <li><strong>上方表格</strong>：欄位為 <strong>Step Name / 指令 / 錯誤回應 / Retry次數 / 錯誤原因</strong>。</li>
+          <li><strong>下方區域</strong>：顯示詳細錯誤內容，含紅色標示的 <em>is Fail</em> 文字。</li>
+        </ul>
+        <li>點選上方任一列，會即時更新下方詳細內容。</li>
+        <li>打開檔案時會自動選取第一筆 FAIL 方便查看。</li>
+      </ul>
+    </div>
+
+    <div class="section" id="section4">
+      <h2>四、📄 原始LOG 標籤頁</h2>
+      <ul>
+        <li>顯示完整原始 LOG 文字。</li>
+        <li>若有錯誤行，會自動捲動到錯誤處並套用醒目標示。</li>
+      </ul>
+    </div>
+
+    <div class="section" id="section5">
+      <h2>五、匯出 Excel（僅「選擇資料夾」時自動執行）</h2>
+      <ul>
+        <li>輸出路徑：所選資料夾內的 <code>LOG集總整理/</code>。</li>
+        <li><strong>PASS匯總.xlsx</strong>：
+          <ul>
+            <li>Summary 工作表：
+              <ul>
+                <li>欄位：<strong>檔名</strong>、<strong>PASS項目</strong>（超過 25 筆會水平分欄為 PASS項目2、3…）。</li>
+                <li>相同 PASS 項目集合會合併成一組，檔名欄以換行列出所有對應檔名，包含 SFIS 與測試總秒數。</li>
+                <li>底部提供「工作表快速連結（點擊跳轉）」；僅此區有超連結與懸停預覽（約 400x500）。</li>
+              </ul>
+            </li>
+            <li>各 LOG 工作表：第 1 行檔名（綠底白字），第 2 行 PASS 項目清單，第 3 行起貼上原始 LOG。</li>
+          </ul>
+        </li>
+        <li><strong>FAIL匯總.xlsx</strong>：
+          <ul>
+            <li>Summary 工作表：欄位 <strong>檔名 / FAIL原因</strong>，原因取自單檔主錯（例如：<em>IPIO009-0580:Check Battery_tempture is Fail
+                !</em>）。</li>
+            <li>各 LOG 工作表：第 1 行檔名（紅底白字），第 2 行主要錯誤原因，第 3 行 PASS 項目，第 4 行起為原始 LOG。</li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+
+    <div class="section" id="section6">
+      <h2>六、常見問題</h2>
+      <ul>
+        <li>檔名是中文？→ 支援繁體中文檔名。</li>
+        <li>Excel 提示修復？→ 已做文字清理與格式保護；仍發生時，請先更新 Office 版本，並回報樣本 LOG。</li>
+        <li>看不到預覽視窗？→ 只有 Summary 底部的「工作表快速連結」具備懸停預覽。</li>
+      </ul>
+    </div>
+
+    <div class="section" id="section7">
+      <h2>七、新功能說明 (V1.6.6)</h2>
+      <ul>
+        <li><strong>🔍 彈出視窗搜尋功能</strong>：搜尋按鈕已更新為橘色背景，提升視覺辨識度</li>
+        <li><strong>📱 智能視窗定位</strong>：改善多視窗重疊問題，自動避免視窗重疊</li>
+        <li><strong>🎨 字體大小調整</strong>：支援介面字體大小動態調整，包含按鈕和彈出視窗</li>
+        <li><strong>⚡ 效能優化</strong>：改善視窗開啟速度和響應性</li>
+      </ul>
+      <p class="tip">新版本已解決視窗重疊問題，並提供更好的使用者體驗！</p>
+    </div>
+
+    <div class="section" id="section8">
+      <h2>八、V1.9.0 新功能</h2>
+      <h3>🗃️ 多選壓縮檔功能</h3>
+      <ul>
+        <li><strong>批次處理</strong>：選擇包含多個壓縮檔的資料夾</li>
+        <li><strong>選擇性解壓</strong>：顯示所有壓縮檔清單，可勾選要處理的檔案</li>
+        <li><strong>多層嵌套</strong>：支援壓縮檔內還有壓縮檔的複雜結構</li>
+        <li><strong>進度顯示</strong>：顯示解壓縮和分析進度百分比</li>
+        <li><strong>可取消操作</strong>：處理過程中可隨時取消</li>
+      </ul>
+
+      <h3>🔍 搜尋功能</h3>
+      <ul>
+        <li><strong>跨標籤頁搜尋</strong>：支援在 PASS、FAIL、原始LOG 標籤頁中搜尋關鍵字</li>
+        <li><strong>內建 Ctrl+F</strong>：使用 Tkinter 內建搜尋功能，支援上下搜尋</li>
+        <li><strong>搜尋高亮</strong>：找到的匹配文字以黃底黑字高亮顯示</li>
+        <li><strong>循環搜尋</strong>：搜尋到末尾時自動從頭開始</li>
+      </ul>
+
+      <h3>💡 Tooltip 提示功能</h3>
+      <ul>
+        <li><strong>全面覆蓋</strong>：所有按鈕和輸入欄位都有詳細說明</li>
+        <li><strong>智能顯示</strong>：滑鼠懸停時顯示，離開時隱藏</li>
+        <li><strong>多行支援</strong>：支援多行文字和自動換行</li>
+        <li><strong>位置追蹤</strong>：滑鼠移動時 Tooltip 跟隨顯示</li>
+      </ul>
+
+      <h3>🔒 加密驗證功能</h3>
+      <ul>
+        <li><strong>檔案驗證</strong>：啟動時檢查 SIGN.txt 加密檔案</li>
+        <li><strong>內容驗證</strong>：驗證檔案內容是否包含授權字串</li>
+        <li><strong>安全啟動</strong>：只有通過驗證才能正常使用程式</li>
+        <li><strong>錯誤提示</strong>：驗證失敗時顯示明確的錯誤訊息</li>
+      </ul>
+    </div>
+
+    <div class="section" id="section8">
+      <h2>八、V1.9.0 新功能 ⭐</h2>
+
+      <h3>📊 新版Excel報告格式 (FAIL匯總_新版.xlsx)</h3>
+      <p>V1.9.0 引入全新的結構化Excel報告格式，讓錯誤分析更直觀、更高效！</p>
+
+      <h4>🎯 Dashboard 工作表</h4>
+      <p>提供一目了然的錯誤總覽，包含以下欄位：</p>
+      <ul>
+        <li><strong>狀態</strong>：🔴 視覺標識</li>
+        <li><strong>ISN</strong>：序列號 (自動從檔名提取，如 WE253600014)</li>
+        <li><strong>Station</strong>：測試站點 (自動提取，如 "4cam stitching1")</li>
+        <li><strong>錯誤類型</strong>：智能分類的主要錯誤 (帶顏色標識)</li>
+        <li><strong>錯誤詳情</strong>：簡短的錯誤描述</li>
+        <li><strong>發生時間</strong>：測試時間戳</li>
+        <li><strong>Retry次數</strong>：重試次數統計</li>
+        <li><strong>查看詳細</strong>：超鏈接直接跳轉到原始LOG工作表</li>
+      </ul>
+
+      <h4>📋 FAIL_LIST 工作表</h4>
+      <p>詳細的失敗項目列表，包含：</p>
+      <ul>
+        <li><strong>ISN</strong>：序列號</li>
+        <li><strong>Station</strong>：測試站點</li>
+        <li><strong>測試項目</strong>：失敗的具體測試步驟</li>
+        <li><strong>錯誤類型</strong>：錯誤分類</li>
+        <li><strong>錯誤原因</strong>：詳細的錯誤信息</li>
+        <li><strong>執行指令</strong>：失敗時執行的指令</li>
+      </ul>
+
+      <h4>🎨 智能錯誤分類系統</h4>
+      <p>自動識別並分類6種常見錯誤類型，使用顏色編碼：</p>
+      <ul>
+        <li><span style="color: #FF0000; font-weight: bold;">🔴 系統崩溃</span>：Segmentation Fault, core dumped</li>
+        <li><span style="color: #FFA500; font-weight: bold;">🟠 數值不匹配</span>：doesn't match</li>
+        <li><span style="color: #FFFF00; font-weight: bold;">🟡 超時錯誤</span>：timeout</li>
+        <li><span style="color: #FF69B4; font-weight: bold;">🌸 執行失敗</span>：executes fail</li>
+        <li><span style="color: #FFC0CB; font-weight: bold;">🌺 參數錯誤</span>：Wrong, exception</li>
+        <li><span style="color: #D3D3D3; font-weight: bold;">⚪ 其他錯誤</span>：FAIL, ERROR</li>
+      </ul>
+
+      <h4>🔍 4級優先級錯誤提取</h4>
+      <p>使用智能算法提取最關鍵的錯誤信息：</p>
+      <ol>
+        <li><strong>優先級1</strong>：最後一次出現的 "doesn't match"</li>
+        <li><strong>優先級2</strong>：最後一次出現的 "is Fail"</li>
+        <li><strong>優先級3</strong>：最後一次出現的 "FAIL"</li>
+        <li><strong>優先級4</strong>：最後一次出現的 "ERROR"</li>
+      </ol>
+
+      <h4>📁 雙版本輸出</h4>
+      <p class="tip">
+        <strong>重要</strong>：V1.9.0 同時生成兩個版本的FAIL報告：<br>
+        • <code>FAIL匯總.xlsx</code> - 傳統格式（保留向後兼容）<br>
+        • <code>FAIL匯總_新版.xlsx</code> - 新格式（Dashboard + FAIL_LIST）⭐
+      </p>
+
+      <h3>🔧 代碼優化</h3>
+      <ul>
+        <li><strong>模組化重構</strong>：將大型文件拆分為多個小模組，提高可維護性</li>
+        <li><strong>UI模組</strong>：enhanced_treeview, enhanced_text, fail_details_panel</li>
+        <li><strong>Excel模組</strong>：excel_utils, excel_fail_list_builder</li>
+        <li><strong>代碼質量</strong>：所有模組均符合1000行以內的最佳實踐</li>
+      </ul>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; padding: 20px; background: #f5f5f5; border-radius: 10px;">
+      <p><strong>如有問題或建議，請聯繫開發團隊</strong></p>
+      <p>© 2025 PEGA. All rights reserved.</p>
+    </div>
+  </div>
+
+  <script>
+    // 平滑滾動到錨點
+    document.querySelectorAll('.toc a').forEach(link => {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        const targetId = this.getAttribute('href').substring(1);
+        const targetElement = document.getElementById(targetId);
+
+        if (targetElement) {
+          targetElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    });
+  </script>
 </body>
-</html> 
+
+</html>
