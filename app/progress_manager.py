@@ -255,3 +255,37 @@ class ProgressManager:
                     
         except Exception:
             pass
+
+    # Thread-safe wrapper methods for background threads
+    def _safe_update_progress_text(self, text: str):
+        """线程安全：更新进度文字"""
+        try:
+            self.root.after(0, lambda: self.update_progress(text))
+        except Exception:
+            pass
+    
+    def _safe_update_progress_mode(self, mode: str):
+        """线程安全：切换进度条模式"""
+        try:
+            if mode == 'determinate':
+                self.root.after(0, lambda: self.set_determinate(100))
+            elif mode == 'indeterminate':
+                self.root.after(0, lambda: self.set_indeterminate())
+        except Exception:
+            pass
+    
+    def _safe_update_progress_max(self, maximum: int):
+        """线程安全：设置进度条最大值"""
+        try:
+            self.root.after(0, lambda: self.set_determinate(maximum))
+        except Exception:
+            pass
+    
+    def _safe_update_progress(self, current: int, total: int, text: str = ""):
+        """线程安全：更新进度值"""
+        try:
+            self.root.after(0, lambda: self.set_value(current, total))
+            if text:
+                self.root.after(0, lambda: self.update_progress(text))
+        except Exception:
+            pass
