@@ -70,9 +70,15 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         
         # Connect Progress Manager to Status Bar
         if hasattr(self, 'status_label') and hasattr(self, 'main_progress_bar'):
-            # Check if status_light exists (from UIBuilder)
+            # Check for optional status_light and left_title_label
             status_light_widget = getattr(self, 'status_light', None)
-            self.progress_manager.set_widgets(self.status_label, self.main_progress_bar, status_light_widget)
+            header_label_widget = getattr(self, 'left_title_label', None)
+            self.progress_manager.set_widgets(
+                self.status_label, 
+                self.main_progress_bar, 
+                status_light_widget,
+                header_label_widget
+            )
         
         # Events
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)

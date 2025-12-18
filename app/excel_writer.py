@@ -148,49 +148,49 @@ class ExcelWriter:
             for line in raw_lines[:100]:  # 只檢查前100行，系統資訊通常在LOG開頭
                 line_str = str(line).strip()
                 
-                # 擷取各種系統資訊
+                # 擷取各種系統資訊 (規則：... is 值 ! 或 ... is 值)
                 if 'System Version is' in line_str:
-                    match = re.search(r'System Version is ([^.]+)', line_str)
+                    match = re.search(r'System Version is ([^!]+)', line_str)
                     if match:
                         system_info['System Version'] = match.group(1).strip()
                 
                 elif 'Script File is' in line_str:
-                    match = re.search(r'Script File is ([^.]+)', line_str)
+                    match = re.search(r'Script File is ([^!]+)', line_str)
                     if match:
                         system_info['Script File'] = match.group(1).strip()
                 
                 elif 'Script Version is' in line_str:
-                    match = re.search(r'Script Version is ([^.]+)', line_str)
+                    match = re.search(r'Script Version is ([^!]+)', line_str)
                     if match:
                         system_info['Script Version'] = match.group(1).strip()
                 
                 elif 'Script Creator is' in line_str:
-                    match = re.search(r'Script Creator is ([^.]+)', line_str)
+                    match = re.search(r'Script Creator is ([^!]+)', line_str)
                     if match:
                         system_info['Script Creator'] = match.group(1).strip()
                 
                 elif 'Utility Version is' in line_str:
-                    match = re.search(r'Utility Version is ([^.]+)', line_str)
+                    match = re.search(r'Utility Version is ([^!]+)', line_str)
                     if match:
                         system_info['Utility Version'] = match.group(1).strip()
                 
                 elif 'DeviceID is' in line_str:
-                    match = re.search(r'DeviceID is ([^.]+)', line_str)
+                    match = re.search(r'DeviceID is ([^!]+)', line_str)
                     if match:
                         system_info['DeviceID'] = match.group(1).strip()
                 
                 elif 'SFIS is' in line_str:
-                    match = re.search(r'SFIS is ([^.]+)', line_str)
+                    match = re.search(r'SFIS is ([^!]+)', line_str)
                     if match:
                         system_info['SFIS'] = match.group(1).strip()
                 
                 elif 'MiniCloud2 is' in line_str:
-                    match = re.search(r'MiniCloud2 is ([^.]+)', line_str)
+                    match = re.search(r'MiniCloud2 is ([^!]+)', line_str)
                     if match:
                         system_info['MiniCloud2'] = match.group(1).strip()
                 
                 elif 'FTP is' in line_str:
-                    match = re.search(r'FTP is ([^.]+)', line_str)
+                    match = re.search(r'FTP is ([^!]+)', line_str)
                     if match:
                         system_info['FTP'] = match.group(1).strip()
                 
@@ -410,8 +410,11 @@ class ExcelWriter:
                 if result and result not in step_name:
                      fail_item_str += f" {result}"
                 
+                # 清理 Item 名稱：移除冗餘的 FAIL/is Fail 以讓顯示更精簡 (使用者要求優化)
+                fail_item_str = re.sub(r'\s+\b(is\s+)?FAIL\b.*$', '', fail_item_str, flags=re.IGNORECASE).strip()
+                
                 # 清理 Item 名稱作為統計鍵
-                fail_item_str = fail_item_str.strip()
+                fail_item_str = fail_item_str.strip() or "Unknown Item"
                 
                 reason = item.get('error', '')
                 if not reason or reason == 'FAIL':
@@ -763,7 +766,8 @@ class ExcelWriter:
             # 調整欄寬以顯示所有文字
             self._auto_fit_columns(ws2, min_widths={1: 150})
         # Summary 表格：
-        headers = ['檔名', 'PASS步驟數', '測試總時間', 'SFIS']
+        # 使用者要求：顯示檔名、腳本檔案、SFIS、測試時間即可
+        headers = ['檔名', '腳本檔案', 'SFIS', '測試總時間']
         for c, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=c, value=header)
             cell.font = header_font
@@ -773,78 +777,55 @@ class ExcelWriter:
         thin = Side(border_style='thin', color='FF888888')
         thick = Side(border_style='thick', color='FF000000')
         start_data_row = ws.max_row + 1
+        
         for entry in logs:
-            # 檔名欄
+            # 檔名欄 (格式化時間戳)
             base = self._sanitize_cell_text(entry.get('file_name') or '')
             base_fmt = self._format_filename_with_timestamp(base)
             
             # 擷取系統資訊
             system_info = self._extract_system_info(entry.get('raw_lines') or [])
             
-            # 組合顯示名稱，使用多行格式讓使用者容易看懂
-            display_lines = [base_fmt]
-            
-            # 添加系統資訊，分行顯示
-            if system_info.get('System Version'):
-                display_lines.append(f"系統版本: {system_info['System Version']}")
-            if system_info.get('Script File'):
-                display_lines.append(f"腳本檔案: {system_info['Script File']}")
-            if system_info.get('Script Version'):
-                display_lines.append(f"腳本版本: {system_info['Script Version']}")
-            if system_info.get('Script Creator'):
-                display_lines.append(f"建立者: {system_info['Script Creator']}")
-            if system_info.get('Utility Version'):
-                display_lines.append(f"工具版本: {system_info['Utility Version']}")
-            if system_info.get('DeviceID'):
-                display_lines.append(f"設備ID: {system_info['DeviceID']}")
-            if system_info.get('SFIS'):
-                display_lines.append(f"SFIS: {system_info['SFIS']}")
-            if system_info.get('MiniCloud2'):
-                display_lines.append(f"MiniCloud2: {system_info['MiniCloud2']}")
-            if system_info.get('FTP'):
-                display_lines.append(f"FTP: {system_info['FTP']}")
-            if system_info.get('Active IPs'):
-                display_lines.append(f"IP位址: {system_info['Active IPs']}")
-            
-            # 添加測試時間
-            secs, _ = self._extract_total_secs(entry.get('raw_lines') or [])
-            if secs is not None:
-                display_lines.append(f"測試時間: {secs:.1f} 秒")
-            
-            display_name = "\n".join(display_lines)
-            
+            # 1. 檔名
             r = ws.max_row + 1
-            cell_name = ws.cell(row=r, column=1, value=self._sanitize_cell_text(display_name))
+            cell_name = ws.cell(row=r, column=1, value=self._sanitize_cell_text(base_fmt))
             cell_name.number_format='@'
-            cell_name.font = Font(name='Calibri', size=10, color='FF000000')
-            cell_name.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top', shrink_to_fit=True)
+            cell_name.font = Font(name='Calibri', size=11, color='FF000000')
+            cell_name.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top')
+            
             # 備註與超連結
             sheet = sheet_map.get(entry.get('file_name'))
-            try:
-                cell_name.comment = Comment(self._build_preview_comment(entry), "LOG Analyzer")
-                cell_name.comment.width = 400
-                cell_name.comment.height = 500
-            except Exception:
-                pass
-            # 移除超連結，只保留提示
             if sheet:
+                # 點擊跳轉到對應工作表
+                cell_name.hyperlink = f"#'{sheet}'!A1"
+                try:
+                    cell_name.comment = Comment(self._build_preview_comment(entry), "LOG Analyzer")
+                    cell_name.comment.width = 400
+                    cell_name.comment.height = 500
+                except Exception:
+                    pass
                 self._add_input_prompt(ws, cell_name, '對應工作表', entry.get('file_name') or '')
-            # PASS步驟數欄
-            pass_count = len(entry.get('pass_items') or [])
-            cell_count = ws.cell(row=r, column=2, value=pass_count)
-            cell_count.font = normal_font
-            cell_count.alignment = center
+
+            # 2. 腳本檔案
+            script_file = system_info.get('Script File', 'N/A')
+            cell_script = ws.cell(row=r, column=2, value=self._sanitize_cell_text(script_file))
+            cell_script.font = normal_font
+            cell_script.alignment = Alignment(wrap_text=True, vertical='top')
             
-            # 測試總時間欄
-            sec_txt = f"{secs:.1f} Sec." if secs is not None else ''
-            cell_time = ws.cell(row=r, column=3, value=sec_txt)
-            cell_time.font = normal_font
-            cell_time.alignment = center
-            # SFIS欄
-            sfis_value = system_info.get('SFIS', '')
-            cell_sfis = ws.cell(row=r, column=4, value=sfis_value)
+            # 3. SFIS
+            sfis_value = system_info.get('SFIS', 'N/A')
+            cell_sfis = ws.cell(row=r, column=3, value=sfis_value)
             cell_sfis.font = normal_font
             cell_sfis.alignment = center
+            
+            # 4. 測試總時間
+            secs, _ = self._extract_total_secs(entry.get('raw_lines') or [])
+            sec_txt = f"{secs:.1f} Sec." if secs is not None else 'N/A'
+            cell_time = ws.cell(row=r, column=4, value=sec_txt)
+            cell_time.font = normal_font
+            cell_time.alignment = center
+            
+            # 格線
             for c in range(1, len(headers)+1):
                 ws.cell(row=r, column=c).border = Border(left=thin, right=thin, top=thin, bottom=thin)
         # 外框粗線
@@ -1142,7 +1123,7 @@ class ExcelWriter:
         back_to_top.hyperlink = f"#'Summary'!A1"
         back_to_top.fill = PatternFill('solid', fgColor='FFE6FFE6')
         
-        self._auto_fit_columns(ws, min_widths={1: 30, 2: 80}) # 減小寬度限制，避免過寬
+        self._auto_fit_columns(ws, min_widths={1: 30, 2: 60, 3: 10, 4: 15})
         
         # 設定 Summary 頁面整體字體風格
         for row in ws.iter_rows():

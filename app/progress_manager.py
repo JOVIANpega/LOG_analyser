@@ -22,28 +22,43 @@ class ProgressManager:
         self._status_label = None
         self._main_progress_bar = None
         self._status_light = None
+        self._header_label = None # Left sidebar title label
         self._is_flashing = False
         
         self._start_time = None
         self._cancel_flag = False
         
-    def set_widgets(self, status_label, progress_bar, status_light=None):
-        """設定主視窗的狀態列元件"""
+    def set_widgets(self, status_label, progress_bar, status_light=None, header_label=None):
+        """設定主視窗的狀態列與標題元件"""
         self._status_label = status_label
         self._main_progress_bar = progress_bar
         self._status_light = status_light
+        self._header_label = header_label
 
     def _flash_loop(self):
         """閃爍迴圈"""
-        if not self._is_flashing or not self._status_light:
+        if not self._is_flashing:
             return
             
-        current_color = self._status_light.cget('fg')
-        # Toggle between Bright Green and Dark Green (or Grayish Green)
-        next_color = '#00FF00' if current_color != '#00FF00' else '#006400'
-        
+        # 1. 狀態燈閃爍 (Green <-> DarkGreen)
+        if self._status_light:
+            try:
+                curr = self._status_light.cget('fg')
+                self._status_light.config(fg='#00FF00' if curr != '#00FF00' else '#006400')
+            except: pass
+
+        # 2. 標題標籤閃爍 (Green <-> Orange/Blue or simple Fade)
+        # 使用者提到 GUI左上的 centermani LOG 閃爍
+        if self._header_label:
+            try:
+                curr_bg = self._header_label.cget('bg')
+                # 在原本的綠色 (#4CAF50) 與較亮的綠色 (#81C784) 之間切換
+                next_bg = '#81C784' if curr_bg == '#4CAF50' else '#4CAF50'
+                self._header_label.config(bg=next_bg)
+                # 同步更新 parent frame bg 如果有的話，但通常 label 閃爍就夠了
+            except: pass
+
         try:
-            self._status_light.config(fg=next_color)
             self.root.after(500, self._flash_loop)
         except Exception:
             self._is_flashing = False
@@ -60,8 +75,11 @@ class ProgressManager:
         if self._status_light:
             try:
                 self._status_light.config(fg='gray')
-            except:
-                pass
+            except: pass
+        if self._header_label:
+            try:
+                self._header_label.config(bg='#4CAF50') # 恢復原始綠色
+            except: pass
 
     @property
     def is_cancelled(self):
