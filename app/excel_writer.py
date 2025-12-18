@@ -531,41 +531,35 @@ class ExcelWriter:
                 ws.column_dimensions['B'].width = 10
                 ws.column_dimensions['C'].width = 10
                 
-                # 創建橫條圖 (Bar Chart) - 排序更清楚
-                from openpyxl.chart import BarChart, Reference, Series
+                # 創建圓餅圖 (Pie Chart) - 提供佔比視覺化
+                from openpyxl.chart import PieChart, Reference, Series
                 from openpyxl.chart.label import DataLabelList
                 
-                chart = BarChart()
-                chart.type = "bar"
-                chart.style = 10
-                chart.title = "FAIL Item 排名 (次數)"
-                chart.y_axis.title = '次數'
-                chart.x_axis.title = 'FAIL Item 名稱'
+                chart = PieChart()
+                chart.title = "FAIL Item 佔比統計"
+                chart.style = 10 
                 
-                # 設定數據範圍
+                # 設定數據範圍 (數量列)
                 max_row = summary_start_row + len(error_counts) - 1
                 data = Reference(ws, min_col=2, min_row=summary_start_row, max_row=max_row)
                 cats = Reference(ws, min_col=1, min_row=summary_start_row, max_row=max_row)
                 
                 chart.add_data(data, titles_from_data=False)
                 chart.set_categories(cats)
-                chart.shape = 4
+                
+                # 顯示資料標籤 (數值與百分比)
+                chart.dataLabels = DataLabelList()
+                chart.dataLabels.showVal = True      # 顯示數值
+                chart.dataLabels.showPercent = True  # 顯示百分比
                 
                 # 調整圖表大小
-                chart.height = 10 
+                chart.height = 12 
                 chart.width = 18
-                
-                # 隱藏圖例 (因為只有一個數列)
-                chart.legend = None
-                
-                # 在長條上顯示數值
-                chart.dLbls = DataLabelList()
-                chart.dLbls.showVal = True
                 
                 # 將圖表放在統計表格旁邊（E 欄開始）
                 ws.add_chart(chart, f"E{table_start_row}")
                 
-                print(f"[INFO] 已添加 FAIL Item 排名圖表 (BarChart)，共 {len(error_counts)} 種項目")
+                print(f"[INFO] 已添加 FAIL Item 分佈圖表 (PieChart)，共 {len(error_counts)} 種項目")
                 
             except Exception as e:
                 print(f"[WARNING] 添加錯誤統計失敗: {e}")
@@ -1058,17 +1052,18 @@ class ExcelWriter:
             cell_info.hyperlink = None
             
             # 備註與超連結
+            # 備註與超連結
             sheet = sheet_map.get(entry.get('file_name'))
             try:
-                cell_name.comment = Comment(self._build_preview_comment(entry), "LOG Analyzer")
-                cell_name.comment.width = 400
-                cell_name.comment.height = 500
+                cell_info.comment = Comment(self._build_preview_comment(entry), "LOG Analyzer")
+                cell_info.comment.width = 400
+                cell_info.comment.height = 500
             except Exception:
                 pass
             if sheet:
-                cell_name.hyperlink = f"#'{sheet}'!A1"
+                cell_info.hyperlink = f"#'{sheet}'!A1"
             # 白底提示
-            self._add_input_prompt(ws, cell_name, '對應工作表', entry.get('file_name') or '')
+            self._add_input_prompt(ws, cell_info, '對應工作表', entry.get('file_name') or '')
             
             # 詳細錯誤原因欄 - 包含主要錯誤和執行指令
             detailed_error = self._build_detailed_error_summary(entry)

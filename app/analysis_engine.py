@@ -484,11 +484,23 @@ class AnalysisEngineMixin:
                             is_temp = True
                     
                     if is_temp:
-                         # 嘗試從上次記錄的路徑取得目錄
-                         if self.settings.get('last_log_path') and os.path.exists(self.settings.get('last_log_path')):
-                             out_dir = os.path.dirname(self.settings.get('last_log_path'))
+                         # 嘗試從上次記錄的路徑取得目錄 (優先檢查壓縮檔資料夾，再檢查單一 Log 路徑)
+                         if self.settings.get('last_compressed_folder') and os.path.exists(self.settings.get('last_compressed_folder')):
+                             out_dir = self.settings.get('last_compressed_folder')
+                         elif self.settings.get('last_folder_path') and os.path.exists(self.settings.get('last_folder_path')):
+                             out_dir = self.settings.get('last_folder_path')
+                         elif self.settings.get('last_log_path') and os.path.exists(self.settings.get('last_log_path')):
+                             # 如果 last_log_path 是檔案，取其目錄；如果是目錄，直接使用
+                             if os.path.isdir(self.settings.get('last_log_path')):
+                                 out_dir = self.settings.get('last_log_path')
+                             else:
+                                 out_dir = os.path.dirname(self.settings.get('last_log_path'))
                          else:
-                             out_dir = os.getcwd()
+                             # 最終 fallback：桌面 (比工作目錄更友善) 或 使用者目錄
+                             out_dir = os.path.join(os.path.expanduser("~"), "Desktop")
+                             if not os.path.exists(out_dir):
+                                 out_dir = os.getcwd()
+                                 
                          self._ui_log(f"偵測到暫存目錄，改為輸出至: {out_dir}")
                     elif isinstance(current_path, str) and os.path.exists(current_path):
                         if os.path.isdir(current_path):

@@ -372,7 +372,7 @@ class FileHandlerMixin:
                     target = os.path.join(extracted_root, f"{idx:03d}_{base}")
                     os.makedirs(target, exist_ok=True)
                     try:
-                        self._update_progress(f"解壓中 {idx}/{total}: {os.path.basename(apath)}")
+                        self._safe_update_progress_text(f"解壓中 {idx}/{total}: {os.path.basename(apath)}")
                         self._extract_archive(apath, target)
                         self._extract_all_archives(target, max_depth=5)
                     except Exception as e:
@@ -452,7 +452,7 @@ class FileHandlerMixin:
                     target = os.path.join(extracted_root, f"{idx:03d}_{base}")
                     os.makedirs(target, exist_ok=True)
                     try:
-                        self._update_progress(f"解壓中 {idx}/{total}: {os.path.basename(apath)}")
+                        self._safe_update_progress_text(f"解壓中 {idx}/{total}: {os.path.basename(apath)}")
                         self._extract_archive(apath, target)
                         self._extract_all_archives(target, max_depth=5)
                     except Exception as e:
@@ -635,7 +635,7 @@ class FileHandlerMixin:
                     target = os.path.join(extracted_root, f"{idx:03d}_{base}")
                     os.makedirs(target, exist_ok=True)
                     try:
-                        self._update_progress(f"解壓中 {idx}/{total}: {os.path.basename(apath)}")
+                        self._safe_update_progress_text(f"解壓中 {idx}/{total}: {os.path.basename(apath)}")
                         self._extract_archive(apath, target)
                         self._extract_all_archives(target, max_depth=5)
                     except Exception as e:
@@ -759,7 +759,7 @@ class FileHandlerMixin:
             elif file_ext == '.rar':
                 self._extract_rar(compressed_path, temp_dir)
             else:
-                messagebox.showerror("錯誤", "不支援的壓縮格式")
+                self.root.after(0, lambda: messagebox.showerror("錯誤", "不支援的壓縮格式"))
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 return
 
@@ -784,7 +784,7 @@ class FileHandlerMixin:
             log_files = self._find_log_files(temp_dir)
             
             if not log_files:
-                messagebox.showwarning("警告", "壓縮檔中未找到 .log 檔案")
+                self.root.after(0, lambda: messagebox.showwarning("警告", "壓縮檔中未找到 .log 檔案"))
                 return
             
             # 根據檔案數量決定處理模式
@@ -793,12 +793,12 @@ class FileHandlerMixin:
                 self.current_mode = 'single'
                 self.current_log_path = log_files[0]
                 filename = os.path.basename(log_files[0])
-                self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮檔)", fg='orange')
+                self.root.after(0, lambda: self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮檔)", fg='orange'))
             else:
                 # 資料夾模式
                 self.current_mode = 'multi'
                 self.current_log_path = temp_dir
-                self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮檔)", fg='orange')
+                self.root.after(0, lambda: self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮檔)", fg='orange'))
             
             # 儲存選擇的路徑到設定
             self.settings['last_compressed_path'] = compressed_path
@@ -811,7 +811,7 @@ class FileHandlerMixin:
             self.temp_cleanup_path = temp_dir
             
         except Exception as e:
-            messagebox.showerror("錯誤", f"處理壓縮檔案時發生錯誤：\\n{str(e)}")
+            self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮檔案時發生錯誤：\\n{str(e)}"))
             # 清理暫存目錄
             if 'temp_dir' in locals() and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir, ignore_errors=True)

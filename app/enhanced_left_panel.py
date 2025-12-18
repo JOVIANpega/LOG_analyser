@@ -54,6 +54,7 @@ def build_left_panel(parent, app):
     app.font_scaler.register(title_label)
     # 讓設定頁面可即時更新此標題
     app.left_title_label = title_label
+    app.left_title_frame = title_frame
     
     # 檔案選擇區域
     file_frame = tk.LabelFrame(parent, text="檔案選擇", padx=10, pady=10)

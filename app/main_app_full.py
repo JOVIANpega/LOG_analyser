@@ -73,11 +73,13 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
             # Check for optional status_light and left_title_label
             status_light_widget = getattr(self, 'status_light', None)
             header_label_widget = getattr(self, 'left_title_label', None)
+            header_frame_widget = getattr(self, 'left_title_frame', None)
             self.progress_manager.set_widgets(
                 self.status_label, 
                 self.main_progress_bar, 
                 status_light_widget,
-                header_label_widget
+                header_label_widget,
+                header_frame_widget
             )
         
         # Events
@@ -147,19 +149,19 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
     
     # === Delegate Methods for ProgressManager ===
     def _show_progress(self, title, message=""):
-        self.progress_manager.show_progress(title, message)
+        self.root.after(0, lambda: self.progress_manager.show_progress(title, message))
         
     def _update_progress(self, text):
-         self.progress_manager.update_progress(text)
+         self.root.after(0, lambda: self.progress_manager.update_progress(text))
          
     def _close_progress(self):
-        self.progress_manager.close_progress()
+        self.root.after(0, self.progress_manager.close_progress)
         
     def _progress_set_determinate(self, maximum):
-        self.progress_manager.set_determinate(maximum)
+        self.root.after(0, lambda: self.progress_manager.set_determinate(maximum))
         
     def _progress_set_value(self, current, total):
-        self.progress_manager.set_value(current, total)
+        self.root.after(0, lambda: self.progress_manager.set_value(current, total))
         
     def _safe_update_progress_mode(self, mode):
         """Thread-safe: Set progress mode"""

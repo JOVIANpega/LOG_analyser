@@ -309,105 +309,130 @@
       <p class="tip">新版本已解決視窗重疊問題，並提供更好的使用者體驗！</p>
     </div>
 
-    <div class="section" id="section8">
-      <h2>八、V1.9.0 新功能</h2>
-      <h3>🗃️ 多選壓縮檔功能</h3>
-      <ul>
-        <li><strong>批次處理</strong>：選擇包含多個壓縮檔的資料夾</li>
-        <li><strong>選擇性解壓</strong>：顯示所有壓縮檔清單，可勾選要處理的檔案</li>
-        <li><strong>多層嵌套</strong>：支援壓縮檔內還有壓縮檔的複雜結構</li>
-        <li><strong>進度顯示</strong>：顯示解壓縮和分析進度百分比</li>
-        <li><strong>可取消操作</strong>：處理過程中可隨時取消</li>
-      </ul>
+    <div class="section" id="section_flow">
+      <h2>🔍 分析流程圖</h2>
+      <div class="flowchart">
+        <div class="step">
+          <div class="icon">🚀</div>
+          <div class="title">啟動程式</div>
+          <div class="desc">執行 main.py</div>
+        </div>
+        <div class="arrow">⬇️</div>
+        <div class="step">
+          <div class="icon">📂</div>
+          <div class="title">選擇檔案</div>
+          <div class="desc">支援 Log / 資料夾 / 壓縮檔 (ZIP/7Z/RAR)</div>
+        </div>
+        <div class="arrow">⬇️</div>
+        <div class="step">
+          <div class="icon">⚙️</div>
+          <div class="title">自動分析</div>
+          <div class="desc">背景執行緒解析，介面不卡頓</div>
+        </div>
+        <div class="arrow">⬇️</div>
+        <div class="step">
+          <div class="icon">📊</div>
+          <div class="title">分類結果</div>
+          <div class="desc">
+            <strong>成功</strong> = 判定為 PASS 的 Log<br>
+            <strong>失敗</strong> = 判定為 FAIL 的 Log
+          </div>
+        </div>
+        <div class="arrow">⬇️</div>
+        <div class="step">
+          <div class="icon">📑</div>
+          <div class="title">產生報告</div>
+          <div class="desc">自動生成 Excel (PASS/FAIL 匯總)</div>
+        </div>
+        <div class="arrow">⬇️</div>
+        <div class="step">
+          <div class="icon">✅</div>
+          <div class="title">完成</div>
+          <div class="desc">彈出視窗提示開啟檔案</div>
+        </div>
+      </div>
+      <style>
+        .flowchart {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          background: #f8f9fa;
+          padding: 20px;
+          border-radius: 10px;
+          margin: 20px 0;
+        }
 
-      <h3>🔍 搜尋功能</h3>
-      <ul>
-        <li><strong>跨標籤頁搜尋</strong>：支援在 PASS、FAIL、原始LOG 標籤頁中搜尋關鍵字</li>
-        <li><strong>內建 Ctrl+F</strong>：使用 Tkinter 內建搜尋功能，支援上下搜尋</li>
-        <li><strong>搜尋高亮</strong>：找到的匹配文字以黃底黑字高亮顯示</li>
-        <li><strong>循環搜尋</strong>：搜尋到末尾時自動從頭開始</li>
-      </ul>
+        .step {
+          background: white;
+          border: 2px solid #2196f3;
+          border-radius: 10px;
+          padding: 15px;
+          width: 250px;
+          text-align: center;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+          transition: transform 0.2s;
+        }
 
-      <h3>💡 Tooltip 提示功能</h3>
-      <ul>
-        <li><strong>全面覆蓋</strong>：所有按鈕和輸入欄位都有詳細說明</li>
-        <li><strong>智能顯示</strong>：滑鼠懸停時顯示，離開時隱藏</li>
-        <li><strong>多行支援</strong>：支援多行文字和自動換行</li>
-        <li><strong>位置追蹤</strong>：滑鼠移動時 Tooltip 跟隨顯示</li>
-      </ul>
+        .step:hover {
+          transform: translateY(-5px);
+          border-color: #4caf50;
+        }
 
-      <h3>🔒 加密驗證功能</h3>
-      <ul>
-        <li><strong>檔案驗證</strong>：啟動時檢查 SIGN.txt 加密檔案</li>
-        <li><strong>內容驗證</strong>：驗證檔案內容是否包含授權字串</li>
-        <li><strong>安全啟動</strong>：只有通過驗證才能正常使用程式</li>
-        <li><strong>錯誤提示</strong>：驗證失敗時顯示明確的錯誤訊息</li>
-      </ul>
+        .step .icon {
+          font-size: 24px;
+          margin-bottom: 5px;
+        }
+
+        .step .title {
+          font-weight: bold;
+          color: #333;
+          margin-bottom: 5px;
+        }
+
+        .step .desc {
+          font-size: 14px;
+          color: #666;
+          line-height: 1.4;
+        }
+
+        .arrow {
+          font-size: 24px;
+          color: #999;
+          margin: 10px 0;
+        }
+      </style>
     </div>
 
     <div class="section" id="section8">
       <h2>八、V1.9.0 新功能 ⭐</h2>
 
-      <h3>📊 新版Excel報告格式 (FAIL匯總_新版.xlsx)</h3>
-      <p>V1.9.0 引入全新的結構化Excel報告格式，讓錯誤分析更直觀、更高效！</p>
-
-      <h4>🎯 Dashboard 工作表</h4>
-      <p>提供一目了然的錯誤總覽，包含以下欄位：</p>
+      <h3>📊 FAIL 匯總報告升級</h3>
+      <h4>1. 圓餅圖統計 (Pie Chart)</h4>
+      <p>在 <code>FAIL匯總.xlsx</code> 的 <strong>FAIL_LIST</strong> 工作表中，新增了直觀的圓餅圖：</p>
       <ul>
-        <li><strong>狀態</strong>：🔴 視覺標識</li>
-        <li><strong>ISN</strong>：序列號 (自動從檔名提取，如 WE253600014)</li>
-        <li><strong>Station</strong>：測試站點 (自動提取，如 "4cam stitching1")</li>
-        <li><strong>錯誤類型</strong>：智能分類的主要錯誤 (帶顏色標識)</li>
-        <li><strong>錯誤詳情</strong>：簡短的錯誤描述</li>
-        <li><strong>發生時間</strong>：測試時間戳</li>
-        <li><strong>Retry次數</strong>：重試次數統計</li>
-        <li><strong>查看詳細</strong>：超鏈接直接跳轉到原始LOG工作表</li>
+        <li><strong>位置</strong>：位於錯誤統計表格右側 (H欄)</li>
+        <li><strong>內容</strong>：顯示各類錯誤的佔比與數量</li>
+        <li><strong>用途</strong>：快速識別主要失效原因 (Top Failure Modes)</li>
       </ul>
 
-      <h4>📋 FAIL_LIST 工作表</h4>
-      <p>詳細的失敗項目列表，包含：</p>
+      <h4>2. 統計表格優化</h4>
       <ul>
-        <li><strong>ISN</strong>：序列號</li>
-        <li><strong>Station</strong>：測試站點</li>
-        <li><strong>測試項目</strong>：失敗的具體測試步驟</li>
-        <li><strong>錯誤類型</strong>：錯誤分類</li>
-        <li><strong>錯誤原因</strong>：詳細的錯誤信息</li>
-        <li><strong>執行指令</strong>：失敗時執行的指令</li>
+        <li>自動統計各類錯誤數量</li>
+        <li>按錯誤發生頻率降序排列</li>
+        <li>顯示錯誤百分比</li>
       </ul>
 
-      <h4>🎨 智能錯誤分類系統</h4>
-      <p>自動識別並分類6種常見錯誤類型，使用顏色編碼：</p>
+      <h3>🗃️ 壓縮檔支援增強</h3>
       <ul>
-        <li><span style="color: #FF0000; font-weight: bold;">🔴 系統崩溃</span>：Segmentation Fault, core dumped</li>
-        <li><span style="color: #FFA500; font-weight: bold;">🟠 數值不匹配</span>：doesn't match</li>
-        <li><span style="color: #FFFF00; font-weight: bold;">🟡 超時錯誤</span>：timeout</li>
-        <li><span style="color: #FF69B4; font-weight: bold;">🌸 執行失敗</span>：executes fail</li>
-        <li><span style="color: #FFC0CB; font-weight: bold;">🌺 參數錯誤</span>：Wrong, exception</li>
-        <li><span style="color: #D3D3D3; font-weight: bold;">⚪ 其他錯誤</span>：FAIL, ERROR</li>
+        <li><strong>多檔選擇</strong>：支援一次選擇多個壓縮檔 (ZIP/7Z/RAR)</li>
+        <li><strong>智能路徑</strong>：若是暫存目錄，Excel 自動輸出到原始路徑或桌面，避免檔案遺失</li>
+        <li><strong>進度提示</strong>：更準確的解壓縮與分析進度顯示</li>
       </ul>
 
-      <h4>🔍 4級優先級錯誤提取</h4>
-      <p>使用智能算法提取最關鍵的錯誤信息：</p>
-      <ol>
-        <li><strong>優先級1</strong>：最後一次出現的 "doesn't match"</li>
-        <li><strong>優先級2</strong>：最後一次出現的 "is Fail"</li>
-        <li><strong>優先級3</strong>：最後一次出現的 "FAIL"</li>
-        <li><strong>優先級4</strong>：最後一次出現的 "ERROR"</li>
-      </ol>
-
-      <h4>📁 雙版本輸出</h4>
-      <p class="tip">
-        <strong>重要</strong>：V1.9.0 同時生成兩個版本的FAIL報告：<br>
-        • <code>FAIL匯總.xlsx</code> - 傳統格式（保留向後兼容）<br>
-        • <code>FAIL匯總_新版.xlsx</code> - 新格式（Dashboard + FAIL_LIST）⭐
-      </p>
-
-      <h3>🔧 代碼優化</h3>
+      <h3>💡 介面體驗優化</h3>
       <ul>
-        <li><strong>模組化重構</strong>：將大型文件拆分為多個小模組，提高可維護性</li>
-        <li><strong>UI模組</strong>：enhanced_treeview.py, enhanced_text.py, fail_details_panel.py, window_manager.py</li>
-        <li><strong>Excel模組</strong>：excel_writer.py, utils.py, styles.py, fail_list_builder.py</li>
-        <li><strong>代碼質量</strong>：所有模組均符合1000行以內的最佳實踐</li>
+        <li><strong>閃爍提示</strong>：分析進行時，Owl Logo 與標題會呈現 <strong>綠/黃</strong> 交替閃爍，狀態更明顯</li>
+        <li><strong>完成提示</strong>：分析結束後彈出對話框，可直接勾選開啟 Excel 或資料夾</li>
       </ul>
     </div>
 

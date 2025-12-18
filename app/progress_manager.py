@@ -23,39 +23,52 @@ class ProgressManager:
         self._main_progress_bar = None
         self._status_light = None
         self._header_label = None # Left sidebar title label
+        self._header_frame = None # Left sidebar title frame
         self._is_flashing = False
         
         self._start_time = None
         self._cancel_flag = False
         
-    def set_widgets(self, status_label, progress_bar, status_light=None, header_label=None):
+    def set_widgets(self, status_label, progress_bar, status_light=None, header_label=None, header_frame=None):
         """設定主視窗的狀態列與標題元件"""
         self._status_label = status_label
         self._main_progress_bar = progress_bar
         self._status_light = status_light
         self._header_label = header_label
+        self._header_frame = header_frame
 
     def _flash_loop(self):
         """閃爍迴圈"""
         if not self._is_flashing:
             return
             
-        # 1. 狀態燈閃爍 (Bright Green <-> Gray)
+        # 1. 狀態燈閃爍 (Bright Green <-> Bright Yellow)
         if self._status_light:
             try:
                 curr = self._status_light.cget('fg')
-                self._status_light.config(fg='#00FF00' if curr != '#00FF00' else 'gray')
+                # 綠色 (#00FF00) <-> 黃色 (#FFFF00)
+                self._status_light.config(fg='#00FF00' if curr != '#00FF00' else '#FFFF00')
             except: pass
 
-        # 2. 標題標籤閃爍 (明顯的顏色切換：原色 <-> 淺橘色)
-        if self._header_label:
+        # 2. 標題標籤與框架閃爍 (綠色 <-> 鮮豔黃色)
+        if self._header_label or self._header_frame:
             try:
-                curr_bg = self._header_label.cget('bg')
-                # #4CAF50 是原始綠色，切換到一個醒目的黃色/橘色
+                # 偵測當前顏色
+                target_label = self._header_label if self._header_label else self._header_frame
+                curr_bg = target_label.cget('bg').upper()
+                
+                # #4CAF50 是原始綠色，切換到鮮黃色 #FFFF00 (更高對比)
                 if curr_bg == '#4CAF50':
-                    self._header_label.config(bg='#FFEB3B', fg='black') # 鮮黃
+                    new_bg = '#FFFF00'
+                    new_fg = 'black' # 黃底黑字
                 else:
-                    self._header_label.config(bg='#4CAF50', fg='white') # 恢復
+                    new_bg = '#4CAF50'
+                    new_fg = 'white' # 綠底白字
+                
+                if self._header_label:
+                    self._header_label.config(bg=new_bg, fg=new_fg)
+                if self._header_frame:
+                    self._header_frame.config(bg=new_bg)
             except: pass
 
         try:
@@ -79,6 +92,10 @@ class ProgressManager:
         if self._header_label:
             try:
                 self._header_label.config(bg='#4CAF50', fg='white') # 恢復原始
+            except: pass
+        if self._header_frame:
+            try:
+                self._header_frame.config(bg='#4CAF50') # 恢復原始
             except: pass
 
     @property
