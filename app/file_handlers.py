@@ -166,54 +166,46 @@ class FileHandlerMixin:
         self.settings['last_folder_path'] = folder_path
         self._save_settings_silent()
 
-        # 如果選了多個檔案，或單個檔案，詢問意圖
-        print(f"[DEBUG] _select_folder_unified: 選擇了 {len(file_paths)} 個檔案")
-        print(f"[DEBUG] - 資料夾路徑: {folder_path}")
-        print(f"[DEBUG] - 檔案列表: {[os.path.basename(f) for f in file_paths]}")
+        # 智能判斷：如果只選了一個檔案，檢查同目錄下是否有其他 LOG 檔案
+        if len(file_paths) == 1:
+            folder_path = os.path.dirname(file_paths[0])
+            try:
+                # 快速掃描同目錄下的其他 .log 檔案
+                other_logs = [f for f in os.listdir(folder_path) 
+                            if f.lower().endswith('.log') and f != os.path.basename(file_paths[0])]
+                
+                if other_logs:
+                    # 發現其他 LOG，詢問使用者
+                    count = len(other_logs)
+                    msg = f"在同個資料夾中發現另外 {count} 個 LOG 檔案。\\n\\n是否要一併處理整個資料夾？\\n(選擇【否】將只處理選定的這個檔案)"
+                    if messagebox.askyesno("智慧偵測", msg):
+                        # 處理整個資料夾
+                        print(f"[DEBUG] - 使用者選擇處理整個資料夾: {folder_path}")
+                        self._select_folder_classic(target_path=folder_path)
+                        return
+                    else:
+                        print(f"[DEBUG] - 使用者選擇只處理單一檔案")
+            except Exception as e:
+                print(f"[DEBUG] 智慧偵測失敗: {e}")
         
-        action = show_smart_select_dialog(self.root, list(file_paths), folder_path)
-        print(f"[DEBUG] - 使用者選擇: {action}")
+        # 執行原本的處理邏輯 (如果是多檔，直接處理；如果是單檔且使用者選否，也直接處理)
+        has_archives = any(self._is_archive_file(f) for f in file_paths)
+        print(f"[DEBUG] - 包含壓縮檔: {has_archives}")
         
-        if action == 'files':
-            # 僅處理選定的檔案 (轉發給 _select_files_unified 的邏輯處理)
-            # 這裡我們需要根據檔案類型分流
-            has_archives = any(self._is_archive_file(f) for f in file_paths)
-            print(f"[DEBUG] - 包含壓縮檔: {has_archives}")
+        if has_archives:
+            archives = [f for f in file_paths if self._is_archive_file(f)]
+            logs = [f for f in file_paths if f.lower().endswith('.log')]
             
-            if has_archives:
-                # 走壓縮檔邏輯
-                # 這裡假設如果混合，就全部視為壓縮檔處理流程（支援解壓）
-                # 或是過濾出壓縮檔？
-                # 如果使用者明確選了 "Files"，我們就把這些檔案當作要解壓的對象
-                archives = [f for f in file_paths if self._is_archive_file(f)]
-                logs = [f for f in file_paths if f.lower().endswith('.log')]
-                
-                print(f"[DEBUG] - 壓縮檔數量: {len(archives)}")
-                print(f"[DEBUG] - LOG 檔案數量: {len(logs)}")
-                
-                if archives and not logs:
-                    print(f"[DEBUG] - 處理壓縮檔")
-                    self._process_selected_archives_direct(archives, folder_path)
-                elif logs and not archives:
-                     # 純 Log
-                     print(f"[DEBUG] - 處理 LOG 檔案")
-                     self._process_selected_logs_direct(logs)
-                else:
-                    # 混合：優先處理壓縮檔，或是都處理？
-                    # 簡化：只處理壓縮檔
-                    if archives:
-                         print(f"[DEBUG] - 混合檔案，處理壓縮檔")
-                         self._process_selected_archives_direct(archives, folder_path)
-                    
+            if archives and not logs:
+                self._process_selected_archives_direct(archives, folder_path)
+            elif logs and not archives:
+                self._process_selected_logs_direct(logs)
             else:
-                 # 純 Log 檔案
-                 print(f"[DEBUG] - 處理純 LOG 檔案")
-                 self._process_selected_logs_direct(list(file_paths))
-
-        elif action == 'folder':
-            # 掃描整個資料夾 (呼叫經典邏輯，傳入路徑)
-            print(f"[DEBUG] - 掃描整個資料夾: {folder_path}")
-            self._select_folder_classic(target_path=folder_path)
+                # 混合：優先處理壓縮檔
+                self._process_selected_archives_direct(archives, folder_path)
+        else:
+            # 純 Log 檔案
+            self._process_selected_logs_direct(list(file_paths))
             
     def _process_selected_logs_direct(self, file_paths):
         """直接處理選定的 LOG 檔案列表"""
@@ -651,6 +643,8 @@ class FileHandlerMixin:
                     return
                 
                 def _apply_result():
+                    # 確保先關閉解壓縮的進度條，避免影響分析的進度條
+                    self._close_progress()
                     if len(log_files) == 1:
                         self.current_mode = 'single'
                         self.current_log_path = log_files[0]
@@ -663,14 +657,17 @@ class FileHandlerMixin:
                     self.settings['last_compressed_folder'] = folder_path
                     self._save_settings_silent()
                     self._analyze_enhanced_log()
+                    
                 self.temp_cleanup_path = temp_dir
                 self.root.after(0, _apply_result)
+                
             except Exception as e:
                 self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\\n{e}"))
                 if temp_dir and os.path.exists(temp_dir):
-                    shutil.rmtree(temp_dir, ignore_errors=True)
-            finally:
+                    try: shutil.rmtree(temp_dir, ignore_errors=True)
+                    except: pass
                 self.root.after(0, self._close_progress)
+                
         threading.Thread(target=_bg, daemon=True).start()
 
     def _show_archive_preview(self, archives: list):
@@ -739,82 +736,98 @@ class FileHandlerMixin:
             return archives
 
     def _process_compressed_file(self, compressed_path):
-        """處理壓縮檔案"""
-        try:
-            # 建立暫存目錄
-            temp_dir = tempfile.mkdtemp(prefix="log_analyzer_")
-            
-            # 檢查取消狀態
-            if self._cancel_flag:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                return
-            
-            # 解壓縮
-            file_ext = os.path.splitext(compressed_path)[1].lower()
-            
-            if file_ext == '.zip':
-                self._extract_zip(compressed_path, temp_dir)
-            elif file_ext == '.7z':
-                self._extract_7z(compressed_path, temp_dir)
-            elif file_ext == '.rar':
-                self._extract_rar(compressed_path, temp_dir)
-            else:
-                self.root.after(0, lambda: messagebox.showerror("錯誤", "不支援的壓縮格式"))
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                return
-
-            # 檢查取消狀態
-            if self._cancel_flag:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                return
-
-            # 遞迴展開內嵌壓縮檔
+        """處理壓縮檔案 (Threading wrapper)"""
+        filename = os.path.basename(compressed_path)
+        self._show_progress("處理中", f"正在解壓縮 {filename}...")
+        
+        def _bg():
+            temp_dir = None
             try:
-                self._extract_all_archives(temp_dir, max_depth=5)
-            except Exception as sub_e:
-                # 不阻斷主流程，僅提示
-                print(f"遞迴解壓過程發生問題：{sub_e}")
-            
-            # 檢查取消狀態
-            if self._cancel_flag:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                return
-            
-            # 搜尋 LOG 檔案
-            log_files = self._find_log_files(temp_dir)
-            
-            if not log_files:
-                self.root.after(0, lambda: messagebox.showwarning("警告", "壓縮檔中未找到 .log 檔案"))
-                return
-            
-            # 根據檔案數量決定處理模式
-            if len(log_files) == 1:
-                # 單檔模式
-                self.current_mode = 'single'
-                self.current_log_path = log_files[0]
-                filename = os.path.basename(log_files[0])
-                self.root.after(0, lambda: self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮檔)", fg='orange'))
-            else:
-                # 資料夾模式
-                self.current_mode = 'multi'
-                self.current_log_path = temp_dir
-                self.root.after(0, lambda: self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮檔)", fg='orange'))
-            
-            # 儲存選擇的路徑到設定
-            self.settings['last_compressed_path'] = compressed_path
-            self._save_settings_silent()
-            
-            # 開始分析 (必須回到主執行緒執行，因為會更新UI)
-            self.root.after(0, self._analyze_enhanced_log)
-            
-            # 註冊清理函數（分析完成後清理暫存檔案）
-            self.temp_cleanup_path = temp_dir
-            
-        except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮檔案時發生錯誤：\\n{str(e)}"))
-            # 清理暫存目錄
-            if 'temp_dir' in locals() and os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir, ignore_errors=True)
+                # 建立暫存目錄
+                temp_dir = tempfile.mkdtemp(prefix="log_analyzer_")
+                
+                # 檢查取消狀態
+                if self._cancel_flag:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    self.root.after(0, self._close_progress)
+                    return
+                
+                # 解壓縮
+                file_ext = os.path.splitext(compressed_path)[1].lower()
+                
+                if file_ext == '.zip':
+                    self._extract_zip(compressed_path, temp_dir)
+                elif file_ext == '.7z':
+                    self._extract_7z(compressed_path, temp_dir)
+                elif file_ext == '.rar':
+                    self._extract_rar(compressed_path, temp_dir)
+                else:
+                    self.root.after(0, lambda: messagebox.showerror("錯誤", "不支援的壓縮格式"))
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    self.root.after(0, self._close_progress)
+                    return
+
+                # 檢查取消狀態
+                if self._cancel_flag:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    self.root.after(0, self._close_progress)
+                    return
+
+                # 遞迴展開內嵌壓縮檔
+                try:
+                    self._extract_all_archives(temp_dir, max_depth=5)
+                except Exception as sub_e:
+                    print(f"遞迴解壓過程發生問題：{sub_e}")
+                
+                # 檢查取消狀態
+                if self._cancel_flag:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    self.root.after(0, self._close_progress)
+                    return
+                
+                # 搜尋 LOG 檔案
+                log_files = self._find_log_files(temp_dir)
+                
+                if not log_files:
+                    self.root.after(0, lambda: messagebox.showwarning("警告", "壓縮檔中未找到 .log 檔案"))
+                    self.root.after(0, self._close_progress)
+                    return
+                
+                def _apply_result():
+                    # 確保先關閉解壓縮進度
+                    self._close_progress()
+                    
+                    # 根據檔案數量決定處理模式
+                    if len(log_files) == 1:
+                        # 單檔模式
+                        self.current_mode = 'single'
+                        self.current_log_path = log_files[0]
+                        filename = os.path.basename(log_files[0])
+                        self.file_info_label.config(text=f"已選擇：{filename} (來自壓縮檔)", fg='orange')
+                    else:
+                        # 資料夾模式
+                        self.current_mode = 'multi'
+                        self.current_log_path = temp_dir
+                        self.file_info_label.config(text=f"已選擇：{len(log_files)} 個LOG檔案 (來自壓縮檔)", fg='orange')
+                    
+                    # 儲存選擇的路徑到設定
+                    self.settings['last_compressed_path'] = compressed_path
+                    self._save_settings_silent()
+                    
+                    # 開始分析
+                    self._analyze_enhanced_log()
+                    
+                # 註冊清理函數
+                self.temp_cleanup_path = temp_dir
+                self.root.after(0, _apply_result)
+                
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮檔案時發生錯誤：\\n{str(e)}"))
+                if temp_dir and os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                self.root.after(0, self._close_progress)
+
+        threading.Thread(target=_bg, daemon=True).start()
 
     def _extract_zip(self, zip_path, extract_to):
         """解壓縮 ZIP 檔案"""
