@@ -536,24 +536,23 @@ class ExcelWriter:
                 
                 # 優化數據標籤
                 pie.dataLabels = DataLabelList()
-                pie.dataLabels.showCatName = False  # 不顯示類別名稱（避免「數列1」）
-                pie.dataLabels.showVal = True       # 顯示數值
+                pie.dataLabels.showCatName = True   # 顯示錯誤項目名稱
+                pie.dataLabels.showSerName = False  # 絕對不顯示數列名稱 (數列1)
+                pie.dataLabels.showVal = True       # 顯示筆數
                 pie.dataLabels.showPercent = True   # 顯示百分比
                 pie.dataLabels.showLeaderLines = True
-                pie.dataLabels.showLegendKey = False
                 
                 # 設定標籤位置和格式
                 try:
-                    # 標籤格式：數量 + 百分比
+                    # 標籤分隔符號，讓項目、數量、百分比分行顯示以求清晰
                     pie.dataLabels.separator = "\n"
-                    # 將百分比放在圓餅圖內部
-                    from openpyxl.chart.label import DataLabel
-                    pie.dataLabels.dLblPos = "bestFit"  # 自動最佳位置
+                    # 設定標籤位置在「圓餅內側」或「最佳位置」
+                    pie.dataLabels.dLblPos = "bestFit" 
                 except:
                     pass
                 
-                # 顯示圖例（這樣可以看到錯誤類型名稱）
-                pie.legend = None  # 移除圖例，因為我們有統計表
+                # 隱藏右側圖例 (Legend)，因為圓餅圖上已經有標籤了，且下方有統計表
+                pie.legend = None 
                 
                 # 將圖表放在統計表格旁邊（E 欄開始）
                 ws.add_chart(pie, f"E{table_start_row}")
