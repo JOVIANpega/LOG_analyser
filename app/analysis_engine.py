@@ -15,9 +15,20 @@ class AnalysisEngineMixin:
     
     def _analyze_enhanced_log(self):
         """分析log檔案並更新增強版GUI顯示"""
+        print(f"[DEBUG] _analyze_enhanced_log 被調用")
+        print(f"[DEBUG] - current_mode: {self.current_mode}")
+        print(f"[DEBUG] - current_log_path 類型: {type(self.current_log_path)}")
+        
         if not self.current_log_path:
+            print(f"[ERROR] current_log_path 為空！")
             messagebox.showwarning("警告", "請先選擇log檔案或資料夾")
             return
+        
+        # 如果是列表，顯示檔案數量
+        if isinstance(self.current_log_path, (list, tuple)):
+            print(f"[DEBUG] - current_log_path 包含 {len(self.current_log_path)} 個檔案")
+        else:
+            print(f"[DEBUG] - current_log_path: {self.current_log_path}")
             
         # 清空現有內容
         if hasattr(self, 'pass_tree_enhanced'):
@@ -28,21 +39,30 @@ class AnalysisEngineMixin:
             self.log_text_enhanced.clear()
 
         # 顯示分析進度
-        filename = os.path.basename(self.current_log_path)
+        if isinstance(self.current_log_path, (list, tuple)):
+            filename = f"{len(self.current_log_path)} 個檔案"
+        else:
+            filename = os.path.basename(self.current_log_path)
+        
+        print(f"[DEBUG] - 顯示進度: {filename}")
         self._show_progress("正在分析LOG檔案", f"分析檔案: {filename}")
         
         try:
             if self.current_mode == 'single':
+                print(f"[DEBUG] - 調用 _analyze_enhanced_single_file()")
                 self._analyze_enhanced_single_file()
             else:
+                print(f"[DEBUG] - 調用 _analyze_enhanced_multiple_files()")
                 self._analyze_enhanced_multiple_files()
             
 
                 
         except Exception as e:
+            print(f"[ERROR] 分析過程中發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
             self._close_progress()
             messagebox.showerror("分析錯誤", f"分析過程中發生錯誤：\n{str(e)}")
-            traceback.print_exc()
     
     def _analyze_enhanced_single_file(self):
         """分析單一檔案（增強版）- 啟動背景執行緒"""
@@ -221,8 +241,8 @@ class AnalysisEngineMixin:
                 (r'All phase Total Test Time[\s!:\-]+([\d\.]+)\s*Sec', 'Test Time Regex 2') # 修正後的增強版 Regex
             ]
             
-            # 用檔案名作為備選
-            filename = os.path.basename(self.current_log_path)
+            # 用檔案名作為備選（但在多檔模式下不使用）
+            # filename = os.path.basename(self.current_log_path)
             # info_lines.append(f"File: {filename}")
             
             for pattern, label in patterns:
@@ -246,6 +266,11 @@ class AnalysisEngineMixin:
     def _export_markdown_report(self, header_info, pass_items, fail_items, last_fail):
         """匯出 Markdown 報告到 markdown_File 資料夾"""
         try:
+            # 檢查 current_log_path 是否為列表（多檔模式不支援 Markdown 匯出）
+            if isinstance(self.current_log_path, (list, tuple)):
+                print(f"[INFO] 多檔模式不支援 Markdown 報告匯出")
+                return
+            
             # 建立目錄
             md_dir = os.path.join(os.path.dirname(self.current_log_path), "markdown_File")
             if not os.path.exists(md_dir):
@@ -309,19 +334,35 @@ class AnalysisEngineMixin:
         try:
             target_files = []
             
-            # 1. 確定檔案清單
-            if os.path.isdir(self.current_log_path):
-                 for root, dirs, files in os.walk(self.current_log_path):
-                    for f in files:
-                        if self._cancel_flag: break
-                        if f.lower().endswith('.log'):
-                            target_files.append(os.path.join(root, f))
-            elif isinstance(self.current_log_path, (list, tuple)):
+            print(f"[DEBUG] _analyze_enhanced_multiple_files_thread 開始")
+            print(f"[DEBUG] - current_log_path 類型: {type(self.current_log_path)}")
+            
+            # 1. 確定檔案清單（先檢查類型，避免將列表傳給 os.path 函數）
+            if isinstance(self.current_log_path, (list, tuple)):
+                # 多個檔案（列表）
+                print(f"[DEBUG] - 處理檔案列表，共 {len(self.current_log_path)} 個")
                 target_files = [f for f in self.current_log_path if f.lower().endswith('.log')]
-            elif os.path.isfile(self.current_log_path):
-                 target_files = [self.current_log_path]
-                 
+            elif isinstance(self.current_log_path, str):
+                # 單一路徑（字串）
+                if os.path.isdir(self.current_log_path):
+                    # 資料夾：遞迴搜尋
+                    print(f"[DEBUG] - 掃描資料夾: {self.current_log_path}")
+                    for root, dirs, files in os.walk(self.current_log_path):
+                        for f in files:
+                            if self._cancel_flag: break
+                            if f.lower().endswith('.log'):
+                                target_files.append(os.path.join(root, f))
+                elif os.path.isfile(self.current_log_path):
+                    # 單一檔案
+                    print(f"[DEBUG] - 處理單一檔案: {self.current_log_path}")
+                    target_files = [self.current_log_path]
+                else:
+                    print(f"[ERROR] 路徑不存在: {self.current_log_path}")
+            else:
+                print(f"[ERROR] current_log_path 類型不正確: {type(self.current_log_path)}")
+                  
             if not target_files:
+                print(f"[ERROR] 找不到 .log 檔案")
                 self.root.after(0, lambda: messagebox.showwarning("警告", "找不到 .log 檔案"))
                 return
     
@@ -384,31 +425,67 @@ class AnalysisEngineMixin:
                     continue
     
             # 4. 匯出 Excel
+            print(f"[DEBUG] 準備匯出 Excel")
+            print(f"[DEBUG] - 找到檔案數: {len(target_files)}")
+            print(f"[DEBUG] - PASS logs: {len(pass_logs)}")
+            print(f"[DEBUG] - FAIL logs: {len(fail_logs)}")
+            print(f"[DEBUG] - cancel_flag: {self._cancel_flag}")
+            
             if not self._cancel_flag:
                 self._safe_update_progress_text("正在產生 Excel 報告...")
                 try:
                     # 決定輸出目錄
                     if os.path.isdir(self.current_log_path):
                         out_dir = self.current_log_path
+                        print(f"[DEBUG] - 輸出目錄 (資料夾模式): {out_dir}")
                     else:
+                        if not target_files:
+                            error_msg = "沒有找到任何檔案，無法決定輸出目錄"
+                            print(f"[ERROR] {error_msg}")
+                            self.root.after(0, lambda: messagebox.showerror("錯誤", error_msg))
+                            return
                         out_dir = os.path.dirname(target_files[0])
-                        
-                    pass_path, fail_path = self.excel_writer.export_pass_fail_workbooks(
+                        print(f"[DEBUG] - 輸出目錄 (檔案模式): {out_dir}")
+                    
+                    # 檢查 excel_writer 是否存在
+                    if not hasattr(self, 'excel_writer'):
+                        error_msg = "excel_writer 未初始化！"
+                        print(f"[ERROR] {error_msg}")
+                        self.root.after(0, lambda: messagebox.showerror("錯誤", error_msg))
+                        return
+                    
+                    print(f"[DEBUG] - 開始調用 export_pass_fail_workbooks...")
+                    pass_path, fail_path, fail_path_new = self.excel_writer.export_pass_fail_workbooks(
                         out_dir, pass_logs, fail_logs
                     )
                     
+                    print(f"[DEBUG] - Excel 生成成功！")
+                    print(f"[DEBUG]   - PASS 檔案: {pass_path}")
+                    print(f"[DEBUG]   - FAIL 檔案: {fail_path}")
+                    if fail_path_new:
+                        print(f"[DEBUG]   - FAIL 新版: {fail_path_new}")
+                    
                     # 5. 顯示完成視窗 (必須回到主執行緒)
                     self.root.after(0, lambda: self._show_open_folder_prompt(
-                        out_dir, total_files, len(pass_logs), len(fail_logs), pass_path, fail_path
+                        out_dir, total_files, len(pass_logs), len(fail_logs), pass_path, fail_path, fail_path_new
                     ))
                     
                 except Exception as e:
-                    self.root.after(0, lambda: messagebox.showerror("匯出錯誤", f"產生 Excel 報告時發生錯誤: {e}"))
+                    error_msg = f"產生 Excel 報告時發生錯誤: {e}"
+                    print(f"[ERROR] {error_msg}")
+                    import traceback
                     traceback.print_exc()
+                    self.root.after(0, lambda: messagebox.showerror("匯出錯誤", error_msg))
+            else:
+                print(f"[INFO] Excel 生成被取消 (cancel_flag = True)")
                     
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("錯誤", f"多檔分析過程發生錯誤: {e}"))
+            error_msg = f"多檔分析過程發生錯誤: {e}"
+            print(f"[ERROR] {error_msg}")
+            import traceback
             traceback.print_exc()
+            self.root.after(0, lambda: messagebox.showerror("錯誤", error_msg))
         finally:
             # 確保結束時關閉進度條
+            print(f"[DEBUG] 分析完成，關閉進度條")
             self.root.after(0, self._close_progress)

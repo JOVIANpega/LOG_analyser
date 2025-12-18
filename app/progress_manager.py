@@ -163,6 +163,10 @@ class ProgressManager:
             
             # 關閉彈窗
             if self._progress_win and self._progress_win.winfo_exists():
+                try:
+                    self._progress_win.grab_release()  # 釋放輸入鎖定
+                except:
+                    pass
                 self._progress_win.destroy()
         except Exception:
             pass

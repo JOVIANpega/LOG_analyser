@@ -11,6 +11,7 @@ from openpyxl.comments import Comment
 from openpyxl.worksheet.datavalidation import DataValidation
 import re
 import os
+from .excel_fail_list_builder import FailListBuilder
 
 class ExcelWriter:
     def __init__(self):
@@ -1069,6 +1070,142 @@ class ExcelWriter:
                 except Exception:
                     pass
 
+    def _build_fail_workbook_new_format(self, output_path: str, logs: list):
+        """建立新版 FAIL 匯總報告 (Dashboard + FAIL_LIST + 詳細分頁)"""
+        wb = Workbook()
+        if wb.sheetnames:
+            wb.remove(wb.active)
+            
+        # 使用 Builder 建立 Dashboard 和 FAIL_LIST
+        builder = FailListBuilder()
+        builder.build_dashboard_sheet(wb, logs)
+        builder.build_fail_list_sheet(wb, logs)
+        
+        # 建立詳細分頁 (重用現有邏輯)
+        # 為了避免與舊版 Sheet 名稱衝突 (雖然是不同檔案，但邏輯一致比較好)
+        sheet_map = {}
+        
+        # 定義樣式
+        thin = Side(border_style='thin', color='FF888888')
+        thick = Side(border_style='thick', color='FF000000')
+        
+        for entry in logs:
+            fname = entry.get('file_name', 'LOG')
+            isn = self._extract_isn_from_filename(fname)
+            
+            # 使用 ISN 或檔名作為 Sheet 名稱
+            sheet_name_base = self._sanitize_sheet_title(isn if isn else fname)
+            sheet_name = self._unique_sheet_name(wb, sheet_name_base)
+            
+            # 記錄對應關係 (供 Dashboard 超連結使用)
+            # 注意: logs 裡的 dict 是可變的，我們可以把 sheet_name 塞回去給 Dashboard 用？
+            # 但 Dashboard 已經建立完成了... 
+            # 實際上 FailListBuilder 裡面的超連結邏輯可能依賴於預先知道的 sheet name?
+            # 檢查 FailListBuilder: 它嘗試從 log_entry.get('sheet_name') 獲取。
+            # 所以我們應該先決定 sheet names，再呼叫 build_dashboard。
+            # 但這裡我們先簡單處理，因為 build_dashboard 已經呼叫了。
+            # 如果要完美支援超連結，應該重構順序。
+            # 暫時先把 Sheet 建立起來。
+            
+            entry['sheet_name'] = sheet_name # 更新 entry 以便後續可能的用途 (或如果是參照引用)
+            
+            ws2 = wb.create_sheet(title=sheet_name)
+            
+            # --- 以下邏輯複製自 _build_fail_workbook 的分頁建立部分，確保一致性 ---
+            
+            cell = ws2.cell(row=1, column=1, value=self._sanitize_cell_text(entry.get('file_name')))
+            cell.font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+            cell.fill = PatternFill('solid', fgColor='FFE74C3C')
+            cell.number_format = '@'
+            
+            # 在最上面添加回到 Dashboard 的快速連結 (取代 Summary)
+            back_link = ws2.cell(row=2, column=1, value='🔙 回到 Dashboard 頁面')
+            back_link.number_format='@'
+            back_link.font = Font(name='Calibri', size=12, bold=True, color='FF008000', underline='single')
+            back_link.alignment = Alignment(horizontal='left')
+            back_link.hyperlink = f"#'Dashboard'!A1"
+            back_link.fill = PatternFill('solid', fgColor='FFE6FFE6')
+            
+            # 添加分隔線
+            ws2.cell(row=3, column=1, value='─' * 50).font = Font(name='Calibri', size=10, color='FF808080')
+            
+            # 插入 Header Info
+            current_row = 4
+            header_info = entry.get('header_info', '')
+            if header_info:
+                current_row = self._insert_header_info(ws2, header_info, start_row=current_row)
+            
+            # 顯示完整錯誤原因區塊
+            detailed_error = self._build_detailed_error_summary(entry)
+            error_lines = detailed_error.split('\n')
+            
+            for line in error_lines:
+                if line.strip():
+                    cell = ws2.cell(row=current_row, column=1, value=self._sanitize_cell_text(line))
+                    cell.number_format = '@'
+                    
+                    if "===============錯誤原因====================" in line:
+                        cell.font = Font(name='Calibri', size=12, bold=True, color='FF0000')
+                    elif "🔴 突出錯誤" in line:
+                        cell.font = Font(name='Calibri', size=11, bold=True, color='FF0000')
+                    elif "=" * 50 in line:
+                        cell.font = Font(name='Calibri', size=10)
+                    elif "執行指令:" in line:
+                        cell.font = Font(name='Calibri', size=11, color='FF0000FF')
+                    elif any(keyword in line.lower() for keyword in ['is fail', 'executes fail', "doesn't match", 'all test aborted']):
+                        cell.font = Font(name='Calibri', size=11, bold=True, color='FF0000')
+                        cell.fill = PatternFill('solid', fgColor='FFFFFF99')
+                    else:
+                        cell.font = Font(name='Calibri', size=11)
+                    
+                    ws2.row_dimensions[current_row].height = 25
+                    current_row += 1
+                else:
+                    current_row += 1
+            
+            # 添加分隔線
+            ws2.cell(row=current_row, column=1, value=self._sanitize_cell_text("=" * 60)).number_format='@'
+            ws2.cell(row=current_row, column=1).font = Font(name='Microsoft JhengHei', size=10)
+            current_row += 1
+            
+            # PASS步驟資訊
+            pass_steps = [str(i) for i, _ in enumerate(entry.get('pass_items') or [], 1)]
+            ws2.cell(row=current_row, column=1, value=self._sanitize_cell_text('PASS步驟: ' + '，'.join(pass_steps) if pass_steps else 'PASS步驟: 無'))
+            ws2.cell(row=current_row, column=1).number_format='@'
+            ws2.cell(row=current_row, column=1).font = Font(name='Calibri', size=11, color='FF008000')
+            start_row = current_row + 1
+            
+            # 寫入原始LOG內容
+            self._write_raw_log_with_annotations(ws2, start_row=start_row, raw_lines=entry.get('raw_lines') or [], annotations=entry.get('ui_annotations') or [], font=Font(name='Calibri', size=11), step_marks=entry.get('step_marks'))
+            
+            # 設定行高與欄寬
+            for row_num in range(1, ws2.max_row + 1):
+                if ws2.row_dimensions[row_num].height == 15:
+                    ws2.row_dimensions[row_num].height = 20
+            self._auto_fit_columns(ws2)
+        
+        # 重新建立 Dashboard (為了正確更新超連結)
+        # 這是因為我們剛才知道每個 Log 分配到的 Sheet Name
+        # 如果效率允許，重新跑一次 Builder
+        if logs:
+             # 移除舊的 Dashboard
+             try:
+                del wb['Dashboard']
+             except:
+                pass
+             # 重建
+             builder.build_dashboard_sheet(wb, logs)
+             # 移動 Dashboard 到第一頁
+             if 'Dashboard' in wb.sheetnames:
+                 ws_dash = wb['Dashboard']
+                 wb.move_sheet(ws_dash, offset= -wb.sheetnames.index('Dashboard'))
+
+        try:
+            wb.save(output_path)
+            print(f"新版 FAIL 報告已生成: {output_path}")
+        except Exception as e:
+            print(f"保存新版 FAIL 報告失敗: {e}")
+            
     def _write_raw_log_with_annotations(self, ws, start_row: int, raw_lines: list, annotations: list, font: Font, step_marks: dict | None = None):
         color_map = {
             'black': 'FF000000',

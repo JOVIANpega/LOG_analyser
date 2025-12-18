@@ -93,6 +93,10 @@ def show_mixed_content_dialog(parent, archives, log_count, folder_path):
             return
         result['action'] = 'process_archives'
         result['selected'] = selected
+        try:
+            dialog.grab_release()
+        except:
+            pass
         dialog.destroy()
         
     def on_logs():
@@ -100,9 +104,17 @@ def show_mixed_content_dialog(parent, archives, log_count, folder_path):
             messagebox.showinfo("提示", "此資料夾中沒有直接的 Log 檔案", parent=dialog)
             return
         result['action'] = 'process_logs'
+        try:
+            dialog.grab_release()
+        except:
+            pass
         dialog.destroy()
         
     def on_cancel():
+        try:
+            dialog.grab_release()
+        except:
+            pass
         dialog.destroy()
         
     # 處理壓縮檔按鈕 (主要動作)
@@ -118,6 +130,9 @@ def show_mixed_content_dialog(parent, archives, log_count, folder_path):
         
     # 取消按鈕
     tk.Button(right_btns, text="取消", command=on_cancel).pack(side=tk.LEFT, padx=5)
+    
+    # 綁定視窗關閉事件
+    dialog.protocol("WM_DELETE_WINDOW", on_cancel)
     
     dialog.wait_window()
     return result
@@ -168,11 +183,27 @@ def show_smart_select_dialog(parent, selected_files, folder_path):
     def on_files():
         nonlocal action
         action = 'files'
+        try:
+            dialog.grab_release()
+        except:
+            pass
         dialog.destroy()
         
     def on_folder():
         nonlocal action
         action = 'folder'
+        try:
+            dialog.grab_release()
+        except:
+            pass
+        dialog.destroy()
+    
+    def on_close():
+        """處理視窗關閉事件"""
+        try:
+            dialog.grab_release()
+        except:
+            pass
         dialog.destroy()
 
     tk.Button(btn_frame, text="僅處理選定檔案", command=on_files, 
@@ -180,6 +211,9 @@ def show_smart_select_dialog(parent, selected_files, folder_path):
              
     tk.Button(btn_frame, text="掃描整個資料夾", command=on_folder,
              bg='#4CAF50', fg='white', font=('Arial', 10), width=15).pack(side=tk.LEFT, padx=10)
+    
+    # 綁定視窗關閉事件
+    dialog.protocol("WM_DELETE_WINDOW", on_close)
              
     dialog.wait_window()
     return action

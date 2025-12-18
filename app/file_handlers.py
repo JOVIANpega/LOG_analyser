@@ -66,6 +66,10 @@ class FileHandlerMixin:
         # 檢查是否包含壓縮檔
         has_archives = any(self._is_archive_file(f) for f in file_paths)
         
+        print(f"[DEBUG] _select_files_unified: 選擇了 {len(file_paths)} 個檔案")
+        print(f"[DEBUG] - 包含壓縮檔: {has_archives}")
+        print(f"[DEBUG] - 檔案列表: {[os.path.basename(f) for f in file_paths]}")
+        
         if has_archives:
             # 如果包含壓縮檔，走壓縮檔處理流程
             # 清除現有結果
@@ -73,26 +77,34 @@ class FileHandlerMixin:
             
             if len(file_paths) == 1:
                 # 單一壓縮檔 -> 直接解壓處理
-                 self.root.after(100, lambda: self._process_single_compressed_file(file_paths[0]))
+                print(f"[DEBUG] - 處理單一壓縮檔")
+                self.root.after(100, lambda: self._process_single_compressed_file(file_paths[0]))
             else:
                 # 多個檔 -> 走壓縮檔多選流程 (需確保此方法存在或邏輯正確)
                 # 這裡可以直接複用 _show_compressed_selection_window 或是直接處理
                 # 為了簡化，直接視為多個壓縮檔處理
-                 self._show_compressed_selection_window(list(file_paths))
+                print(f"[DEBUG] - 處理多個壓縮檔")
+                self._show_compressed_selection_window(list(file_paths))
         else:
             # 全是 Log 檔案
             self._clear_enhanced_results()
             
             if len(file_paths) == 1:
                 # 單一 Log
+                print(f"[DEBUG] - 處理單一 LOG 檔案")
                 self.root.after(100, lambda: self._start_analysis_after_preview(file_paths[0]))
             else:
                 # 多個 Log
+                print(f"[DEBUG] - 處理多個 LOG 檔案")
+                print(f"[DEBUG] - 設定 current_mode = 'multi'")
+                print(f"[DEBUG] - 設定 current_log_path = {len(file_paths)} 個檔案")
+                
                 self.current_mode = 'multi'
                 self.current_log_path = list(file_paths)
                 
                 self.file_info_label.config(text=f"已選擇：{len(file_paths)} 個檔案", fg='blue')
                 
+                print(f"[DEBUG] - 調用 _analyze_enhanced_log()")
                 # 自動開始分析
                 self._analyze_enhanced_log()
 
@@ -155,12 +167,18 @@ class FileHandlerMixin:
         self._save_settings_silent()
 
         # 如果選了多個檔案，或單個檔案，詢問意圖
+        print(f"[DEBUG] _select_folder_unified: 選擇了 {len(file_paths)} 個檔案")
+        print(f"[DEBUG] - 資料夾路徑: {folder_path}")
+        print(f"[DEBUG] - 檔案列表: {[os.path.basename(f) for f in file_paths]}")
+        
         action = show_smart_select_dialog(self.root, list(file_paths), folder_path)
+        print(f"[DEBUG] - 使用者選擇: {action}")
         
         if action == 'files':
             # 僅處理選定的檔案 (轉發給 _select_files_unified 的邏輯處理)
             # 這裡我們需要根據檔案類型分流
             has_archives = any(self._is_archive_file(f) for f in file_paths)
+            print(f"[DEBUG] - 包含壓縮檔: {has_archives}")
             
             if has_archives:
                 # 走壓縮檔邏輯
@@ -170,23 +188,31 @@ class FileHandlerMixin:
                 archives = [f for f in file_paths if self._is_archive_file(f)]
                 logs = [f for f in file_paths if f.lower().endswith('.log')]
                 
+                print(f"[DEBUG] - 壓縮檔數量: {len(archives)}")
+                print(f"[DEBUG] - LOG 檔案數量: {len(logs)}")
+                
                 if archives and not logs:
+                    print(f"[DEBUG] - 處理壓縮檔")
                     self._process_selected_archives_direct(archives, folder_path)
                 elif logs and not archives:
                      # 純 Log
+                     print(f"[DEBUG] - 處理 LOG 檔案")
                      self._process_selected_logs_direct(logs)
                 else:
                     # 混合：優先處理壓縮檔，或是都處理？
                     # 簡化：只處理壓縮檔
                     if archives:
+                         print(f"[DEBUG] - 混合檔案，處理壓縮檔")
                          self._process_selected_archives_direct(archives, folder_path)
                     
             else:
                  # 純 Log 檔案
+                 print(f"[DEBUG] - 處理純 LOG 檔案")
                  self._process_selected_logs_direct(list(file_paths))
 
         elif action == 'folder':
             # 掃描整個資料夾 (呼叫經典邏輯，傳入路徑)
+            print(f"[DEBUG] - 掃描整個資料夾: {folder_path}")
             self._select_folder_classic(target_path=folder_path)
             
     def _process_selected_logs_direct(self, file_paths):

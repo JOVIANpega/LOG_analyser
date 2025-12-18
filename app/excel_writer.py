@@ -205,31 +205,40 @@ class ExcelWriter:
             return {}
 
     def _extract_total_secs(self, raw_lines: list) -> float | None:
-        """從 raw_lines 嘗試提取測試總時間（秒數）"""
+        """從 raw_lines 嘗試提取測試總時間（秒數）- 從最後往前掃描"""
         try:
-            for line in (raw_lines[-50:] if len(raw_lines) > 50 else raw_lines):
+            # 從最後 100 行開始往前找（reversed）
+            search_lines = raw_lines[-100:] if len(raw_lines) > 100 else raw_lines
+            
+            # 從後往前掃描
+            for line in reversed(search_lines):
                 line_str = str(line).strip()
                 line_lower = line_str.lower()
                 
-                # 優先尋找 "All phase Total Test Time" 格式
-                if 'all phase total test time' in line_lower:
-                    # 尋找 "----- XXX.XXXXXXX Sec." 格式
-                    time_match = re.search(r'----- (\d+\.?\d*) Sec\.', line_str)
+                # 優先尋找 "Total Test Time is XXX Sec" 格式（最常見）
+                if 'total test time is' in line_lower:
+                    # 匹配 "Total Test Time is XXX.XXX Sec" 或 "Total Test Time is ! ----- XXX.XXX Sec."
+                    time_match = re.search(r'total test time is[^0-9]*?([\d\.]+)\s*sec', line_str, re.IGNORECASE)
                     if time_match:
                         val = float(time_match.group(1))
                         if val > 0:
+                            print(f"[DEBUG] 找到測試總時間: {val} 秒 (來源: Total Test Time is)")
                             return val
                 
-                # 備用：尋找其他時間格式
-                elif 'testtime' in line_lower or 'total time' in line_lower:
-                    # 嘗試提取數字
-                    nums = re.findall(r'(\d+\.?\d*)', line_str)
-                    if nums:
-                        val = float(nums[-1])
+                # 次要：尋找 "All phase Total Test Time" 格式
+                elif 'all phase total test time' in line_lower:
+                    # 尋找 "----- XXX.XXXXXXX Sec." 格式
+                    time_match = re.search(r'-+\s*([\d\.]+)\s*sec', line_str, re.IGNORECASE)
+                    if time_match:
+                        val = float(time_match.group(1))
                         if val > 0:
+                            print(f"[DEBUG] 找到測試總時間: {val} 秒 (來源: All phase Total Test Time)")
                             return val
+            
+            print(f"[WARNING] 未找到測試總時間")
             return None
-        except Exception:
+        except Exception as e:
+            print(f"[ERROR] 提取測試總時間失敗: {e}")
             return None
 
     def _unique_sheet_name(self, wb, base_name: str) -> str:
@@ -299,13 +308,21 @@ class ExcelWriter:
              'pass_items': [...],
              'fail_items': [...],
              'summary': { '測試日期時間': str, 'SFIS': 'ON'|'OFF', '測試總時間': str, 'FAIL原因': str可選 }
-          }, ...]
+           }, ...]
+        
+        Returns:
+            tuple: (pass_path, fail_path, fail_path_new)
+                   fail_path_new 目前為 None，保留給未來的新版 FAIL 報告
         """
         pass_path = os.path.join(folder_path, 'PASS匯總.xlsx')
         fail_path = os.path.join(folder_path, 'FAIL匯總.xlsx')
         self._build_pass_workbook(pass_path, pass_logs)
         self._build_fail_workbook(fail_path, fail_logs)
-        return pass_path, fail_path
+        
+        # 第三個返回值保留給未來的新版 FAIL 報告
+        fail_path_new = None
+        
+        return pass_path, fail_path, fail_path_new
 
     def _extract_station_from_filename_content(self, filename: str) -> str:
         """從檔名提取 Station 名稱
@@ -465,6 +482,88 @@ class ExcelWriter:
             current_w = ws.column_dimensions[col_letter].width
             new_w = min(max(current_w, max_len + 2), 80)
             ws.column_dimensions[col_letter].width = new_w
+        
+        # 3. 添加錯誤類型統計表格和圓餅圖
+        if error_counts:
+            try:
+                from openpyxl.chart import PieChart, Reference
+                from openpyxl.chart.label import DataLabelList
+                
+                # 計算表格位置（在資料表格下方）
+                table_start_row = ws.max_row + 3
+                
+                # 創建統計摘要表格
+                ws.cell(row=table_start_row, column=1, value="錯誤類型統計").font = Font(name='Calibri', size=12, bold=True)
+                ws.cell(row=table_start_row + 1, column=1, value="錯誤類型").font = Font(name='Calibri', size=11, bold=True)
+                ws.cell(row=table_start_row + 1, column=2, value="數量").font = Font(name='Calibri', size=11, bold=True)
+                ws.cell(row=table_start_row + 1, column=3, value="佔比").font = Font(name='Calibri', size=11, bold=True)
+                
+                # 計算總數
+                total_errors = sum(error_counts.values())
+                
+                # 填充統計數據
+                summary_start_row = table_start_row + 2
+                for idx, (error_type, count) in enumerate(sorted(error_counts.items(), key=lambda x: x[1], reverse=True), 0):
+                    row = summary_start_row + idx
+                    percentage = (count / total_errors * 100) if total_errors > 0 else 0
+                    
+                    ws.cell(row=row, column=1, value=self._sanitize_cell_text(error_type)).font = content_font
+                    ws.cell(row=row, column=2, value=count).font = content_font
+                    ws.cell(row=row, column=3, value=f"{percentage:.1f}%").font = content_font
+                    
+                    # 對齊
+                    ws.cell(row=row, column=2).alignment = center_align
+                    ws.cell(row=row, column=3).alignment = center_align
+                
+                # 設定欄寬
+                ws.column_dimensions['A'].width = 50
+                ws.column_dimensions['B'].width = 10
+                ws.column_dimensions['C'].width = 10
+                
+                # 創建圓餅圖
+                pie = PieChart()
+                pie.title = "錯誤類型分布"
+                pie.style = 10
+                pie.height = 15
+                pie.width = 20
+                
+                # 設定數據範圍
+                labels = Reference(ws, min_col=1, min_row=summary_start_row, max_row=summary_start_row + len(error_counts) - 1)
+                data = Reference(ws, min_col=2, min_row=summary_start_row, max_row=summary_start_row + len(error_counts) - 1)
+                
+                pie.add_data(data, titles_from_data=False)  # 不使用數據中的標題
+                pie.set_categories(labels)
+                
+                # 優化數據標籤
+                pie.dataLabels = DataLabelList()
+                pie.dataLabels.showCatName = False  # 不顯示類別名稱（避免「數列1」）
+                pie.dataLabels.showVal = True       # 顯示數值
+                pie.dataLabels.showPercent = True   # 顯示百分比
+                pie.dataLabels.showLeaderLines = True
+                pie.dataLabels.showLegendKey = False
+                
+                # 設定標籤位置和格式
+                try:
+                    # 標籤格式：數量 + 百分比
+                    pie.dataLabels.separator = "\n"
+                    # 將百分比放在圓餅圖內部
+                    from openpyxl.chart.label import DataLabel
+                    pie.dataLabels.dLblPos = "bestFit"  # 自動最佳位置
+                except:
+                    pass
+                
+                # 顯示圖例（這樣可以看到錯誤類型名稱）
+                pie.legend = None  # 移除圖例，因為我們有統計表
+                
+                # 將圖表放在統計表格旁邊（E 欄開始）
+                ws.add_chart(pie, f"E{table_start_row}")
+                
+                print(f"[INFO] 已添加錯誤類型統計表和圓餅圖，共 {len(error_counts)} 種錯誤類型")
+                
+            except Exception as e:
+                print(f"[WARNING] 添加錯誤統計失敗: {e}")
+                import traceback
+                traceback.print_exc()
 
     def _format_filename_with_timestamp(self, base_name: str) -> str:
         """將檔名中的連續14位時間戳 YYYYMMDDHHMMSS 轉為 YYYY-MMDD-HHMMSS 格式。找不到則原樣回傳。"""
@@ -788,6 +887,7 @@ class ExcelWriter:
                 # 白底提示（提示箭頭在左上方，靠近視窗；Excel控制箭頭顯示位置有限）
                 self._add_input_prompt(ws, c, '對應工作表', sheet)
             cur += 1
+        
         # 更緊湊的欄寬
         self._auto_fit_columns(ws, min_widths={1: 30, 2: 12, 3: 15, 4: 8})
         

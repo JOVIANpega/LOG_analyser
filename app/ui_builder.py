@@ -353,19 +353,19 @@ class UIBuilderMixin:
         except Exception as e:
             print(f"自動調整文字視窗大小失敗: {e}")
 
-    def _show_open_folder_prompt(self, out_dir: str, total_files: int, pass_count: int, fail_count: int, pass_path: str, fail_path: str):
+    def _show_open_folder_prompt(self, out_dir: str, total_files: int, pass_count: int, fail_count: int, pass_path: str, fail_path: str, fail_path_new: str = None):
         """白底視窗，加入打勾選項選擇要開啟的檔案"""
         win = tk.Toplevel(self.root)
         win.title("匯出完成")
-        win.geometry("700x400")
+        win.geometry("750x480")
         
         # 讓視窗居中顯示
         win.transient(self.root)
         win.grab_set()
         win.update_idletasks()
-        x = (win.winfo_screenwidth() // 2) - (700 // 2)
-        y = (win.winfo_screenheight() // 2) - (400 // 2)
-        win.geometry(f"700x400+{x}+{y}")
+        x = (win.winfo_screenwidth() // 2) - (750 // 2)
+        y = (win.winfo_screenheight() // 2) - (480 // 2)
+        win.geometry(f"750x480+{x}+{y}")
         
         try:
             win.configure(bg='white')
@@ -378,6 +378,9 @@ class UIBuilderMixin:
             f"PASS: {pass_count}\nFAIL: {fail_count}\n\n"
             f"已產生：\n{pass_path}\n{fail_path}\n"
         )
+        if fail_path_new:
+             info += f"{fail_path_new} (新版)\n"
+             
         lbl_info = tk.Label(win, text=info, bg='white', fg='black', font=('Microsoft JhengHei', 11))
         lbl_info.pack(fill=tk.BOTH, expand=1, padx=16, pady=(16, 6))
         
@@ -393,6 +396,7 @@ class UIBuilderMixin:
         open_folder_var = tk.BooleanVar(value=True)
         open_pass_var = tk.BooleanVar(value=True)
         open_fail_var = tk.BooleanVar(value=True)
+        open_fail_new_var = tk.BooleanVar(value=True)
         
         # 打勾選項
         cb_folder = tk.Checkbutton(check_frame, text="開啟輸出資料夾", variable=open_folder_var, 
@@ -403,9 +407,14 @@ class UIBuilderMixin:
                                 bg='white', fg='black', font=('Microsoft JhengHei', 10))
         cb_pass.pack(anchor='w', pady=2)
         
-        cb_fail = tk.Checkbutton(check_frame, text="開啟 FAIL匯總.xlsx", variable=open_fail_var, 
+        cb_fail = tk.Checkbutton(check_frame, text="開啟 FAIL匯總.xlsx (舊版)", variable=open_fail_var, 
                                 bg='white', fg='black', font=('Microsoft JhengHei', 10))
         cb_fail.pack(anchor='w', pady=2)
+        
+        if fail_path_new:
+            cb_fail_new = tk.Checkbutton(check_frame, text="開啟 FAIL匯總_新版.xlsx (Dashboard)", variable=open_fail_new_var, 
+                                    bg='white', font=('Microsoft JhengHei', 10, 'bold'), fg='blue')
+            cb_fail_new.pack(anchor='w', pady=2)
         
         # 按鈕框架
         btns = tk.Frame(win, bg='white')
@@ -424,13 +433,29 @@ class UIBuilderMixin:
                 # 開啟 FAIL 檔案
                 if open_fail_var.get() and os.path.exists(fail_path):
                     os.startfile(fail_path)
+
+                # 開啟 FAIL 新版檔案
+                if fail_path_new and open_fail_new_var.get() and os.path.exists(fail_path_new):
+                    os.startfile(fail_path_new)
                     
             except Exception as e:
                 print(f"開啟檔案時發生錯誤: {e}")
-            win.destroy()
+            finally:
+                try:
+                    win.grab_release()
+                except:
+                    pass
+                win.destroy()
             
         def on_cancel():
+            try:
+                win.grab_release()
+            except:
+                pass
             win.destroy()
+        
+        # 綁定視窗關閉事件
+        win.protocol("WM_DELETE_WINDOW", on_cancel)
             
         btn_confirm = tk.Button(btns, text="確定", command=on_confirm, bg='#4CAF50', fg='white', font=('Microsoft JhengHei', 10))
         btn_cancel = tk.Button(btns, text="取消", command=on_cancel, bg='#F44336', fg='white', font=('Microsoft JhengHei', 10))
