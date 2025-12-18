@@ -325,9 +325,32 @@ class AnalysisEngineMixin:
             print(f"匯出 Markdown 報告失敗: {e}")
 
     def _analyze_enhanced_multiple_files(self):
-        """分析多個檔案或是資料夾（資料夾模式/壓縮檔模式）"""
-        # 啟動背景執行緒進行分析，避免卡住主介面
+        """分析多個檔案（增強版）- 啟動背景執行緒"""
+        # 清除並切換到原始LOG標籤，用來顯示處理日誌
+        self._ui_log("=== 開始多檔分析流程 ===", clear=True)
+        if hasattr(self, 'notebook'):
+            try:
+                # 假設「原始LOG」是第三個標籤 (索引 2)
+                self.notebook.select(2)
+            except:
+                pass
+                
+        self._update_progress("正在啟動背景多檔解析...")
         threading.Thread(target=self._analyze_enhanced_multiple_files_thread, daemon=True).start()
+
+    def _ui_log(self, message, clear=False):
+        """在 UI 的原始 LOG 視窗顯示訊息 (Thread-safe)"""
+        import tkinter as tk # Assuming tkinter is used for UI
+        def _append():
+            if hasattr(self, 'log_text_enhanced'):
+                if clear:
+                    self.log_text_enhanced.clear()
+                self.log_text_enhanced.append(message)
+                self.log_text_enhanced.text.see(tk.END)
+        
+        if hasattr(self, 'root'):
+            self.root.after(0, _append)
+        print(f"[UI_LOG] {message}")
 
     def _analyze_enhanced_multiple_files_thread(self):
         """背景執行的多檔分析邏輯"""
@@ -367,6 +390,7 @@ class AnalysisEngineMixin:
                 return
     
             total_files = len(target_files)
+            self._ui_log(f"找到 {total_files} 個檔案開始分析...")
             
             # 2. 初始化進度條 (Thread-safe)
             self._safe_update_progress_mode('determinate')
@@ -378,6 +402,7 @@ class AnalysisEngineMixin:
             # 3. 逐一分析
             for i, file_path in enumerate(target_files):
                 if self._cancel_flag:
+                    self._ui_log("分析被使用者取消")
                     break
                     
                 fname = os.path.basename(file_path)
@@ -388,8 +413,16 @@ class AnalysisEngineMixin:
                     # 解析 (CPU bound, safe in thread)
                     result = self.log_parser.parse_log_file(file_path)
                     
+                    # 提取測試時間日誌
+                    test_time = "未知"
+                    try:
+                        secs = self.excel_writer._extract_total_secs(result['raw_lines'])
+                        if secs: test_time = f"{secs:.2f} 秒"
+                    except: pass
+                    
+                    self._ui_log(f"[{i+1}/{total_files}] 分析完成: {fname} (時間: {test_time})")
+                    
                     # 整理資料結構
-                    # 提取 Header 資訊
                     header_info = self._extract_log_header_info(result['raw_lines'])
                     
                     log_entry = {
@@ -400,84 +433,54 @@ class AnalysisEngineMixin:
                         'pass_items': result['pass_items'],
                         'fail_items': result['fail_items'],
                         'last_fail': result.get('last_fail'),
-                        'step_marks': None,
-                        'header_info': header_info, # 加入 Header 資訊
+                        'header_info': header_info,
                         'summary': {
                             'SFIS': 'Unknown', 
                             'FAIL原因': result.get('last_fail', {}).get('error', '') if result.get('last_fail') else ''
                         }
                     }
                     
-                    # 分類
-                    if result['log_type'] == 'PASS':
-                         pass_logs.append(log_entry)
-                    elif result['log_type'] == 'FAIL':
-                         fail_logs.append(log_entry)
-                    else:
-                        if result['fail_items']:
-                            fail_logs.append(log_entry)
-                        else:
-                            pass_logs.append(log_entry)
-                         
+                    if result['log_type'] == 'PASS': pass_logs.append(log_entry)
+                    else: fail_logs.append(log_entry)
+                          
                 except Exception as e:
-                    print(f"分析檔案失敗 {file_path}: {e}")
-                    traceback.print_exc()
+                    self._ui_log(f"[錯誤] 分析失敗 {fname}: {str(e)}")
                     continue
     
             # 4. 匯出 Excel
-            print(f"[DEBUG] 準備匯出 Excel")
-            print(f"[DEBUG] - 找到檔案數: {len(target_files)}")
-            print(f"[DEBUG] - PASS logs: {len(pass_logs)}")
-            print(f"[DEBUG] - FAIL logs: {len(fail_logs)}")
-            print(f"[DEBUG] - cancel_flag: {self._cancel_flag}")
-            
             if not self._cancel_flag:
                 self._safe_update_progress_text("正在產生 Excel 報告...")
+                self._ui_log(f"分析結束。成功: {len(pass_logs)}, 失敗: {len(fail_logs)}")
                 try:
                     # 決定輸出目錄
-                    if os.path.isdir(self.current_log_path):
-                        out_dir = self.current_log_path
-                        print(f"[DEBUG] - 輸出目錄 (資料夾模式): {out_dir}")
+                    out_dir = ""
+                    if isinstance(self.current_log_path, str) and os.path.exists(self.current_log_path):
+                        if os.path.isdir(self.current_log_path):
+                            out_dir = self.current_log_path
+                        else:
+                            out_dir = os.path.dirname(self.current_log_path)
+                    elif isinstance(self.current_log_path, (list, tuple)):
+                        # 如果是多個檔案，取第一個檔案的目錄
+                        if self.current_log_path and os.path.exists(self.current_log_path[0]):
+                            out_dir = os.path.dirname(self.current_log_path[0])
+                        else:
+                            out_dir = os.getcwd() # 預設為當前工作目錄
                     else:
-                        if not target_files:
-                            error_msg = "沒有找到任何檔案，無法決定輸出目錄"
-                            print(f"[ERROR] {error_msg}")
-                            self.root.after(0, lambda: messagebox.showerror("錯誤", error_msg))
-                            return
-                        out_dir = os.path.dirname(target_files[0])
-                        print(f"[DEBUG] - 輸出目錄 (檔案模式): {out_dir}")
+                        out_dir = os.getcwd() # 預設為當前工作目錄
+
+                    self._ui_log(f"正在產生 Excel 至: {out_dir}")
                     
-                    # 檢查 excel_writer 是否存在
-                    if not hasattr(self, 'excel_writer'):
-                        error_msg = "excel_writer 未初始化！"
-                        print(f"[ERROR] {error_msg}")
-                        self.root.after(0, lambda: messagebox.showerror("錯誤", error_msg))
-                        return
-                    
-                    print(f"[DEBUG] - 開始調用 export_pass_fail_workbooks...")
-                    pass_path, fail_path, fail_path_new = self.excel_writer.export_pass_fail_workbooks(
-                        out_dir, pass_logs, fail_logs
-                    )
-                    
-                    print(f"[DEBUG] - Excel 生成成功！")
-                    print(f"[DEBUG]   - PASS 檔案: {pass_path}")
-                    print(f"[DEBUG]   - FAIL 檔案: {fail_path}")
-                    if fail_path_new:
-                        print(f"[DEBUG]   - FAIL 新版: {fail_path_new}")
-                    
-                    # 5. 顯示完成視窗 (必須回到主執行緒)
-                    self.root.after(0, lambda: self._show_open_folder_prompt(
-                        out_dir, total_files, len(pass_logs), len(fail_logs), pass_path, fail_path, fail_path_new
-                    ))
-                    
+                    if hasattr(self, 'excel_writer'):
+                        pass_path, fail_path, _ = self.excel_writer.export_pass_fail_workbooks(
+                            out_dir, pass_logs, fail_logs
+                        )
+                        self._ui_log(f"Excel 生成成功！\nPASS: {os.path.basename(pass_path)}\nFAIL: {os.path.basename(fail_path)}")
+                        self.root.after(0, lambda: self._show_open_folder_prompt(out_dir, pass_path, fail_path))
                 except Exception as e:
-                    error_msg = f"產生 Excel 報告時發生錯誤: {e}"
-                    print(f"[ERROR] {error_msg}")
-                    import traceback
-                    traceback.print_exc()
-                    self.root.after(0, lambda: messagebox.showerror("匯出錯誤", error_msg))
+                    self._ui_log(f"[錯誤] 匯出 Excel 失敗: {str(e)}")
+                    self.root.after(0, lambda: messagebox.showerror("匯出錯誤", str(e)))
             else:
-                print(f"[INFO] Excel 生成被取消 (cancel_flag = True)")
+                self._ui_log(f"Excel 生成被取消")
                     
         except Exception as e:
             error_msg = f"多檔分析過程發生錯誤: {e}"
