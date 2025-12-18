@@ -40,34 +40,34 @@ class ProgressManager:
         if not self._is_flashing:
             return
             
-        # 1. 狀態燈閃爍 (Green <-> DarkGreen)
+        # 1. 狀態燈閃爍 (Bright Green <-> Gray)
         if self._status_light:
             try:
                 curr = self._status_light.cget('fg')
-                self._status_light.config(fg='#00FF00' if curr != '#00FF00' else '#006400')
+                self._status_light.config(fg='#00FF00' if curr != '#00FF00' else 'gray')
             except: pass
 
-        # 2. 標題標籤閃爍 (Green <-> Orange/Blue or simple Fade)
-        # 使用者提到 GUI左上的 centermani LOG 閃爍
+        # 2. 標題標籤閃爍 (明顯的顏色切換：原色 <-> 淺橘色)
         if self._header_label:
             try:
                 curr_bg = self._header_label.cget('bg')
-                # 在原本的綠色 (#4CAF50) 與較亮的綠色 (#81C784) 之間切換
-                next_bg = '#81C784' if curr_bg == '#4CAF50' else '#4CAF50'
-                self._header_label.config(bg=next_bg)
-                # 同步更新 parent frame bg 如果有的話，但通常 label 閃爍就夠了
+                # #4CAF50 是原始綠色，切換到一個醒目的黃色/橘色
+                if curr_bg == '#4CAF50':
+                    self._header_label.config(bg='#FFEB3B', fg='black') # 鮮黃
+                else:
+                    self._header_label.config(bg='#4CAF50', fg='white') # 恢復
             except: pass
 
         try:
-            self.root.after(500, self._flash_loop)
+            self.root.after(400, self._flash_loop) # 稍微加快頻率
         except Exception:
             self._is_flashing = False
             
     def _start_flashing(self):
         """開始閃爍"""
-        if self._status_light and not self._is_flashing:
+        if not self._is_flashing:
             self._is_flashing = True
-            self._flash_loop()
+            self._flash_loop() # 立即執行第一次
             
     def _stop_flashing(self):
         """停止閃爍"""
@@ -78,7 +78,7 @@ class ProgressManager:
             except: pass
         if self._header_label:
             try:
-                self._header_label.config(bg='#4CAF50') # 恢復原始綠色
+                self._header_label.config(bg='#4CAF50', fg='white') # 恢復原始
             except: pass
 
     @property

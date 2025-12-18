@@ -766,68 +766,65 @@ class ExcelWriter:
             # 調整欄寬以顯示所有文字
             self._auto_fit_columns(ws2, min_widths={1: 150})
         # Summary 表格：
-        # 使用者要求：顯示檔名、腳本檔案、SFIS、測試時間即可
-        headers = ['檔名', '腳本檔案', 'SFIS', '測試總時間']
+        # 使用者要求：將所有資訊整合至第一欄（多行顯示），不帶超連結
+        headers = ['LOG資訊']
         for c, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=c, value=header)
             cell.font = header_font
             cell.alignment = center
             cell.fill = deep_green
+            
         ws.freeze_panes = 'A2'
         thin = Side(border_style='thin', color='FF888888')
         thick = Side(border_style='thick', color='FF000000')
         start_data_row = ws.max_row + 1
         
         for entry in logs:
-            # 檔名欄 (格式化時間戳)
+            # 取得基礎檔名
             base = self._sanitize_cell_text(entry.get('file_name') or '')
             base_fmt = self._format_filename_with_timestamp(base)
             
             # 擷取系統資訊
-            system_info = self._extract_system_info(entry.get('raw_lines') or [])
+            sys_info = entry.get('header_info_dict', {}) or self._extract_system_info(entry.get('raw_lines') or [])
+            script = sys_info.get('Script File', 'N/A')
+            sfis = sys_info.get('SFIS', 'N/A')
             
-            # 1. 檔名
-            r = ws.max_row + 1
-            cell_name = ws.cell(row=r, column=1, value=self._sanitize_cell_text(base_fmt))
-            cell_name.number_format='@'
-            cell_name.font = Font(name='Calibri', size=11, color='FF000000')
-            cell_name.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top')
-            
-            # 備註與超連結
-            sheet = sheet_map.get(entry.get('file_name'))
-            if sheet:
-                # 點擊跳轉到對應工作表
-                cell_name.hyperlink = f"#'{sheet}'!A1"
-                try:
-                    cell_name.comment = Comment(self._build_preview_comment(entry), "LOG Analyzer")
-                    cell_name.comment.width = 400
-                    cell_name.comment.height = 500
-                except Exception:
-                    pass
-                self._add_input_prompt(ws, cell_name, '對應工作表', entry.get('file_name') or '')
-
-            # 2. 腳本檔案
-            script_file = system_info.get('Script File', 'N/A')
-            cell_script = ws.cell(row=r, column=2, value=self._sanitize_cell_text(script_file))
-            cell_script.font = normal_font
-            cell_script.alignment = Alignment(wrap_text=True, vertical='top')
-            
-            # 3. SFIS
-            sfis_value = system_info.get('SFIS', 'N/A')
-            cell_sfis = ws.cell(row=r, column=3, value=sfis_value)
-            cell_sfis.font = normal_font
-            cell_sfis.alignment = center
-            
-            # 4. 測試總時間
+            # 獲取時間資訊
             secs, _ = self._extract_total_secs(entry.get('raw_lines') or [])
-            sec_txt = f"{secs:.1f} Sec." if secs is not None else 'N/A'
-            cell_time = ws.cell(row=r, column=4, value=sec_txt)
-            cell_time.font = normal_font
-            cell_time.alignment = center
+            test_time = f"{secs:.1f} 秒" if secs is not None else 'N/A'
             
-            # 格線
-            for c in range(1, len(headers)+1):
-                ws.cell(row=r, column=c).border = Border(left=thin, right=thin, top=thin, bottom=thin)
+            # 依照使用者要求組合多行字串
+            combined_info = (
+                f"{base_fmt}\n"
+                f"腳本檔案: {script}\n"
+                f"SFIS: {sfis}\n"
+                f"測試時間: {test_time}"
+            )
+            
+            r = ws.max_row + 1
+            cell_info = ws.cell(row=r, column=1, value=self._sanitize_cell_text(combined_info))
+            cell_info.number_format='@'
+            # 樣式：自動換行，靠上對齊
+            cell_info.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top')
+            cell_info.font = Font(name='Calibri', size=11)
+            
+            # 套用框線
+            cell_info.border = Border(left=thin, right=thin, top=thin, bottom=thin)
+            
+            # 設定行高以確保多行文字可見 (大約 4 行)
+            ws.row_dimensions[r].height = 65
+            
+        # 設定欄寬
+        ws.column_dimensions['A'].width = 100
+        
+        # 外框粗線
+        end_r = ws.max_row
+        if end_r >= start_data_row:
+            ws.cell(row=start_data_row, column=1).border = Border(left=thick, right=thick, top=thick, bottom=thin)
+            if end_r > start_data_row:
+                ws.cell(row=end_r, column=1).border = Border(left=thick, right=thick, top=thin, bottom=thick)
+            else:
+                ws.cell(row=end_r, column=1).border = Border(left=thick, right=thick, top=thick, bottom=thick)
         # 外框粗線
         end_r = ws.max_row
         if end_r >= start_data_row:
@@ -1026,20 +1023,39 @@ class ExcelWriter:
         start_data_row = ws.max_row + 1
         
         for entry in logs:
-            # 檔名欄
+            # 取得基礎檔名
             base = self._sanitize_cell_text(entry.get('file_name') or '')
             base_fmt = self._format_filename_with_timestamp(base)
-            sfis = (entry.get('summary') or {}).get('SFIS','')
-            sfis = (sfis or '').upper()
+            
+            # 擷取系統資訊
+            sys_info = entry.get('header_info_dict', {}) or self._extract_system_info(entry.get('raw_lines') or [])
+            script = sys_info.get('Script File', 'N/A')
+            sfis = sys_info.get('SFIS', 'N/A')
+            
+            # 獲取時間資訊
             secs, _ = self._extract_total_secs(entry.get('raw_lines') or [])
-            sec_txt = f"測試總時間:{secs:.1f} Sec." if secs is not None else ''
-            suffix = f"_SFIS_{sfis}" if sfis else ''
-            display_name = f"{base_fmt}{suffix} {sec_txt}".strip()
+            test_time = f"{secs:.1f} 秒" if secs is not None else 'N/A'
+            
+            # 組合多行資訊
+            combined_info = (
+                f"{base_fmt}\n"
+                f"腳本檔案: {script}\n"
+                f"SFIS: {sfis}\n"
+                f"測試時間: {test_time}"
+            )
+            
             r = ws.max_row + 1
-            cell_name = ws.cell(row=r, column=1, value=self._sanitize_cell_text(display_name))
-            cell_name.number_format='@'
-            cell_name.font = Font(name='Calibri', size=10, color='FF000000')
-            cell_name.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top', shrink_to_fit=True)
+            cell_info = ws.cell(row=r, column=1, value=self._sanitize_cell_text(combined_info))
+            cell_info.number_format='@'
+            cell_info.font = Font(name='Calibri', size=11, color='FF000000')
+            cell_info.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top')
+            
+            # 格線與樣式
+            cell_info.border = Border(left=thin, right=thin, top=thin, bottom=thin)
+            ws.row_dimensions[r].height = 65
+            
+            # 移除超連結，僅在下方「快速連結」區域保留導航功能
+            cell_info.hyperlink = None
             
             # 備註與超連結
             sheet = sheet_map.get(entry.get('file_name'))
