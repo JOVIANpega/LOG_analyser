@@ -43,21 +43,25 @@ def build_settings_content(app, parent):
     ui_font_label = tk.Label(ui_font_frame, text="介面文字大小：", font=('Arial', 11))
     ui_font_label._is_settings_label = True  # 標識為設定標籤
     ui_font_label.pack(side=tk.LEFT)
+    app.font_scaler.register(ui_font_label)  # 註冊字體縮放
     
     btn_ui_minus = tk.Button(ui_font_frame, text="－", width=3, 
                             command=app._decrease_ui_font)
     btn_ui_minus._is_settings_button = True  # 標識為設定按鈕
     btn_ui_minus.pack(side=tk.LEFT, padx=3)
+    app.font_scaler.register(btn_ui_minus)  # 註冊字體縮放
     
     app.settings_ui_font_size_label = tk.Label(ui_font_frame, text=str(app.ui_font_size), 
                                      width=3, relief=tk.SUNKEN, font=('Arial', 11))
     app.settings_ui_font_size_label._is_settings_label = True  # 標識為設定標籤
     app.settings_ui_font_size_label.pack(side=tk.LEFT, padx=3)
+    app.font_scaler.register(app.settings_ui_font_size_label)  # 註冊字體縮放
     
     btn_ui_plus = tk.Button(ui_font_frame, text="＋", width=3, 
                            command=app._increase_ui_font)
     btn_ui_plus._is_settings_button = True  # 標識為設定按鈕
     btn_ui_plus.pack(side=tk.LEFT, padx=3)
+    app.font_scaler.register(btn_ui_plus)  # 註冊字體縮放
     
     # 內容字體大小設定
     content_font_frame = tk.Frame(font_frame)
@@ -66,27 +70,32 @@ def build_settings_content(app, parent):
     content_font_label = tk.Label(content_font_frame, text="內容字體大小：", font=('Arial', 11))
     content_font_label._is_settings_label = True  # 標識為設定標籤
     content_font_label.pack(side=tk.LEFT)
+    app.font_scaler.register(content_font_label)  # 註冊字體縮放
     
     btn_content_minus = tk.Button(content_font_frame, text="－", width=3, 
                                 command=app._decrease_content_font)
     btn_content_minus._is_settings_button = True  # 標識為設定按鈕
     btn_content_minus.pack(side=tk.LEFT, padx=3)
+    app.font_scaler.register(btn_content_minus)  # 註冊字體縮放
     
     app.settings_content_font_size_label = tk.Label(content_font_frame, text=str(app.content_font_size), 
                                           width=3, relief=tk.SUNKEN, font=('Arial', 11))
     app.settings_content_font_size_label._is_settings_label = True  # 標識為設定標籤
     app.settings_content_font_size_label.pack(side=tk.LEFT, padx=3)
+    app.font_scaler.register(app.settings_content_font_size_label)  # 註冊字體縮放
     
     btn_content_plus = tk.Button(content_font_frame, text="＋", width=3, 
                                  command=app._increase_content_font)
     btn_content_plus._is_settings_button = True  # 標識為設定按鈕
     btn_content_plus.pack(side=tk.LEFT, padx=3)
+    app.font_scaler.register(btn_content_plus)  # 註冊字體縮放
     
     # ===== 右欄內容 =====
     
     # 其他設定區域
     other_frame = tk.LabelFrame(right_column, text="其他設定", padx=15, pady=15)
     other_frame.pack(fill=tk.X, pady=5)
+    app.font_scaler.register(other_frame)
     
     # 自動分析設定
     app.auto_analyze_var = tk.BooleanVar(value=app.settings.get('auto_analyze', True))
@@ -95,6 +104,7 @@ def build_settings_content(app, parent):
                                        font=('Arial', 11))
     auto_analyze_check._is_settings_checkbutton = True  # 標識為設定核取方塊
     auto_analyze_check.pack(anchor=tk.W, pady=3)
+    app.font_scaler.register(auto_analyze_check)
     
     # 路徑記憶設定
     app.remember_path_var = tk.BooleanVar(value=app.settings.get('remember_path', True))
@@ -103,10 +113,12 @@ def build_settings_content(app, parent):
                                         font=('Arial', 11))
     remember_path_check._is_settings_checkbutton = True  # 標識為設定核取方塊
     remember_path_check.pack(anchor=tk.W, pady=3)
+    app.font_scaler.register(remember_path_check)
     
     # 版本設定區域
     version_frame = tk.LabelFrame(right_column, text="版本設定", padx=15, pady=15)
     version_frame.pack(fill=tk.X, pady=5)
+    app.font_scaler.register(version_frame)
     
     # 版本號碼設定
     version_edit_frame = tk.Frame(version_frame)
@@ -115,17 +127,20 @@ def build_settings_content(app, parent):
     version_label = tk.Label(version_edit_frame, text="版本號碼：", font=('Arial', 11))
     version_label._is_settings_label = True  # 標識為設定標籤
     version_label.pack(side=tk.LEFT)
+    app.font_scaler.register(version_label)
     
     app.version_var = tk.StringVar(value=app.settings.get('version', 'V1.5.6'))
     version_entry = tk.Entry(version_edit_frame, textvariable=app.version_var, width=20)
     version_entry._is_settings_entry = True  # 標識為設定輸入框
     version_entry.pack(side=tk.LEFT, padx=8)
+    app.font_scaler.register(version_entry)
     
     # 版本說明
     version_info_label = tk.Label(version_frame, text="版本號碼會顯示在應用程式標題和設定頁面中", 
                                  fg='#666', font=('Arial', 9))
     version_info_label._is_info_label = True  # 標識為說明文字
     version_info_label.pack(pady=(8, 0))
+    app.font_scaler.register(version_info_label)
     
     # ===== 底部按鈕區域 =====
     

@@ -41,6 +41,14 @@ class EnhancedText:
         """清空文字內容"""
         self.text.delete(1.0, tk.END)
         self.step_positions.clear()
+
+    def append(self, text, tag=None):
+        """追加文字內容並自動捲動"""
+        try:
+            self.text.insert(tk.END, str(text) + "\n", tag)
+            self.text.see(tk.END)
+        except Exception as e:
+            print(f"Append text failed: {e}")
     
     def setup_tags(self):
         """設定文字標籤樣式"""

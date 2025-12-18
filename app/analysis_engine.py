@@ -70,14 +70,42 @@ class AnalysisEngineMixin:
         self._update_progress("正在啟動背景解析...")
         threading.Thread(target=self._single_file_worker, daemon=True).start()
 
+    def _ui_log(self, message, clear=False):
+        """在 UI 的原始 LOG 視窗顯示訊息 (Thread-safe)"""
+        def _append():
+            if hasattr(self, 'log_text_enhanced'):
+                if clear:
+                    self.log_text_enhanced.clear()
+                self.log_text_enhanced.append(message)
+                # 捲動由 EnhancedText.append 處理了，這裡保險加一下
+                try:
+                    import tkinter as tk
+                    self.log_text_enhanced.text.see(tk.END)
+                except:
+                    pass
+        
+        if hasattr(self, 'root'):
+            self.root.after(0, _append)
+        print(f"[UI_LOG] {message}")
+
     def _single_file_worker(self):
         """背景執行緒：執行解析邏輯"""
         try:
+            self._ui_log(f"=== 開始單檔分析: {os.path.basename(self.current_log_path)} ===", clear=True)
             self._safe_update_progress_text("正在解析LOG檔案內容...")
             
             # CPU密集應操作
             result = self.log_parser.parse_log_file(self.current_log_path)
             
+            # 即時顯示測試時間日誌
+            try:
+                if hasattr(self, 'excel_writer'):
+                    secs, time_logs = self.excel_writer._extract_total_secs(result['raw_lines'])
+                    for tlog in time_logs:
+                        self._ui_log(tlog)
+            except:
+                pass
+                
             # 提取 Header 資訊
             header_info = self._extract_log_header_info(result['raw_lines'])
             
@@ -91,6 +119,7 @@ class AnalysisEngineMixin:
             self.root.after(0, lambda: self._single_file_ui_update(data))
             
         except Exception as e:
+            self._ui_log(f"[錯誤] 分析失敗: {str(e)}")
             self.root.after(0, lambda: messagebox.showerror("分析錯誤", f"解析過程中發生錯誤：\n{str(e)}"))
             self.root.after(0, self._close_progress)
             traceback.print_exc()
@@ -338,20 +367,6 @@ class AnalysisEngineMixin:
         self._update_progress("正在啟動背景多檔解析...")
         threading.Thread(target=self._analyze_enhanced_multiple_files_thread, daemon=True).start()
 
-    def _ui_log(self, message, clear=False):
-        """在 UI 的原始 LOG 視窗顯示訊息 (Thread-safe)"""
-        import tkinter as tk # Assuming tkinter is used for UI
-        def _append():
-            if hasattr(self, 'log_text_enhanced'):
-                if clear:
-                    self.log_text_enhanced.clear()
-                self.log_text_enhanced.append(message)
-                self.log_text_enhanced.text.see(tk.END)
-        
-        if hasattr(self, 'root'):
-            self.root.after(0, _append)
-        print(f"[UI_LOG] {message}")
-
     def _analyze_enhanced_multiple_files_thread(self):
         """背景執行的多檔分析邏輯"""
         try:
@@ -416,9 +431,15 @@ class AnalysisEngineMixin:
                     # 提取測試時間日誌
                     test_time = "未知"
                     try:
-                        secs = self.excel_writer._extract_total_secs(result['raw_lines'])
-                        if secs: test_time = f"{secs:.2f} 秒"
-                    except: pass
+                        secs, time_logs = self.excel_writer._extract_total_secs(result['raw_lines'])
+                        # 將詳細日誌輸出到 UI
+                        for tlog in time_logs:
+                            self._ui_log(tlog)
+                            
+                        if secs: 
+                            test_time = f"{secs:.2f} 秒"
+                    except: 
+                        pass
                     
                     self._ui_log(f"[{i+1}/{total_files}] 分析完成: {fname} (時間: {test_time})")
                     
@@ -454,19 +475,33 @@ class AnalysisEngineMixin:
                 try:
                     # 決定輸出目錄
                     out_dir = ""
-                    if isinstance(self.current_log_path, str) and os.path.exists(self.current_log_path):
-                        if os.path.isdir(self.current_log_path):
-                            out_dir = self.current_log_path
+                    current_path = self.current_log_path
+                    
+                    # 智慧判斷：如果是在暫存資料夾中，優先找原始壓縮檔所在處
+                    is_temp = False
+                    if isinstance(current_path, str):
+                        if "AppData\\Local\\Temp" in current_path or "log_archives_" in current_path:
+                            is_temp = True
+                    
+                    if is_temp:
+                         # 嘗試從上次記錄的路徑取得目錄
+                         if self.settings.get('last_log_path') and os.path.exists(self.settings.get('last_log_path')):
+                             out_dir = os.path.dirname(self.settings.get('last_log_path'))
+                         else:
+                             out_dir = os.getcwd()
+                         self._ui_log(f"偵測到暫存目錄，改為輸出至: {out_dir}")
+                    elif isinstance(current_path, str) and os.path.exists(current_path):
+                        if os.path.isdir(current_path):
+                            out_dir = current_path
                         else:
-                            out_dir = os.path.dirname(self.current_log_path)
-                    elif isinstance(self.current_log_path, (list, tuple)):
-                        # 如果是多個檔案，取第一個檔案的目錄
-                        if self.current_log_path and os.path.exists(self.current_log_path[0]):
-                            out_dir = os.path.dirname(self.current_log_path[0])
+                            out_dir = os.path.dirname(current_path)
+                    elif isinstance(current_path, (list, tuple)):
+                        if current_path and os.path.exists(current_path[0]):
+                            out_dir = os.path.dirname(current_path[0])
                         else:
-                            out_dir = os.getcwd() # 預設為當前工作目錄
+                            out_dir = os.getcwd()
                     else:
-                        out_dir = os.getcwd() # 預設為當前工作目錄
+                        out_dir = os.getcwd()
 
                     self._ui_log(f"正在產生 Excel 至: {out_dir}")
                     
@@ -475,9 +510,14 @@ class AnalysisEngineMixin:
                             out_dir, pass_logs, fail_logs
                         )
                         self._ui_log(f"Excel 生成成功！\nPASS: {os.path.basename(pass_path)}\nFAIL: {os.path.basename(fail_path)}")
-                        self.root.after(0, lambda: self._show_open_folder_prompt(out_dir, pass_path, fail_path))
+                        # 使用 root.after 確保在主執行緒彈出
+                        # 參數: out_dir, total_files, pass_count, fail_count, pass_path, fail_path
+                        self.root.after(100, lambda: self._show_open_folder_prompt(
+                            out_dir, total_files, len(pass_logs), len(fail_logs), pass_path, fail_path
+                        ))
                 except Exception as e:
                     self._ui_log(f"[錯誤] 匯出 Excel 失敗: {str(e)}")
+                    traceback.print_exc()
                     self.root.after(0, lambda: messagebox.showerror("匯出錯誤", str(e)))
             else:
                 self._ui_log(f"Excel 生成被取消")
@@ -485,7 +525,6 @@ class AnalysisEngineMixin:
         except Exception as e:
             error_msg = f"多檔分析過程發生錯誤: {e}"
             print(f"[ERROR] {error_msg}")
-            import traceback
             traceback.print_exc()
             self.root.after(0, lambda: messagebox.showerror("錯誤", error_msg))
         finally:

@@ -82,6 +82,12 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         if hasattr(self, 'font_scaler'):
             self.font_scaler.set_font_size(self.ui_font_size)
         
+        # 更新設定頁面中的數字顯示
+        if hasattr(self, 'settings_ui_font_size_label'):
+            self.settings_ui_font_size_label.config(text=str(self.ui_font_size))
+        if hasattr(self, 'settings_content_font_size_label'):
+            self.settings_content_font_size_label.config(text=str(self.content_font_size))
+            
         # 更新某些特定元件的字體
         style = ttk.Style()
         style.configure('TNotebook.Tab', font=('Arial', self.ui_font_size))
@@ -152,8 +158,7 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
     def _safe_update_progress_mode(self, mode):
         """Thread-safe: Set progress mode"""
         if mode == 'determinate':
-             # Usually max is set separately, but we can ensure mode is correct
-             pass 
+             self.root.after(0, lambda: self.progress_manager.set_determinate(100))
         else:
              self.root.after(0, self.progress_manager.set_indeterminate)
 

@@ -11,6 +11,8 @@ from openpyxl.comments import Comment
 from openpyxl.worksheet.datavalidation import DataValidation
 import re
 import os
+import time
+import traceback
 
 class ExcelWriter:
     def __init__(self):
@@ -204,8 +206,11 @@ class ExcelWriter:
         except Exception:
             return {}
 
-    def _extract_total_secs(self, raw_lines: list) -> float | None:
-        """從 raw_lines 嘗試提取測試總時間（秒數）- 從最後往前掃描"""
+    def _extract_total_secs(self, raw_lines: list) -> tuple[float | None, list[str]]:
+        """從 raw_lines 嘗試提取測試總時間（秒數）- 從最後往前掃描
+        回傳: (秒數, [日誌列表])
+        """
+        logs = []
         try:
             # 從最後 100 行開始往前找（reversed）
             search_lines = raw_lines[-100:] if len(raw_lines) > 100 else raw_lines
@@ -222,8 +227,9 @@ class ExcelWriter:
                     if time_match:
                         val = float(time_match.group(1))
                         if val > 0:
-                            print(f"[DEBUG] 找到測試總時間: {val} 秒 (來源: Total Test Time is)")
-                            return val
+                            msg = f"[DEBUG] 找到測試總時間: {val} 秒 (來源: Total Test Time is)"
+                            logs.append(msg)
+                            return val, logs
                 
                 # 次要：尋找 "All phase Total Test Time" 格式
                 elif 'all phase total test time' in line_lower:
@@ -232,14 +238,16 @@ class ExcelWriter:
                     if time_match:
                         val = float(time_match.group(1))
                         if val > 0:
-                            print(f"[DEBUG] 找到測試總時間: {val} 秒 (來源: All phase Total Test Time)")
-                            return val
+                            msg = f"[DEBUG] 找到測試總時間: {val} 秒 (來源: All phase Total Test Time)"
+                            logs.append(msg)
+                            return val, logs
             
-            print(f"[WARNING] 未找到測試總時間")
-            return None
+            logs.append("[WARNING] 未找到測試總時間")
+            return None, logs
         except Exception as e:
-            print(f"[ERROR] 提取測試總時間失敗: {e}")
-            return None
+            msg = f"[ERROR] 提取測試總時間失敗: {e}"
+            logs.append(msg)
+            return None, logs
 
     def _unique_sheet_name(self, wb, base_name: str) -> str:
         """確保工作表名稱不重複"""
@@ -316,8 +324,8 @@ class ExcelWriter:
         """
         pass_path = os.path.join(folder_path, 'PASS匯總.xlsx')
         fail_path = os.path.join(folder_path, 'FAIL匯總.xlsx')
-        self._build_pass_workbook(pass_path, pass_logs)
-        self._build_fail_workbook(fail_path, fail_logs)
+        pass_path = self._build_pass_workbook(pass_path, pass_logs)
+        fail_path = self._build_fail_workbook(fail_path, fail_logs)
         
         # 第三個返回值保留給未來的新版 FAIL 報告
         fail_path_new = None
@@ -402,15 +410,15 @@ class ExcelWriter:
                 if result and result not in step_name:
                      fail_item_str += f" {result}"
                 
+                # 清理 Item 名稱作為統計鍵
+                fail_item_str = fail_item_str.strip()
+                
                 reason = item.get('error', '')
                 if not reason or reason == 'FAIL':
                     reason = item.get('response', '')
                 
-                # 標準化錯誤原因以進行統計 (去除時間戳、錯誤碼等變動資訊)
-                # 使用 _extract_main_error_type (它已經包含在 _normalize_error_group 中，但直接調用更單純)
-                # 這裡使用 _normalize_error_group 可以得到更乾淨的分類
-                norm_key = self._normalize_error_group(reason)
-                error_counts[norm_key] = error_counts.get(norm_key, 0) + 1
+                # 改為以 FAIL Item 為記數依據 (使用者需求優化)
+                error_counts[fail_item_str] = error_counts.get(fail_item_str, 0) + 1
                 
                 pending_rows.append({
                     'isn': isn,
@@ -418,7 +426,7 @@ class ExcelWriter:
                     'item': fail_item_str,
                     'reason': reason,
                     'suggestion': suggestion,
-                    'norm_key': norm_key
+                    'norm_key': fail_item_str # 這裡也改用 item 作為 key
                 })
         
         # 2. 寫入資料
@@ -492,9 +500,9 @@ class ExcelWriter:
                 # 計算表格位置（在資料表格下方）
                 table_start_row = ws.max_row + 3
                 
-                # 創建統計摘要表格
-                ws.cell(row=table_start_row, column=1, value="錯誤類型統計").font = Font(name='Calibri', size=12, bold=True)
-                ws.cell(row=table_start_row + 1, column=1, value="錯誤類型").font = Font(name='Calibri', size=11, bold=True)
+                # 創建統計摘要表格 (依使用者要求改為記數 FAIL Item)
+                ws.cell(row=table_start_row, column=1, value="FAIL Item 統計 (記數)").font = Font(name='Calibri', size=12, bold=True)
+                ws.cell(row=table_start_row + 1, column=1, value="FAIL Item 名稱").font = Font(name='Calibri', size=11, bold=True)
                 ws.cell(row=table_start_row + 1, column=2, value="數量").font = Font(name='Calibri', size=11, bold=True)
                 ws.cell(row=table_start_row + 1, column=3, value="佔比").font = Font(name='Calibri', size=11, bold=True)
                 
@@ -506,8 +514,8 @@ class ExcelWriter:
                 for idx, (error_type, count) in enumerate(sorted(error_counts.items(), key=lambda x: x[1], reverse=True), 0):
                     row = summary_start_row + idx
                     percentage = (count / total_errors * 100) if total_errors > 0 else 0
-                    
-                    ws.cell(row=row, column=1, value=self._sanitize_cell_text(error_type)).font = content_font
+                    error_type_val = self._sanitize_cell_text(error_type)
+                    ws.cell(row=row, column=1, value=error_type_val).font = content_font
                     ws.cell(row=row, column=2, value=count).font = content_font
                     ws.cell(row=row, column=3, value=f"{percentage:.1f}%").font = content_font
                     
@@ -520,44 +528,41 @@ class ExcelWriter:
                 ws.column_dimensions['B'].width = 10
                 ws.column_dimensions['C'].width = 10
                 
-                # 創建圓餅圖
-                pie = PieChart()
-                pie.title = "錯誤類型分布"
-                pie.style = 10
-                pie.height = 15
-                pie.width = 20
+                # 創建橫條圖 (Bar Chart) - 排序更清楚
+                from openpyxl.chart import BarChart, Reference, Series
+                from openpyxl.chart.label import DataLabelList
+                
+                chart = BarChart()
+                chart.type = "bar"
+                chart.style = 10
+                chart.title = "FAIL Item 排名 (次數)"
+                chart.y_axis.title = '次數'
+                chart.x_axis.title = 'FAIL Item 名稱'
                 
                 # 設定數據範圍
-                labels = Reference(ws, min_col=1, min_row=summary_start_row, max_row=summary_start_row + len(error_counts) - 1)
-                data = Reference(ws, min_col=2, min_row=summary_start_row, max_row=summary_start_row + len(error_counts) - 1)
+                max_row = summary_start_row + len(error_counts) - 1
+                data = Reference(ws, min_col=2, min_row=summary_start_row, max_row=max_row)
+                cats = Reference(ws, min_col=1, min_row=summary_start_row, max_row=max_row)
                 
-                pie.add_data(data, titles_from_data=False)  # 不使用數據中的標題
-                pie.set_categories(labels)
+                chart.add_data(data, titles_from_data=False)
+                chart.set_categories(cats)
+                chart.shape = 4
                 
-                # 優化數據標籤
-                pie.dataLabels = DataLabelList()
-                pie.dataLabels.showCatName = True   # 顯示錯誤項目名稱
-                pie.dataLabels.showSerName = False  # 絕對不顯示數列名稱 (數列1)
-                pie.dataLabels.showVal = True       # 顯示筆數
-                pie.dataLabels.showPercent = True   # 顯示百分比
-                pie.dataLabels.showLeaderLines = True
+                # 調整圖表大小
+                chart.height = 10 
+                chart.width = 18
                 
-                # 設定標籤位置和格式
-                try:
-                    # 標籤分隔符號，讓項目、數量、百分比分行顯示以求清晰
-                    pie.dataLabels.separator = "\n"
-                    # 設定標籤位置在「圓餅內側」或「最佳位置」
-                    pie.dataLabels.dLblPos = "bestFit" 
-                except:
-                    pass
+                # 隱藏圖例 (因為只有一個數列)
+                chart.legend = None
                 
-                # 隱藏右側圖例 (Legend)，因為圓餅圖上已經有標籤了，且下方有統計表
-                pie.legend = None 
+                # 在長條上顯示數值
+                chart.dLbls = DataLabelList()
+                chart.dLbls.showVal = True
                 
                 # 將圖表放在統計表格旁邊（E 欄開始）
-                ws.add_chart(pie, f"E{table_start_row}")
+                ws.add_chart(chart, f"E{table_start_row}")
                 
-                print(f"[INFO] 已添加錯誤類型統計表和圓餅圖，共 {len(error_counts)} 種錯誤類型")
+                print(f"[INFO] 已添加 FAIL Item 排名圖表 (BarChart)，共 {len(error_counts)} 種項目")
                 
             except Exception as e:
                 print(f"[WARNING] 添加錯誤統計失敗: {e}")
@@ -593,6 +598,8 @@ class ExcelWriter:
                     s = f"[FAIL] {s}"
                 s = re.sub(r'^\s*>\s*', '▶ ', s)
                 s = re.sub(r'^\s*<\s*', '◀ ', s)
+                # 移除非法字元
+                s = ILLEGAL_CHARACTERS_RE.sub('', s)
                 preview_lines.append(s)
             preview_lines.append('************************')
             return '\n'.join(preview_lines)
@@ -606,8 +613,12 @@ class ExcelWriter:
             msg = (message or '')
             if len(msg) > 250:
                 msg = msg[:250] + '…'
-            dv = DataValidation(type="custom", formula1="TRUE", allow_blank=True, showInputMessage=True)
-            dv.promptTitle = title[:30] if title else ''
+            # 移除非法字元
+            msg = ILLEGAL_CHARACTERS_RE.sub('', msg)
+            title_clean = ILLEGAL_CHARACTERS_RE.sub('', title or '')
+            
+            dv = DataValidation(type="custom", formula1="=TRUE", allow_blank=True, showInputMessage=True)
+            dv.promptTitle = title_clean[:30] if title_clean else ''
             dv.prompt = msg
             ws.add_data_validation(dv)
             dv.add(cell.coordinate)
@@ -616,41 +627,30 @@ class ExcelWriter:
 
     # 內部：PASS 匯總活頁簿
     def _safe_save_workbook(self, wb, output_path):
-        """安全保存工作簿，避免Excel警告"""
+        """安全保存工作簿，處理權限錯誤 (例如檔案已開啟)"""
         try:
-            # 設定工作簿屬性以避免Excel警告
-            wb.properties.creator = "PEGA Log Analyzer"
-            wb.properties.title = "Log Analysis Results"
-            wb.properties.description = "Log analysis results generated by PEGA Log Analyzer"
-            wb.properties.subject = "Log Analysis"
-            wb.properties.keywords = "LOG,Analysis,PEGA"
-            
-            # 設定安全屬性
-            wb.security.lockStructure = False
-            wb.security.lockWindows = False
-            
-            # 清理可能導致問題的內容
-            for ws in wb.worksheets:
-                # 確保所有單元格都有正確的格式
-                for row in ws.iter_rows():
-                    for cell in row:
-                        if cell.value is not None:
-                            # 確保文字格式正確
-                            if isinstance(cell.value, str):
-                                # 移除可能導致問題的控制字符
-                                cell.value = ''.join(char for char in cell.value if ord(char) >= 32 or char in '\t\n\r')
-                                cell.number_format = '@'  # 文字格式
-            
-            self._safe_save_workbook(wb, output_path)
-            
+            # 嘗試儲存
+                try:
+                    wb.save(output_path)
+                    return output_path
+                except PermissionError:
+                    # 檔案可能被開啟，嘗試加上時間戳儲存
+                    import time
+                    import os
+                    timestamp = time.strftime("%H%M%S")
+                    base, ext = os.path.splitext(output_path)
+                    new_path = f"{base}_{timestamp}{ext}"
+                    print(f"[WARNING] 權限不足(檔案可能已開啟)，嘗試另存為: {new_path}")
+                    wb.save(new_path)
+                    return new_path
         except Exception as e:
-            print(f"保存Excel檔案時發生錯誤: {e}")
-            # 嘗試基本保存
+            print(f"[ERROR] 保存Excel檔案時發生錯誤: {e}")
+            # 最後一試，直接嘗試原始路徑
             try:
-                self._safe_save_workbook(wb, output_path)
-            except Exception as e2:
-                print(f"基本保存也失敗: {e2}")
-                raise e2
+                wb.save(output_path)
+                return output_path
+            except:
+                raise e
 
     def _build_pass_workbook(self, output_path: str, logs: list):
         wb = Workbook()
@@ -807,7 +807,7 @@ class ExcelWriter:
                 display_lines.append(f"IP位址: {system_info['Active IPs']}")
             
             # 添加測試時間
-            secs = self._extract_total_secs(entry.get('raw_lines') or [])
+            secs, _ = self._extract_total_secs(entry.get('raw_lines') or [])
             if secs is not None:
                 display_lines.append(f"測試時間: {secs:.1f} 秒")
             
@@ -866,7 +866,7 @@ class ExcelWriter:
             base_fmt = self._format_filename_with_timestamp(base)
             sfis = (entry.get('summary') or {}).get('SFIS', '')
             sfis = (sfis or '').upper()
-            secs = self._extract_total_secs(entry.get('raw_lines') or [])
+            secs, _ = self._extract_total_secs(entry.get('raw_lines') or [])
             sec_txt = f"測試總時間:{secs:.1f} Sec." if secs is not None else ''
             suffix = f"_SFIS_{sfis}" if sfis else ''
             display_name = f"{base_fmt}{suffix} {sec_txt}".strip()
@@ -906,7 +906,8 @@ class ExcelWriter:
                     )
         
         try:
-            wb.save(output_path)
+            saved_path = self._safe_save_workbook(wb, output_path)
+            return saved_path
         finally:
             try:
                 wb.close()
@@ -1038,13 +1039,18 @@ class ExcelWriter:
         thin = Side(border_style='thin', color='FF888888')
         thick = Side(border_style='thick', color='FF000000')
         start_data_row = ws.max_row + 1
+        # Summary：每個LOG一行，顯示檔名和詳細錯誤原因
+        thin = Side(border_style='thin', color='FF888888')
+        thick = Side(border_style='thick', color='FF000000')
+        start_data_row = ws.max_row + 1
+        
         for entry in logs:
             # 檔名欄
             base = self._sanitize_cell_text(entry.get('file_name') or '')
             base_fmt = self._format_filename_with_timestamp(base)
             sfis = (entry.get('summary') or {}).get('SFIS','')
             sfis = (sfis or '').upper()
-            secs = self._extract_total_secs(entry.get('raw_lines') or [])
+            secs, _ = self._extract_total_secs(entry.get('raw_lines') or [])
             sec_txt = f"測試總時間:{secs:.1f} Sec." if secs is not None else ''
             suffix = f"_SFIS_{sfis}" if sfis else ''
             display_name = f"{base_fmt}{suffix} {sec_txt}".strip()
@@ -1053,6 +1059,7 @@ class ExcelWriter:
             cell_name.number_format='@'
             cell_name.font = Font(name='Calibri', size=10, color='FF000000')
             cell_name.alignment = Alignment(wrap_text=True, horizontal='left', vertical='top', shrink_to_fit=True)
+            
             # 備註與超連結
             sheet = sheet_map.get(entry.get('file_name'))
             try:
@@ -1072,6 +1079,7 @@ class ExcelWriter:
             cell_reason.number_format='@'
             cell_reason.font = Font(name='Calibri', size=11)
             cell_reason.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left', shrink_to_fit=False)
+            
             # 設定行高以顯示更多文字
             ws.row_dimensions[r].height = 120
             
@@ -1082,46 +1090,38 @@ class ExcelWriter:
             
             for c in range(1, 2+1):
                 ws.cell(row=r, column=c).border = Border(left=thin, right=thin, top=thin, bottom=thin)
-            end_r = ws.max_row
-            if end_r >= start_data_row:
-                for c in range(1, 2+1):
-                    ws.cell(row=start_data_row, column=c).border = ws.cell(row=start_data_row, column=c).border.copy(top=thick)
-                    ws.cell(row=end_r, column=c).border = ws.cell(row=end_r, column=c).border.copy(bottom=thick)
-                for r in range(start_data_row, end_r+1):
-                    ws.cell(row=r, column=1).border = ws.cell(row=r, column=1).border.copy(left=thick)
-                    ws.cell(row=r, column=2).border = ws.cell(row=r, column=2).border.copy(right=thick)
-            # 表格底部：SHEET 快速連結
-            link_title_row = ws.max_row + 2
-            ws.cell(row=link_title_row, column=1, value='工作表快速連結（點擊跳轉）').font = Font(name='Calibri', size=10, bold=True)
-            ws.cell(row=link_title_row, column=1).alignment = Alignment(horizontal='left')
-            cur = link_title_row + 1
-        
-            # 添加回到Summary的快速連結
-            back_to_summary = ws.cell(row=cur, column=1, value='🔙 回到 Summary 頁面')
-            back_to_summary.number_format='@'
-            back_to_summary.font = Font(name='Calibri', size=12, bold=True, color='FF008000', underline='single')
-            back_to_summary.alignment = Alignment(horizontal='left')
-            back_to_summary.hyperlink = f"#'Summary'!A1"
-            back_to_summary.fill = PatternFill('solid', fgColor='FFE6FFE6')  # 淺綠色背景
-            cur += 1
-        
-            # 添加分隔線
-            ws.cell(row=cur, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
-            cur += 1
+
+        # 外框粗線
+        end_r = ws.max_row
+        if end_r >= start_data_row:
+            for c in range(1, 2+1):
+                ws.cell(row=start_data_row, column=c).border = ws.cell(row=start_data_row, column=c).border.copy(top=thick)
+                ws.cell(row=end_r, column=c).border = ws.cell(row=end_r, column=c).border.copy(bottom=thick)
+            for r in range(start_data_row, end_r+1):
+                ws.cell(row=r, column=1).border = ws.cell(row=r, column=1).border.copy(left=thick)
+                ws.cell(row=r, column=2).border = ws.cell(row=r, column=2).border.copy(right=thick)
+
+        # 表格底部：SHEET 快速連結
+        link_title_row = ws.max_row + 2
+        ws.cell(row=link_title_row, column=1, value='工作表快速連結（點擊跳轉）').font = Font(name='Calibri', size=11, bold=True)
+        ws.cell(row=link_title_row, column=1).alignment = Alignment(horizontal='left')
+        cur = link_title_row + 1
         
         for entry in logs:
             base = self._sanitize_cell_text(entry.get('file_name') or '')
             base_fmt = self._format_filename_with_timestamp(base)
             sfis = (entry.get('summary') or {}).get('SFIS','')
             sfis = (sfis or '').upper()
-            secs = self._extract_total_secs(entry.get('raw_lines') or [])
+            secs, _ = self._extract_total_secs(entry.get('raw_lines') or [])
             sec_txt = f"測試總時間:{secs:.1f} Sec." if secs is not None else ''
             suffix = f"_SFIS_{sfis}" if sfis else ''
             display_name = f"{base_fmt}{suffix} {sec_txt}".strip()
+            
             c = ws.cell(row=cur, column=1, value=self._sanitize_cell_text(display_name))
             c.number_format='@'
-            c.font = Font(name='Microsoft JhengHei', size=10, color='FF0000FF', underline='single')
+            c.font = Font(name='Calibri', size=10, color='FF0000FF', underline='single')
             c.alignment = Alignment(horizontal='left')
+            
             sheet = sheet_map.get(entry.get('file_name'))
             if sheet:
                 c.hyperlink = f"#'{sheet}'!A1"
@@ -1131,32 +1131,40 @@ class ExcelWriter:
                     c.comment.height = 500
                 except Exception:
                     pass
-            self._add_input_prompt(ws, c, '對應工作表', sheet)
+                self._add_input_prompt(ws, c, '對應工作表', sheet)
             cur += 1
-            self._auto_fit_columns(ws, min_widths={1: 30, 2: 120})
-            
-            # 設定 Summary 頁面所有文字字體為 11
-            for row in ws.iter_rows():
-                for cell in row:
-                    if cell.value is not None:
-                        # 保留原有的字體屬性，只修改大小
-                        current_font = cell.font
-                        cell.font = Font(
-                            name='Microsoft JhengHei',
-                            size=11,
-                            bold=current_font.bold,
-                            italic=current_font.italic,
-                            color=current_font.color,
-                            underline=current_font.underline
-                        )
-            
+
+        # 添加回到頂部的快速連結
+        back_to_top = ws.cell(row=cur, column=1, value='🔝 回到頁面頂端')
+        back_to_top.number_format='@'
+        back_to_top.font = Font(name='Calibri', size=12, bold=True, color='FF008000', underline='single')
+        back_to_top.alignment = Alignment(horizontal='left')
+        back_to_top.hyperlink = f"#'Summary'!A1"
+        back_to_top.fill = PatternFill('solid', fgColor='FFE6FFE6')
+        
+        self._auto_fit_columns(ws, min_widths={1: 30, 2: 80}) # 減小寬度限制，避免過寬
+        
+        # 設定 Summary 頁面整體字體風格
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value is not None:
+                    # 如果原本就有字體，保留部分屬性
+                    if cell.font:
+                        curr = cell.font
+                        cell.font = Font(name='Calibri', size=10 if curr.size < 11 else 11, 
+                                        bold=curr.bold, italic=curr.italic, 
+                                        color=curr.color, underline=curr.underline)
+                    else:
+                        cell.font = Font(name='Calibri', size=11)
+        
+        try:
+            saved_path = self._safe_save_workbook(wb, output_path)
+            return saved_path
+        finally:
             try:
-                wb.save(output_path)
-            finally:
-                try:
-                    wb.close()
-                except Exception:
-                    pass
+                wb.close()
+            except Exception:
+                pass
 
     def _write_raw_log_with_annotations(self, ws, start_row: int, raw_lines: list, annotations: list, font: Font, step_marks: dict | None = None):
         color_map = {
