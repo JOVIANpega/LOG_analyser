@@ -1,24 +1,12 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-CSV檔案整理工具
-功能：選擇目錄 → 搜尋CSV → 顯示checkbox列表 → 複製到Analysis_CSV_FILE → 整理並重新命名
-"""
-
 import os
 import shutil
-import pandas as pd
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
 import glob
-from openpyxl import Workbook
-from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.table import Table, TableStyleInfo
 from datetime import datetime
 import re
-
+# 延後載入：pandas, openpyxl 將在內部方法載入以提升啟動速度
 class CSVProcessor:
     def __init__(self, app):
         self.app = app
@@ -137,7 +125,7 @@ class CSVProcessor:
                 '☑' if var.get() else '☐',  # checkbox顯示
                 file_name,
                 f"{file_size:,} bytes",
-                pd.Timestamp.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
+                datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
             ))
             
             # 綁定checkbox變更事件
@@ -395,7 +383,7 @@ class CSVProcessor:
                     try:
                         # 先檢測標題行位置
                         header_row, metadata = self.detect_header_row(csv_file, encoding, sep)
-                        
+                        import pandas as pd
                         if header_row is not None:
                             # 使用檢測到的標題行讀取
                             df = pd.read_csv(csv_file, encoding=encoding, sep=sep,
@@ -433,6 +421,7 @@ class CSVProcessor:
             if df is None or len(df) == 0:
                 for encoding in encodings:
                     try:
+                        import pandas as pd
                         df = pd.read_csv(csv_file, encoding=encoding, sep=None, 
                                         engine='python', on_bad_lines='skip',
                                         keep_default_na=False, na_values=[''])
@@ -486,6 +475,7 @@ class CSVProcessor:
     
     def create_formatted_excel(self, df, output_file, csv_file):
         """創建格式化的Excel檔案 - 增強版報表"""
+        from openpyxl import Workbook
         wb = Workbook()
         
         # 獲取元數據信息
@@ -507,6 +497,7 @@ class CSVProcessor:
     
     def create_summary_sheet(self, ws, df, csv_file, metadata_info=None, metadata_rows=None):
         """創建統計摘要工作表 - 改進版，支持元數據和錯誤代碼分類"""
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         if metadata_info is None:
             metadata_info = {}
         if metadata_rows is None:
@@ -756,6 +747,7 @@ class CSVProcessor:
     def create_data_sheet(self, ws, df):
         """創建數據明細工作表"""
         # 樣式定義
+        from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
         pass_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # 淺綠色
         fail_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # 淺紅色
         warning_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # 淺黃色

@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import messagebox
 import traceback
 import threading
+import time
 
 class AnalysisEngineMixin:
     """Mixin for handling analysis orchestration in the Log Analyzer"""
@@ -405,11 +406,12 @@ class AnalysisEngineMixin:
                 return
     
             total_files = len(target_files)
+            total_steps = total_files + 1  # 總步數包含 Excel 生成
             self._ui_log(f"找到 {total_files} 個檔案開始分析...")
             
             # 2. 初始化進度條 (Thread-safe)
             self._safe_update_progress_mode('determinate')
-            self._safe_update_progress_max(total_files)
+            self._safe_update_progress_max(total_steps)
             
             pass_logs = []
             fail_logs = []
@@ -422,7 +424,7 @@ class AnalysisEngineMixin:
                     
                 fname = os.path.basename(file_path)
                 # 更新進度 (Thread-safe)
-                self._safe_update_progress(i+1, total_files, f"正在分析 ({i+1}/{total_files}): {fname}")
+                self._safe_update_progress(i+1, total_steps, f"正在分析 ({i+1}/{total_files}): {fname}")
                 
                 try:
                     # 解析 (CPU bound, safe in thread)
@@ -463,14 +465,15 @@ class AnalysisEngineMixin:
                     
                     if result['log_type'] == 'PASS': pass_logs.append(log_entry)
                     else: fail_logs.append(log_entry)
-                          
+                           
                 except Exception as e:
                     self._ui_log(f"[錯誤] 分析失敗 {fname}: {str(e)}")
                     continue
     
             # 4. 匯出 Excel
             if not self._cancel_flag:
-                self._safe_update_progress_text("正在產生 Excel 報告...")
+                # 分析完畢，但進度條不應到達 100%，而是保留一步給 Excel
+                self._safe_update_progress(total_files, total_steps, "分析完成，正在準備產生 Excel 報告...")
                 self._ui_log(f"分析結束。成功: {len(pass_logs)}, 失敗: {len(fail_logs)}")
                 try:
                     # 決定輸出目錄
@@ -516,11 +519,15 @@ class AnalysisEngineMixin:
                         out_dir = os.getcwd()
 
                     self._ui_log(f"正在產生 Excel 至: {out_dir}")
+                    # 此時更新進度到 100% 或幾乎 100%
+                    self._safe_update_progress(total_files, total_steps, "正在產生 Excel 報告...")
                     
                     if hasattr(self, 'excel_writer'):
                         pass_path, fail_path, _ = self.excel_writer.export_pass_fail_workbooks(
                             out_dir, pass_logs, fail_logs
                         )
+                        # 生成完成
+                        self._safe_update_progress(total_steps, total_steps, f"Excel 生成成功！耗時 {int(time.time() - self.progress_manager._start_time)}s")
                         self._ui_log(f"Excel 生成成功！\nPASS: {os.path.basename(pass_path)}\nFAIL: {os.path.basename(fail_path)}")
                         # 使用 root.after 確保在主執行緒彈出
                         # 參數: out_dir, total_files, pass_count, fail_count, pass_path, fail_path

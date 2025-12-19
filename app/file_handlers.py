@@ -40,7 +40,10 @@ class FileHandlerMixin:
     
     def _select_files_unified(self):
         """統一的檔案選擇功能（支援 Log 與 壓縮檔，支援多選）"""
-        if self.settings.get('last_log_path') and os.path.exists(self.settings.get('last_log_path')):
+        # 判斷是否要記憶路徑
+        remember = self.settings.get('remember_path', True)
+        
+        if remember and self.settings.get('last_log_path') and os.path.exists(os.path.dirname(self.settings.get('last_log_path'))):
             default_dir = os.path.dirname(self.settings.get('last_log_path'))
         else:
             default_dir = self._get_default_directory()
@@ -128,11 +131,16 @@ class FileHandlerMixin:
         統一的資料夾選擇功能（智慧模式）
         改用 File Dialog 讓使用者可以看到檔案，再決定是要處理選取的檔案還是所在的資料夾
         """
-        # 優先使用上次選擇的路徑
-        if self.settings.get('last_folder_path') and os.path.exists(self.settings.get('last_folder_path')):
-            default_dir = self.settings.get('last_folder_path')
-        elif self.settings.get('last_log_path') and os.path.exists(self.settings.get('last_log_path')):
-            default_dir = os.path.dirname(self.settings.get('last_log_path'))
+        # 判斷是否要記憶路徑
+        remember = self.settings.get('remember_path', True)
+        
+        if remember:
+            if self.settings.get('last_folder_path') and os.path.exists(self.settings.get('last_folder_path')):
+                default_dir = self.settings.get('last_folder_path')
+            elif self.settings.get('last_log_path') and os.path.exists(os.path.dirname(self.settings.get('last_log_path'))):
+                default_dir = os.path.dirname(self.settings.get('last_log_path'))
+            else:
+                default_dir = self._get_default_directory()
         else:
             default_dir = self._get_default_directory()
             

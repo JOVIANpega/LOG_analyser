@@ -29,13 +29,14 @@ class ProgressManager:
         self._start_time = None
         self._cancel_flag = False
         
-    def set_widgets(self, status_label, progress_bar, status_light=None, header_label=None, header_frame=None):
+    def set_widgets(self, status_label, progress_bar, status_light=None, header_label=None, header_frame=None, percentage_label=None):
         """設定主視窗的狀態列與標題元件"""
         self._status_label = status_label
         self._main_progress_bar = progress_bar
         self._status_light = status_light
         self._header_label = header_label
         self._header_frame = header_frame
+        self._percentage_label = percentage_label
 
     def _flash_loop(self):
         """閃爍迴圈"""
@@ -87,15 +88,16 @@ class ProgressManager:
         self._is_flashing = False
         if self._status_light:
             try:
-                self._status_light.config(fg='gray')
+                self._status_light.config(foreground='gray')
             except: pass
         if self._header_label:
             try:
-                self._header_label.config(bg='#4CAF50', fg='white') # 恢復原始
+                # 恢復為 ttkbootstrap 的樣式顏色
+                self._header_label.config(style='inverse-primary')
             except: pass
         if self._header_frame:
             try:
-                self._header_frame.config(bg='#4CAF50') # 恢復原始
+                self._header_frame.config(style='primary.TFrame')
             except: pass
 
     @property
@@ -124,40 +126,41 @@ class ProgressManager:
             if self._progress_win and self._progress_win.winfo_exists():
                 return
             
-            win = tk.Toplevel(self.root)
+            import ttkbootstrap as tb
+            win = tb.Toplevel(self.root)
             win.title(title)
-            win.geometry("450x160")
+            win.geometry("450x180")
             win.transient(self.root)
             win.grab_set()
             
             # 居中顯示
             win.update_idletasks()
             x = (win.winfo_screenwidth() // 2) - (450 // 2)
-            y = (win.winfo_screenheight() // 2) - (160 // 2)
-            win.geometry(f"450x160+{x}+{y}")
+            y = (win.winfo_screenheight() // 2) - (180 // 2)
+            win.geometry(f"450x180+{x}+{y}")
             
-            frame = tk.Frame(win)
-            frame.pack(fill=tk.BOTH, expand=1, padx=12, pady=12)
+            frame = ttk.Frame(win, padding=20)
+            frame.pack(fill=tk.BOTH, expand=1)
             
             # 主標籤
-            lbl = tk.Label(frame, text=text, anchor='w', justify='left', font=('Arial', 10))
+            lbl = ttk.Label(frame, text=text, font=('Arial', 10), wraplength=400)
             lbl.pack(fill=tk.X)
             
             # 進度條
-            bar = ttk.Progressbar(frame, mode='indeterminate')
-            bar.pack(fill=tk.X, pady=10)
+            bar = ttk.Progressbar(frame, mode='indeterminate', style='info.Horizontal.TProgressbar')
+            bar.pack(fill=tk.X, pady=15)
             bar.start(12)
             
             # 時間估算標籤
-            time_label = tk.Label(frame, text="預估剩餘時間: 計算中...", font=('Arial', 9), fg='gray')
+            time_label = ttk.Label(frame, text="預估剩餘時間: 計算中...", font=('Arial', 9))
             time_label.pack(anchor='w')
             
             def on_cancel():
                 self._cancel_flag = True
                 lbl.config(text="正在取消，請稍候…")
             
-            btn = tk.Button(frame, text="取消", command=on_cancel)
-            btn.pack(pady=(4,0))
+            btn = ttk.Button(frame, text="取消分析", command=on_cancel, style='danger.Outline.TButton')
+            btn.pack(pady=(15,0))
             
             # 綁定視窗關閉事件
             win.protocol("WM_DELETE_WINDOW", on_cancel)
@@ -203,6 +206,10 @@ class ProgressManager:
                 except:
                     pass
                 self._progress_win.destroy()
+            
+            # 重置百分比
+            if self._percentage_label:
+                self._percentage_label.config(text="0%")
         except Exception:
             pass
         self._progress_win = None
@@ -262,6 +269,8 @@ class ProgressManager:
             if self._status_label and self._main_progress_bar:
                 self._main_progress_bar['value'] = current
                 self._status_label.config(text=full_text)
+                if self._percentage_label:
+                    self._percentage_label.config(text=f"{percent}%")
                 self.root.update_idletasks()
             
             # 更新彈窗

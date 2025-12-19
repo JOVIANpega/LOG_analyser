@@ -1,19 +1,20 @@
 {
-  "ui_font_size": 11,
+  "ui_font_size": 13,
   "content_font_size": 11,
-  "last_log_path": "D:/((Python TOOL/解析LOG2/MINE/result/stitching1/1+4cam stitching1 test-1030250029-20251205084015-IOCD041-74Y.log",
-  "last_folder_path": "C:/Users/pega_user/Desktop/TEMP ASIAOPT/LOG",
-  "window_width": 1536,
-  "window_height": 793,
+  "last_log_path": "D:/((Python TOOL/解析LOG2/MINE/result/1+4cam stitching1 test-1110250394-20251205092343-B7PL011-135.7z",
+  "last_folder_path": "C:/Users/pega_user/Desktop/TEMP ASIAOPT/LOG/20251217",
+  "window_width": 1902,
+  "window_height": 1033,
   "pane_width": 248,
   "app_title": "PEGA test log Aanlyser",
   "gui_header": "ONLY FOR CENTIMANIA LOG",
   "auto_analyze": true,
   "remember_path": true,
   "version": "V1.9.0",
-  "last_compressed_path": "D:/((Python TOOL/解析LOG2/MINE/result/pqtest.7z",
+  "last_compressed_path": "D:/((Python TOOL/解析LOG2/MINE/result/1+4cam stitching1 test-1110250394-20251205092343-B7PL011-135.7z",
   "last_compressed_folder": "D:/((Python TOOL/解析LOG2/MINE/蒐集LOG/ZIP LOG",
   "csv_max_display_length": 50,
   "csv_pass_color": "#90EE90",
-  "csv_fail_color": "#FFB6C1"
+  "csv_fail_color": "#FFB6C1",
+  "theme": "pulse"
 }

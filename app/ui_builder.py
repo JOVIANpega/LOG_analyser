@@ -20,34 +20,42 @@ class UIBuilderMixin:
     
     def _build_status_bar(self):
         """建立底部狀態列 (進度條與狀態文字)"""
-        self.status_frame = tk.Frame(self.root, relief=tk.SUNKEN, bd=1)
+        # 使用更深色的背景以便識別 (基於主題)
+        self.status_frame = ttk.Frame(self.root, style='secondary.TFrame')
         self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
         
         # 狀態文字標籤
-        self.status_label = tk.Label(self.status_frame, text="就緒", anchor='w')
-        self.status_label.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        self.status_label = ttk.Label(self.status_frame, text="就緒", font=('Arial', 10), style='inverse-secondary')
+        self.status_label.pack(side=tk.LEFT, padx=10, pady=5, fill=tk.X, expand=True)
+        if hasattr(self, 'font_scaler'):
+            self.font_scaler.register(self.status_label)
         
-        # 此處預留進度條位置，初始隱藏或與 ProgressManager 連動
-        # ProgressManager 會動態配置它，或者我們先建立好
-        self.main_progress_bar = ttk.Progressbar(self.status_frame, orient=tk.HORIZONTAL, length=200, mode='determinate')
-        self.main_progress_bar.pack(side=tk.RIGHT, padx=5, pady=2)
+        # 百分比標籤
+        self.percentage_label = ttk.Label(self.status_frame, text="0%", font=('Arial', 10, 'bold'), style='inverse-secondary')
+        self.percentage_label.pack(side=tk.RIGHT, padx=5)
+        if hasattr(self, 'font_scaler'):
+            self.font_scaler.register(self.percentage_label)
+        
+        # 進度條 (加長一點)
+        self.main_progress_bar = ttk.Progressbar(self.status_frame, orient=tk.HORIZONTAL, length=300, mode='determinate', style='info.Horizontal.TProgressbar')
+        self.main_progress_bar.pack(side=tk.RIGHT, padx=10, pady=5)
     
     def _build_enhanced_ui(self):
         """建立增強版UI"""
-        # 主要分割視窗
-        self.paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, sashrelief=tk.RAISED)
+        # 主要分割視窗 - 使用 ttk.Panedwindow 以獲得更好的外觀
+        self.paned = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
         self.paned.pack(fill=tk.BOTH, expand=1)
         
         # 左側控制面板
         pane_width = self.settings.get('pane_width', 250)
-        self.left_frame = tk.Frame(self.paned, width=pane_width)
+        self.left_frame = ttk.Frame(self.paned, width=pane_width)
         self._build_enhanced_left_panel(self.left_frame)
-        self.paned.add(self.left_frame, minsize=200)
+        self.paned.add(self.left_frame, weight=0) # weight=0 讓左側面板保持固定大小或由使用者調整
         
         # 右側結果顯示區域
-        self.right_frame = tk.Frame(self.paned)
+        self.right_frame = ttk.Frame(self.paned)
         self._build_enhanced_right_panel(self.right_frame)
-        self.paned.add(self.right_frame, minsize=800)
+        self.paned.add(self.right_frame, weight=1)
         
         # 綁定分割視窗調整事件
         self.paned.bind('<ButtonRelease-1>', self._on_pane_adjust)
@@ -58,6 +66,12 @@ class UIBuilderMixin:
         
         # 設定初始面板寬度（使用after確保UI已建立）
         self.root.after(100, lambda: self._set_initial_pane_width(pane_width))
+        
+    def _on_tab_changed(self, event):
+        """標籤切換時的處理"""
+        # 同步更新字體大小設定，確保樣式一致
+        if hasattr(self, '_apply_font_size'):
+            self._apply_font_size()
     
     def _set_initial_pane_width(self, width):
         """設定初始面板寬度"""
@@ -93,11 +107,11 @@ class UIBuilderMixin:
     def _build_enhanced_right_panel(self, parent):
         """建立增強版右側面板"""
         # 建立頂部檔案資訊框架
-        top_frame = tk.Frame(parent)
+        top_frame = ttk.Frame(parent)
         top_frame.pack(fill=tk.X, padx=5, pady=2)
         
         # 狀態指示燈 (放在右側)
-        self.status_light = tk.Label(top_frame, text="●", fg='gray', font=('Arial', 24))
+        self.status_light = ttk.Label(top_frame, text="●", foreground='gray', font=('Arial', 24))
         self.status_light.pack(side=tk.RIGHT, padx=5)
         
         # 檔案資訊標籤 (放在左側，佔滿剩餘空間)
@@ -109,6 +123,9 @@ class UIBuilderMixin:
         # 建立標籤頁
         self.notebook = ttk.Notebook(parent)
         self.notebook.pack(fill=tk.BOTH, expand=1)
+        
+        # 綁定標籤切換事件
+        self.notebook.bind('<<NotebookTabChanged>>', self._on_tab_changed)
         
         # 設定標籤頁樣式
         self._setup_tab_styles()
@@ -155,42 +172,43 @@ class UIBuilderMixin:
         self.tab_fail = ttk.Frame(self.notebook)
         self.notebook.add(self.tab_fail, text="❌ FAIL測項")
         
-        # 創建上下分割視窗
-        self.fail_paned = tk.PanedWindow(self.tab_fail, orient=tk.VERTICAL, sashrelief=tk.RAISED)
+        # 創建上下分割視窗 - 使用 ttk.Panedwindow
+        self.fail_paned = ttk.Panedwindow(self.tab_fail, orient=tk.VERTICAL)
         self.fail_paned.pack(fill=tk.BOTH, expand=1)
         
         # 上半部 - FAIL測項列表
-        self.fail_upper_frame = tk.Frame(self.fail_paned)
+        self.fail_upper_frame = ttk.Frame(self.fail_paned)
         fail_columns = ("測項名稱", "指令", "錯誤回應", "Retry次數", "FAIL原因")
         self.fail_tree_enhanced = EnhancedTreeview(self.fail_upper_frame, fail_columns)
         self.fail_tree_enhanced.pack_with_scrollbars(fill=tk.BOTH, expand=1)
-        self.fail_paned.add(self.fail_upper_frame, minsize=200)
+        self.fail_paned.add(self.fail_upper_frame, weight=3) # 分配權重
         
         # 下半部 - FAIL錯誤詳細資訊
-        self.fail_lower_frame = tk.Frame(self.fail_paned, bg='white')
+        self.fail_lower_frame = ttk.Frame(self.fail_paned)
         
         # 錯誤標題
-        self.fail_error_title = tk.Label(self.fail_lower_frame, text="選擇FAIL項目查看詳細錯誤", 
-                                        font=('Arial', 16, 'bold'), fg='red', bg='white')
+        self.fail_error_title = ttk.Label(self.fail_lower_frame, text="選擇FAIL項目查看詳細錯誤", 
+                                        font=('Arial', 16, 'bold'), foreground='red')
         self.fail_error_title.pack(pady=10)
         
         # 錯誤內容文字框
-        error_text_frame = tk.Frame(self.fail_lower_frame)
+        error_text_frame = ttk.Frame(self.fail_lower_frame)
         error_text_frame.pack(fill=tk.BOTH, expand=1, padx=10, pady=5)
         
         self.fail_error_text = tk.Text(error_text_frame, wrap=tk.WORD, 
-                                      bg='white', fg='black', font=('Consolas', 12))
+                                      bg='#FFF0F0', fg='darkred', font=('Consolas', 12),
+                                      relief=tk.FLAT, padx=8, pady=8)
         self.fail_error_text.grid(row=0, column=0, sticky='nsew')
         
         # 滾動條
-        error_scrollbar = tk.Scrollbar(error_text_frame, command=self.fail_error_text.yview)
+        error_scrollbar = ttk.Scrollbar(error_text_frame, command=self.fail_error_text.yview)
         error_scrollbar.grid(row=0, column=1, sticky='ns')
         self.fail_error_text.config(yscrollcommand=error_scrollbar.set)
         
         error_text_frame.grid_rowconfigure(0, weight=1)
         error_text_frame.grid_columnconfigure(0, weight=1)
         
-        self.fail_paned.add(self.fail_lower_frame, minsize=150)
+        self.fail_paned.add(self.fail_lower_frame, weight=2)
         
         # 載入FAIL分割視窗設定
         fail_pane_position = self.settings.get('fail_pane_position', 300)

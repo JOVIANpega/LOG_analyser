@@ -115,6 +115,29 @@ def build_settings_content(app, parent):
     remember_path_check.pack(anchor=tk.W, pady=3)
     app.font_scaler.register(remember_path_check)
     
+    # 主題設定區域
+    theme_frame = tk.LabelFrame(right_column, text="介面主題", padx=15, pady=15)
+    theme_frame.pack(fill=tk.X, pady=5)
+    app.font_scaler.register(theme_frame)
+    
+    theme_edit_frame = tk.Frame(theme_frame)
+    theme_edit_frame.pack(fill=tk.X, pady=8)
+    
+    theme_label = tk.Label(theme_edit_frame, text="主題名稱：", font=('Arial', 11))
+    theme_label._is_settings_label = True
+    theme_label.pack(side=tk.LEFT)
+    app.font_scaler.register(theme_label)
+    
+    # 支援的主題清單
+    themes = ['superhero', 'darkly', 'cosmo', 'flatly', 'journal', 'litera', 'lumen', 'minty', 'pulse', 'sandstone', 'united', 'yeti', 'morph', 'simplex', 'cerculean']
+    app.theme_var = tk.StringVar(value=app.settings.get('theme', 'superhero'))
+    
+    # 使用 ttk.Combobox
+    theme_combo = ttk.Combobox(theme_edit_frame, textvariable=app.theme_var, values=themes, state='readonly', width=15)
+    theme_combo.pack(side=tk.LEFT, padx=8)
+    # 綁定即時切換事件
+    theme_combo.bind('<<ComboboxSelected>>', app._on_theme_change)
+    
     # 版本設定區域
     version_frame = tk.LabelFrame(right_column, text="版本設定", padx=15, pady=15)
     version_frame.pack(fill=tk.X, pady=5)

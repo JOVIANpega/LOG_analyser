@@ -311,94 +311,147 @@
 
     <div class="section" id="section_flow">
       <h2>🔍 分析流程圖</h2>
-      <div class="flowchart">
-        <div class="step">
-          <div class="icon">🚀</div>
-          <div class="title">啟動程式</div>
-          <div class="desc">執行 main.py</div>
-        </div>
-        <div class="arrow">⬇️</div>
-        <div class="step">
-          <div class="icon">📂</div>
-          <div class="title">選擇檔案</div>
-          <div class="desc">支援 Log / 資料夾 / 壓縮檔 (ZIP/7Z/RAR)</div>
-        </div>
-        <div class="arrow">⬇️</div>
-        <div class="step">
-          <div class="icon">⚙️</div>
-          <div class="title">自動分析</div>
-          <div class="desc">背景執行緒解析，介面不卡頓</div>
-        </div>
-        <div class="arrow">⬇️</div>
-        <div class="step">
-          <div class="icon">📊</div>
-          <div class="title">分類結果</div>
-          <div class="desc">
-            <strong>成功</strong> = 判定為 PASS 的 Log<br>
-            <strong>失敗</strong> = 判定為 FAIL 的 Log
+      <div class="flow-container">
+        <div class="flow-item">
+          <div class="flow-step">1</div>
+          <div class="flow-content">
+            <div class="flow-icon">🚀</div>
+            <div class="flow-title">啟動程式</div>
+            <div class="flow-desc">執行 <code>main.py</code> 進入主介面</div>
           </div>
         </div>
-        <div class="arrow">⬇️</div>
-        <div class="step">
-          <div class="icon">📑</div>
-          <div class="title">產生報告</div>
-          <div class="desc">自動生成 Excel (PASS/FAIL 匯總)</div>
+        <div class="flow-arrow">➜</div>
+        <div class="flow-item">
+          <div class="flow-step">2</div>
+          <div class="flow-content">
+            <div class="flow-icon">📂</div>
+            <div class="flow-title">選擇來源</div>
+            <div class="flow-desc">支援單/多檔案、資料夾或壓縮檔</div>
+          </div>
         </div>
-        <div class="arrow">⬇️</div>
-        <div class="step">
-          <div class="icon">✅</div>
-          <div class="title">完成</div>
-          <div class="desc">彈出視窗提示開啟檔案</div>
+        <div class="flow-arrow">➜</div>
+        <div class="flow-item">
+          <div class="flow-step">3</div>
+          <div class="flow-content">
+            <div class="flow-icon">⚙️</div>
+            <div class="flow-title">智能分析</div>
+            <div class="flow-desc">自動辨識 Log 格式並提取關鍵數據</div>
+          </div>
+        </div>
+        <div class="flow-arrow">➜</div>
+        <div class="flow-item">
+          <div class="flow-step">4</div>
+          <div class="flow-content">
+            <div class="flow-icon">📊</div>
+            <div class="flow-title">結果分類</div>
+            <div class="flow-desc">同步產出 PASS/FAIL 列表與詳細原因</div>
+          </div>
+        </div>
+        <div class="flow-arrow">➜</div>
+        <div class="flow-item">
+          <div class="flow-step">5</div>
+          <div class="flow-content">
+            <div class="flow-icon">📑</div>
+            <div class="flow-title">匯出報表</div>
+            <div class="flow-desc">自動生成 Excel 總結與統計圖表</div>
+          </div>
         </div>
       </div>
       <style>
-        .flowchart {
+        .flow-container {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          background: #fdfdfd;
+          padding: 30px 15px;
+          border-radius: 12px;
+          border: 1px solid #eee;
+          margin: 20px 0;
+          overflow-x: auto;
+        }
+
+        .flow-item {
+          flex: 1;
           display: flex;
           flex-direction: column;
           align-items: center;
-          background: #f8f9fa;
-          padding: 20px;
-          border-radius: 10px;
-          margin: 20px 0;
+          position: relative;
+          min-width: 150px;
         }
 
-        .step {
+        .flow-step {
+          width: 24px;
+          height: 24px;
+          background: #2196f3;
+          color: white;
+          border-radius: 50%;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          font-size: 12px;
+          font-weight: bold;
+          margin-bottom: 10px;
+          box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+        }
+
+        .flow-content {
           background: white;
-          border: 2px solid #2196f3;
-          border-radius: 10px;
-          padding: 15px;
-          width: 250px;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          padding: 15px 10px;
           text-align: center;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-          transition: transform 0.2s;
+          width: 90%;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+          transition: all 0.3s ease;
         }
 
-        .step:hover {
+        .flow-content:hover {
           transform: translateY(-5px);
-          border-color: #4caf50;
+          border-color: #2196f3;
+          box-shadow: 0 6px 16px rgba(33, 150, 243, 0.15);
         }
 
-        .step .icon {
-          font-size: 24px;
-          margin-bottom: 5px;
+        .flow-icon {
+          font-size: 28px;
+          margin-bottom: 8px;
         }
 
-        .step .title {
+        .flow-title {
           font-weight: bold;
           color: #333;
+          font-size: 16px;
           margin-bottom: 5px;
         }
 
-        .step .desc {
-          font-size: 14px;
-          color: #666;
+        .flow-desc {
+          font-size: 12px;
+          color: #777;
           line-height: 1.4;
         }
 
-        .arrow {
-          font-size: 24px;
-          color: #999;
-          margin: 10px 0;
+        .flow-arrow {
+          align-self: center;
+          font-size: 20px;
+          color: #bdbdbd;
+          padding: 0 5px;
+          margin-top: 20px;
+        }
+
+        @media (max-width: 900px) {
+          .flow-container {
+            flex-direction: column;
+            align-items: center;
+          }
+
+          .flow-arrow {
+            transform: rotate(90deg);
+            margin: 10px 0;
+          }
+
+          .flow-item {
+            width: 100%;
+            margin-bottom: 15px;
+          }
         }
       </style>
     </div>

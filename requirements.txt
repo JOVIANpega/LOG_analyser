@@ -5,3 +5,6 @@ tkinter  # Python內建，但某些Linux發行版需要額外安裝
 
 # Excel處理
 openpyxl>=3.0.0
+
+# UI增強
+ttkbootstrap>=1.10.1

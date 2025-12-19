@@ -18,42 +18,8 @@ class ConfigManager:
         self.settings = load_settings()
         
     def check_encryption(self):
-        """檢查加密檔案"""
-        try:
-            # 獲取EXE所在目錄
-            if getattr(sys, 'frozen', False):
-                # 如果是打包的EXE
-                exe_dir = os.path.dirname(sys.executable)
-            else:
-                # 如果是Python腳本
-                exe_dir = os.path.dirname(os.path.abspath(__file__))
-                # 處理在app目錄下運行的情況，向上找一層
-                if os.path.basename(exe_dir) == 'app':
-                    exe_dir = os.path.dirname(exe_dir)
-            
-            # 檢查SIGN.txt檔案
-            sign_file = os.path.join(exe_dir, "SIGN.txt")
-            
-            if not os.path.exists(sign_file):
-                self._show_encryption_error()
-                return False
-            
-            # 讀取檔案內容
-            with open(sign_file, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-            
-            # 檢查是否包含jovian字串
-            if 'jovian' not in content.lower():
-                self._show_encryption_error()
-                return False
-            
-            print("加密檔案驗證成功")
-            return True
-            
-        except Exception as e:
-            print(f"檢查加密檔案時發生錯誤: {e}")
-            self._show_encryption_error()
-            return False
+        """檢查加密檔案 (目前已停用，直接回傳成功)"""
+        return True
     
     def _show_encryption_error(self):
         """顯示加密錯誤訊息"""

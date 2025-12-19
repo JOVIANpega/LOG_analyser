@@ -20,18 +20,32 @@ class EnhancedTreeview:
     
     def setup_styles(self):
         """設定樣式"""
+        # 獲取主題的前景和背景色
+        try:
+            from ttkbootstrap import Style
+            theme_style = Style().colors
+            fg_color = theme_style.inputfg
+            bg_color = theme_style.inputbg
+            pass_color = theme_style.success
+            fail_color = theme_style.danger
+            hover_color = theme_style.selectbg
+        except:
+            fg_color = "black"
+            bg_color = "white"
+            pass_color = "green"
+            fail_color = "red"
+            hover_color = "#E8F4FD"
+
         self.style = ttk.Style()
         
-        # PASS項目樣式（黑色）
-        self.style.configure("Pass.Treeview", foreground="black", font=('Arial', self.font_size))
-        self.style.configure("Pass.Treeview.Item", foreground="black", font=('Arial', self.font_size))
+        # PASS項目樣式
+        self.style.configure("Pass.Treeview", foreground=pass_color, font=('Arial', self.font_size))
         
-        # FAIL項目樣式（紅色）
-        self.style.configure("Fail.Treeview", foreground="red", font=('Arial', self.font_size))
-        self.style.configure("Fail.Treeview.Item", foreground="red", font=('Arial', self.font_size))
+        # FAIL項目樣式
+        self.style.configure("Fail.Treeview", foreground=fail_color, font=('Arial', self.font_size))
         
         # Hover效果樣式
-        self.style.configure("Hover.Treeview.Item", background="#E8F4FD")
+        self.style.configure("Hover.Treeview.Item", background=hover_color)
         
         # 一般TreeView樣式
         self.style.configure("Treeview", font=('Arial', self.font_size))

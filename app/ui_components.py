@@ -39,29 +39,39 @@ class FontScaler:
 
     def set_font_size(self, size):
         self.font_size = max(self.min_size, min(self.max_size, size))
+        
+        # 1. 更新所有註冊的傳統 tk 元件
         for w in self.widgets:
             try:
                 style = self.widget_styles.get(w)
                 if not style:
                     style = self._capture_widget_style(w)
                     self.widget_styles[w] = style
-                family = style.get('family') or None
+                family = style.get('family') or 'Arial'
                 weight = style.get('weight') or 'normal'
-                # 保留粗體設定
-                if family:
-                    w.configure(font=(family, self.font_size, weight))
-                else:
-                    w.configure(font=(None, self.font_size, weight))
+                w.configure(font=(family, self.font_size, weight))
             except Exception:
                 try:
-                    w.configure(font=(None, self.font_size))
+                    w.configure(font=('Arial', self.font_size))
                 except Exception:
                     pass
+        
+        # 2. 更新 ttk 全域樣式，確保所有 ttk 元件同步縮放
+        try:
+            style = ttk.Style()
+            style.configure('.', font=('Arial', self.font_size))
+            style.configure('TNotebook.Tab', font=('Arial', self.font_size))
+            style.configure('TButton', font=('Arial', self.font_size))
+            style.configure('TLabel', font=('Arial', self.font_size))
+            style.configure('TEntry', font=('Arial', self.font_size))
+            style.configure('TLabelframe.Label', font=('Arial', self.font_size, 'bold'))
+        except Exception as e:
+            print(f"更新 ttk 樣式失敗: {e}")
 
     def apply_to_treeview(self, tree):
         style = ttk.Style()
-        style.configure("Treeview", font=(None, self.font_size))
-        style.configure("Treeview.Heading", font=(None, self.font_size))
+        style.configure("Treeview", font=('Arial', self.font_size))
+        style.configure("Treeview.Heading", font=('Arial', self.font_size, 'bold'))
 
 # 共同UI工具：設定元件字體為粗體並與FontScaler相容
 def make_bold(widget):

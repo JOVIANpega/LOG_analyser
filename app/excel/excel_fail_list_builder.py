@@ -1,17 +1,5 @@
-# -*- coding: utf-8 -*-
-"""
-Excel FAIL List Builder - 新格式Dashboard+FAIL_LIST
-实现结构化的错误报告格式
-"""
-from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.utils import get_column_letter
-from .excel_utils import (
-    sanitize_cell_text, extract_isn_from_filename,
-    extract_station_from_filename, auto_fit_columns
-)
 import re
-
+# 延後載入：openpyxl 將在內部方法載入以提升啟動速度
 
 class FailListBuilder:
     """构建新格式的FAIL报告 - Dashboard + FAIL_LIST"""
@@ -46,6 +34,8 @@ class FailListBuilder:
         
         列: 状态 | ISN | Station | 错误类型 | 错误详情 | 发生时间 | Retry次数 | 查看详细
         """
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from .excel_utils import auto_fit_columns
         ws = wb.create_sheet("Dashboard", 0)
         
         # 标题行
@@ -115,6 +105,8 @@ class FailListBuilder:
         
         列: ISN | Station | 测试项目 | 错误类型 | 错误原因 | 执行指令
         """
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from .excel_utils import auto_fit_columns
         ws = wb.create_sheet("FAIL_LIST", 1)
         
         # 标题行
@@ -165,6 +157,7 @@ class FailListBuilder:
     
     def _extract_error_info(self, log_entry):
         """从LOG条目提取结构化错误信息"""
+        from .excel_utils import extract_isn_from_filename, extract_station_from_filename
         filename = log_entry.get('filename', '')
         error_text = log_entry.get('error_text', '')
         summary = log_entry.get('summary', {})

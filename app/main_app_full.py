@@ -74,38 +74,40 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
             status_light_widget = getattr(self, 'status_light', None)
             header_label_widget = getattr(self, 'left_title_label', None)
             header_frame_widget = getattr(self, 'left_title_frame', None)
+            percentage_label_widget = getattr(self, 'percentage_label', None)
             self.progress_manager.set_widgets(
                 self.status_label, 
                 self.main_progress_bar, 
                 status_light_widget,
                 header_label_widget,
-                header_frame_widget
+                header_frame_widget,
+                percentage_label_widget
             )
         
         # Events
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
 
     def _apply_font_size(self):
-        """應用字體設定"""
+        """應用字體設定並更新介面"""
         if hasattr(self, 'font_scaler'):
             self.font_scaler.set_font_size(self.ui_font_size)
         
-        # 更新設定頁面中的數字顯示
+        # 1. 更新設定頁面中的數字顯示
         if hasattr(self, 'settings_ui_font_size_label'):
             self.settings_ui_font_size_label.config(text=str(self.ui_font_size))
         if hasattr(self, 'settings_content_font_size_label'):
             self.settings_content_font_size_label.config(text=str(self.content_font_size))
             
-        # 更新某些特定元件的字體
-        style = ttk.Style()
-        style.configure('TNotebook.Tab', font=('Arial', self.ui_font_size))
-        
-        # Update text widgets if they exist
+        # 2. 更新 Text 編輯器字體
         if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
              self.log_text_enhanced.text.configure(font=('Consolas', self.content_font_size))
              
         if hasattr(self, 'fail_error_text'):
-             self.fail_error_text.configure(font=('Consolas', 12)) # Fixed size or scaled?
+             self.fail_error_text.configure(font=('Consolas', 12))
+             
+        # 3. 更新 Treeview 
+        if hasattr(self, 'result_tree'):
+            self.font_scaler.apply_to_treeview(self.result_tree.tree)
 
     def _cleanup_temp_files_async(self):
         """非同步清理暫存檔案"""
@@ -187,12 +189,40 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
     def _save_settings_silent(self):
         self.config_manager.save()
 
+    def _on_theme_change(self, event=None):
+        """當主題選擇改變時"""
+        theme_name = self.theme_var.get()
+        # 使用 ttkbootstrap 視窗內建的 style 進行切換
+        if hasattr(self.root, 'style'):
+            self.root.style.theme_use(theme_name)
+        else:
+            import ttkbootstrap as ttk
+            ttk.Style().theme_use(theme_name)
+        
+        # 4. 標題背景也需要同步更新 (因為它是特殊的 tk.Frame)
+        try:
+            import ttkbootstrap as ttk
+            colors = ttk.Style().colors
+            header_bg = colors.primary
+            header_fg = colors.inversefg if hasattr(colors, 'inversefg') else 'white'
+            if hasattr(self, 'left_title_label'):
+                self.left_title_label.config(bg=header_bg, fg=header_fg)
+            if hasattr(self, 'left_title_frame'):
+                self.left_title_frame.config(bg=header_bg)
+        except:
+            pass
+            
+        # 5. 主題切換後強制重新套用字體大小，確保樣式刷新
+        self._apply_font_size()
+            
     def _save_settings(self):
         """手動保存所有設定"""
         try:
             # 更新其他設定值
             if hasattr(self, 'version_var'):
                  self.config_manager.set('version', self.version_var.get())
+            if hasattr(self, 'theme_var'):
+                 self.config_manager.set('theme', self.theme_var.get())
             if hasattr(self, 'auto_analyze_var'):
                  self.config_manager.set('auto_analyze', self.auto_analyze_var.get())
             if hasattr(self, 'remember_path_var'):

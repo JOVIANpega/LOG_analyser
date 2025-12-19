@@ -12,9 +12,89 @@ import os
 
 def main():
     """主程式入口點（僅增強版）"""
-    from app.main_app import EnhancedLogAnalyzerApp
-    root = tk.Tk()
-    app = EnhancedLogAnalyzerApp(root)
+    # 延遲載入 heavy 模組的預備
+    from app.settings_loader import load_settings
+    settings = load_settings()
+    selected_theme = settings.get('theme', 'superhero')
+    
+    import ttkbootstrap as ttk
+    
+    # 直接建立 ttk.Window 作為唯一的 root
+    root = ttk.Window(
+        title="PEGA Log Analyzer",
+        themename=selected_theme,
+        resizable=(True, True)
+    )
+    root.withdraw() # 初始隱藏，先做啟動畫面
+    
+    # 建立啟動畫面 (作為 Toplevel 或在 root 上佈置)
+    # 這裡直接在 root 上佈置一個全螢幕的 Frame 作為啟動畫面
+    splash_frame = ttk.Frame(root, style='secondary.TFrame')
+    splash_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+    
+    # 設定視窗大小與置中
+    ww, wh = 450, 300
+    sw = root.winfo_screenwidth()
+    sh = root.winfo_screenheight()
+    root.geometry(f"{ww}x{wh}+{(sw-ww)//2}+{(sh-wh)//2}")
+    root.overrideredirect(True) # 暫時隱藏標題列
+    root.deiconify()
+    
+    canvas = tk.Canvas(splash_frame, width=ww, height=wh, bg='#2c3e50', highlightthickness=0)
+    canvas.pack(fill=tk.BOTH, expand=True)
+    
+    canvas.create_rectangle(0, 0, ww, wh, outline='#3498db', width=4)
+    canvas.create_text(ww//2, wh//2-30, text="PEGA Log Analyzer", fill='white', font=('Arial', 22, 'bold'))
+    status_text = canvas.create_text(ww//2, wh//2+40, text="正在初始化核心服務...", fill='#bdc3c7', font=('Arial', 10))
+    
+    def animate_splash(step=0):
+        if not root.winfo_exists(): return
+        colors = ['#bdc3c7', '#ecf0f1', '#3498db']
+        canvas.itemconfig(status_text, fill=colors[step % len(colors)])
+        root.after(300, lambda: animate_splash(step + 1))
+    
+    animate_splash()
+    
+    def load_app():
+        try:
+            # 載入主程式類別
+            canvas.itemconfig(status_text, text="正在載入介面組件...")
+            root.update()
+            from app.main_app import EnhancedLogAnalyzerApp
+            
+            canvas.itemconfig(status_text, text="正在完成最後部署...")
+            root.update()
+            
+            # 初始化 App
+            app = EnhancedLogAnalyzerApp(root)
+            
+            # 恢復視窗標準外觀
+            root.overrideredirect(False)
+            
+            # 讀取視窗幾何設定（如果有存的話）
+            if hasattr(app, 'config_manager'):
+                app.config_manager.load_window_geometry()
+            else:
+                root.geometry("1280x800")
+            
+            # 移除啟動畫面
+            splash_frame.destroy()
+            
+            # 如果有 PyInstaller 的啟動畫面，關閉它
+            try:
+                import pyi_splash
+                pyi_splash.close()
+            except ImportError:
+                pass
+                
+        except Exception as e:
+            print(f"啟動時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+            root.destroy()
+
+    # 稍微延遲後開始載入
+    root.after(500, load_app)
     root.mainloop()
 
 if __name__ == '__main__':

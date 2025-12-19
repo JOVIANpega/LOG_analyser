@@ -100,18 +100,19 @@ class EnhancedText:
             self.search_frame.destroy()
         
         # 創建搜尋框架
-        self.search_frame = tk.Frame(self.text.master)
+        from tkinter import ttk
+        self.search_frame = ttk.Frame(self.text.master, style='secondary.TFrame')
         self.search_frame.pack(side=tk.TOP, fill=tk.X, padx=5, pady=2)
         
-        tk.Label(self.search_frame, text="搜尋:").pack(side=tk.LEFT)
+        ttk.Label(self.search_frame, text=" 🔍 搜尋: ").pack(side=tk.LEFT, padx=5)
         
-        self.search_entry = tk.Entry(self.search_frame, textvariable=self.search_var, width=20)
-        self.search_entry.pack(side=tk.LEFT, padx=5)
+        self.search_entry = ttk.Entry(self.search_frame, textvariable=self.search_var)
+        self.search_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         self.search_entry.focus()
         
-        tk.Button(self.search_frame, text="下一個", command=self._find_next).pack(side=tk.LEFT, padx=2)
-        tk.Button(self.search_frame, text="上一個", command=self._find_prev).pack(side=tk.LEFT, padx=2)
-        tk.Button(self.search_frame, text="關閉", command=self._close_search).pack(side=tk.LEFT, padx=2)
+        ttk.Button(self.search_frame, text="下一個", command=self._find_next, style='info.TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(self.search_frame, text="上一個", command=self._find_prev, style='success.TButton').pack(side=tk.LEFT, padx=2)
+        ttk.Button(self.search_frame, text="關閉", command=self._close_search, style='danger.TButton').pack(side=tk.LEFT, padx=2)
         
         # 綁定Enter鍵
         self.search_entry.bind('<Return>', lambda e: self._find_next())

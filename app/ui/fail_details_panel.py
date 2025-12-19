@@ -13,18 +13,20 @@ class FailDetailsPanel:
     
     def setup_ui(self):
         """設定UI"""
+        from tkinter import ttk
         # 標題
-        title_label = tk.Label(self.frame, text="錯誤完整區塊", 
-                              font=('Arial', 12, 'bold'), fg='red')
+        title_label = ttk.Label(self.frame, text=" 🔴 錯誤完整區塊 ", 
+                               font=('Arial', 12, 'bold'), style='danger.TLabel')
         title_label.pack(pady=(10, 5))
         
         # 錯誤內容文字框（可複製）
         self.error_text = tk.Text(self.frame, height=8, wrap=tk.WORD, 
-                                 bg='#FFE4E1', fg='red', font=('Consolas', 9))
+                                 bg='#FFF0F0', fg='darkred', font=('Consolas', 10),
+                                 relief=tk.FLAT, padx=5, pady=5)
         self.error_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
         # 滾動條
-        scrollbar = tk.Scrollbar(self.frame, command=self.error_text.yview)
+        scrollbar = ttk.Scrollbar(self.frame, command=self.error_text.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.error_text.config(yscrollcommand=scrollbar.set)
     

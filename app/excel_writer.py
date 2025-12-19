@@ -1,18 +1,10 @@
-# excel_writer.py
-# 用途：將log分析結果匯出為Excel檔案，支援PASS/FAIL分頁，欄位依規格
-import pandas as pd
+from __future__ import annotations
 from datetime import datetime
-from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill
-from openpyxl.utils import get_column_letter
-from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
-from openpyxl.styles.borders import Border, Side
-from openpyxl.comments import Comment
-from openpyxl.worksheet.datavalidation import DataValidation
 import re
 import os
 import time
 import traceback
+# 延後載入：pandas, openpyxl, re, 等重量級庫將在內部方法載入以提升啟動速度
 
 class ExcelWriter:
     def __init__(self):
@@ -24,6 +16,7 @@ class ExcelWriter:
             return start_row
             
         try:
+            from openpyxl.styles import Font, Alignment, PatternFill
             lines = header_info.split('\n')
             current_row = start_row
             
@@ -50,7 +43,9 @@ class ExcelWriter:
         - 去除 ANSI/ESC 序列 (更廣泛)
         - 截斷過長文字 (3 萬字元)
         """
+        from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
         try:
+            from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
             text = '' if value is None else str(value)
             # 移除 Excel 禁用控制字元 (0x00-0x1F 無法接受，openpyxl 內建 regex)
             text = ILLEGAL_CHARACTERS_RE.sub('', text)
@@ -76,6 +71,9 @@ class ExcelWriter:
         pass_items: List[dict]
         fail_items: List[dict]
         """
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        from openpyxl.utils import get_column_letter
         wb = Workbook()
         # 移除預設工作表
         wb.remove(wb.active)
@@ -367,6 +365,10 @@ class ExcelWriter:
 
     def _build_fail_list_sheet(self, wb, logs):
         """建立 FAIL_LIST 工作表 (依使用者要求的 CSV 格式，並統計相同錯誤)"""
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+        from openpyxl.chart import PieChart, Reference, Series
+        from openpyxl.chart.label import DataLabelList
         ws = wb.create_sheet("FAIL_LIST", 0) # 放在第一頁
         try:
             ws.sheet_properties.tabColor = 'FFFF0000' # 紅色標籤
@@ -380,13 +382,18 @@ class ExcelWriter:
         # 樣式設定
         header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
         content_font = Font(name='Calibri', size=11)
-        fill_blue = PatternFill('solid', fgColor='FF4472C4')
+        fill_blue = PatternFill('solid', fgColor='4472C4')
+        fill_red = PatternFill('solid', fgColor='FF0000')
         center_align = Alignment(horizontal='center', vertical='center')
         
         for col in range(1, len(headers) + 1):
             cell = ws.cell(row=1, column=col)
             cell.font = header_font
-            cell.fill = fill_blue
+            # FAIL Reason (Column D) 使用紅色背景
+            if col == 4:
+                cell.fill = fill_red
+            else:
+                cell.fill = fill_blue
             cell.alignment = center_align
         
         # 1. 收集所有資料行與統計錯誤
@@ -451,54 +458,29 @@ class ExcelWriter:
             for col_idx, value in enumerate(row_values, 1):
                 cell = ws.cell(row=current_row, column=col_idx)
                 cell.font = content_font
-                if col_idx == 6: # Count column
-                    cell.alignment = center_align
-                else:
+                if col_idx in (1, 2, 3, 6): # ISN, Station, FAIL Item, Count 不換行且置中
+                    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
+                elif col_idx == 4: # FAIL Reason 換行且靠上
                     cell.alignment = Alignment(wrap_text=True, vertical='top', horizontal='left')
+                else: # suggestion 置中靠上
+                    cell.alignment = Alignment(wrap_text=True, vertical='center', horizontal='left')
                 
         # 強制自動調整欄寬
         min_widths = {
-            1: 15, # ISN
-            2: 20, # Station
-            3: 30, # FAIL Item
-            4: 50, # FAIL Reason
+            1: 25, # ISN
+            2: 30, # Station
+            3: 45, # FAIL Item
+            4: 65, # FAIL Reason
             5: 20, # suggestion
-            6: 10  # Count
+            6: 12  # Count
         }
         
-        for col_idx, min_w in min_widths.items():
-            col_letter = get_column_letter(col_idx)
-            ws.column_dimensions[col_letter].width = min_w
-
-        # 根據內文調整 (如果有更長的)
-        for col in ws.columns:
-            max_len = 0
-            col_idx = col[0].column
-            col_letter = get_column_letter(col_idx)
-            
-            # 跳過 Reason 欄位因為它可能很長且已設定 wrap_text，太寬不好看
-            if col_idx == 4: 
-                continue
-                
-            for cell in col:
-                try:
-                    val = str(cell.value) if cell.value else ""
-                    # 考慮中文字寬度
-                    length = len(val.encode('utf-8')) * 0.5 
-                    if length > max_len:
-                        max_len = length
-                except:
-                    pass
-            
-            current_w = ws.column_dimensions[col_letter].width
-            new_w = min(max(current_w, max_len + 2), 80)
-            ws.column_dimensions[col_letter].width = new_w
+        # 使用共用的自動調整函數
+        self._auto_fit_columns(ws, min_widths=min_widths)
         
         # 3. 添加錯誤類型統計表格和圓餅圖
         if error_counts:
             try:
-                from openpyxl.chart import PieChart, Reference
-                from openpyxl.chart.label import DataLabelList
                 
                 # 計算表格位置（在資料表格下方）
                 table_start_row = ws.max_row + 3
@@ -532,8 +514,6 @@ class ExcelWriter:
                 ws.column_dimensions['C'].width = 10
                 
                 # 創建圓餅圖 (Pie Chart) - 提供佔比視覺化
-                from openpyxl.chart import PieChart, Reference, Series
-                from openpyxl.chart.label import DataLabelList
                 
                 chart = PieChart()
                 chart.title = "FAIL Item 佔比統計"
@@ -580,6 +560,7 @@ class ExcelWriter:
 
     def _build_preview_comment(self, entry: dict) -> str:
         """產生懸停預覽內容：顯示對應工作表名稱與原始LOG前幾行（加上簡易標記）。"""
+        from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
         try:
             sheet_or_name = entry.get('file_name') or 'LOG'
             raw = entry.get('raw_lines') or []
@@ -605,6 +586,8 @@ class ExcelWriter:
 
     def _add_input_prompt(self, ws, cell, title: str, message: str):
         """在儲存格上加一個資料驗證提示（白底有框），當選取時顯示。"""
+        from openpyxl.worksheet.datavalidation import DataValidation
+        from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
         try:
             # Excel 對於訊息有長度限制，做適當截斷
             msg = (message or '')
@@ -650,6 +633,9 @@ class ExcelWriter:
                 raise e
 
     def _build_pass_workbook(self, output_path: str, logs: list):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.comments import Comment
         wb = Workbook()
         ws = wb.active
         ws.title = 'Summary'
@@ -658,10 +644,10 @@ class ExcelWriter:
             ws.sheet_properties.tabColor = 'FFFF0000'
         except Exception:
             pass
-        header_font = Font(name='Calibri', size=16, bold=True, color='FFFFFFFF')
-        normal_font = Font(name='Calibri', size=10)
+        header_font_big = Font(name='Calibri', size=14, bold=True, color='FFFFFF')
+        header_fill_blue = PatternFill('solid', fgColor='4472C4')
+        normal_font = Font(name='Calibri', size=11)
         center = Alignment(horizontal='center', vertical='center')
-        deep_green = PatternFill('solid', fgColor='FF1B5E20')
         # 先建立各 LOG 原始工作表，並記錄 sheet 名稱
         sheet_map = {}
         for entry in logs:
@@ -764,9 +750,9 @@ class ExcelWriter:
         headers = ['LOG資訊']
         for c, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=c, value=header)
-            cell.font = header_font
+            cell.font = header_font_big
             cell.alignment = center
-            cell.fill = deep_green
+            cell.fill = header_fill_blue
             
         ws.freeze_panes = 'A2'
         thin = Side(border_style='thin', color='FF888888')
@@ -887,6 +873,10 @@ class ExcelWriter:
                 pass
 
     def _build_fail_workbook(self, output_path: str, logs: list):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.comments import Comment
+        from openpyxl.worksheet.datavalidation import DataValidation
         wb = Workbook()
         # 移除預設工作表
         if wb.sheetnames:
@@ -907,17 +897,20 @@ class ExcelWriter:
             ws.sheet_properties.tabColor = 'FFFF0000'
         except Exception:
             pass
-        header_font = Font(name='Calibri', size=16, bold=True, color='FFFFFFFF')
-        normal_font = Font(name='Calibri', size=10)
+        header_font_big = Font(name='Calibri', size=14, bold=True, color='FFFFFF')
+        fill_blue = PatternFill('solid', fgColor='4472C4')
+        fill_red = PatternFill('solid', fgColor='FF0000')
         center = Alignment(horizontal='center', vertical='center')
-        deep_green = PatternFill('solid', fgColor='FF1B5E20')
         headers = ['檔名', '詳細錯誤原因']
         ws.append(headers)
         for c in range(1, len(headers)+1):
             cell = ws.cell(row=1, column=c)
-            cell.font = header_font
+            cell.font = header_font_big
             cell.alignment = center
-            cell.fill = deep_green
+            if c == 2: # 詳細錯誤原因 使用紅色
+                cell.fill = fill_red
+            else:
+                cell.fill = fill_blue
         ws.freeze_panes = 'A2'
         # 先建立各 LOG 原始工作表
         sheet_map = {}
@@ -1158,7 +1151,8 @@ class ExcelWriter:
             except Exception:
                 pass
 
-    def _write_raw_log_with_annotations(self, ws, start_row: int, raw_lines: list, annotations: list, font: Font, step_marks: dict | None = None):
+    def _write_raw_log_with_annotations(self, ws, start_row: int, raw_lines: list, annotations: list, font, step_marks: dict | None = None):
+        from openpyxl.styles import Font, PatternFill
         color_map = {
             'black': 'FF000000',
             'red': 'FFE74C3C',
@@ -1372,6 +1366,7 @@ class ExcelWriter:
     
     def _add_error_statistics(self, ws, logs: list):
         """在Summary頁面最上面添加錯誤統計"""
+        from openpyxl.styles import Font, PatternFill
         try:
             # 收集所有錯誤原因
             error_counts = {}
@@ -1393,19 +1388,19 @@ class ExcelWriter:
             # 直接在現有內容上方添加錯誤統計，不移動現有內容
             # 添加錯誤統計標題
             title_row = 1
-            ws.cell(row=title_row, column=1, value='📊 錯誤原因統計').font = Font(name='Microsoft JhengHei', size=14, bold=True, color='FF0000')
+            ws.cell(row=title_row, column=1, value='📊 錯誤原因統計').font = Font(name='Calibri', size=14, bold=True, color='FF0000')
             ws.cell(row=title_row, column=1).fill = PatternFill('solid', fgColor='FFFFE6E6')
             
             # 添加統計內容
             current_row = 2
             for error_type, count in sorted(error_counts.items(), key=lambda x: x[1], reverse=True):
                 ws.cell(row=current_row, column=1, value=f'{error_type} = {count} 筆')
-                ws.cell(row=current_row, column=1).font = Font(name='Microsoft JhengHei', size=11, bold=True)
+                ws.cell(row=current_row, column=1).font = Font(name='Calibri', size=11, bold=True)
                 ws.cell(row=current_row, column=1).fill = PatternFill('solid', fgColor='FFFFFF99')  # 淺黃色背景
                 current_row += 1
             
             # 添加分隔線
-            ws.cell(row=current_row, column=1, value='─' * 50).font = Font(name='Microsoft JhengHei', size=10, color='FF808080')
+            ws.cell(row=current_row, column=1, value='─' * 50).font = Font(name='Calibri', size=10, color='FF808080')
             
             print(f"錯誤統計已添加到第 {title_row} 到 {current_row} 行")
             
@@ -1527,9 +1522,17 @@ class ExcelWriter:
             for cell in col:
                 try:
                     if cell.value:
-                        max_length = max(max_length, len(str(cell.value)))
+                        # 簡單估計寬度，中文字算 2 個長度
+                        val_str = str(cell.value)
+                        length = 0
+                        for char in val_str:
+                            if ord(char) > 255:
+                                length += 2.0  # 中文字
+                            else:
+                                length += 1.3  # 英文字 (Calibri 稍微加寬預留空間)
+                        max_length = max(max_length, length)
                 except:
                     pass
-            adjusted_width = max(max_length + 2, min_w.get(col_num, 10))
-            adjusted_width = min(adjusted_width, 150)  # 最大寬度限制
+            adjusted_width = max(max_length + 3, min_w.get(col_num, 10))
+            adjusted_width = min(adjusted_width, 100)  # 最大寬度限制
             ws.column_dimensions[column].width = adjusted_width
