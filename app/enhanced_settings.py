@@ -115,6 +115,15 @@ def build_settings_content(app, parent):
     remember_path_check.pack(anchor=tk.W, pady=3)
     app.font_scaler.register(remember_path_check)
     
+    # 忽略無測試時間的LOG
+    app.skip_no_test_time_var = tk.BooleanVar(value=app.settings.get('skip_no_test_time', True))
+    skip_no_test_time_check = tk.Checkbutton(other_frame, text="忽略未找到測試總時間的LOG", 
+                                            variable=app.skip_no_test_time_var, 
+                                            font=('Arial', 11))
+    skip_no_test_time_check._is_settings_checkbutton = True  # 標識為設定核取方塊
+    skip_no_test_time_check.pack(anchor=tk.W, pady=3)
+    app.font_scaler.register(skip_no_test_time_check)
+    
     # 主題設定區域
     theme_frame = tk.LabelFrame(right_column, text="介面主題", padx=15, pady=15)
     theme_frame.pack(fill=tk.X, pady=5)

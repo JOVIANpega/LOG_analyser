@@ -6,7 +6,9 @@ from pathlib import Path
 import glob
 from datetime import datetime
 import re
-# 延後載入：pandas, openpyxl 將在內部方法載入以提升啟動速度
+import pandas as pd
+from openpyxl.utils import get_column_letter
+# 延後載入：openpyxl 將在內部方法載入以提升啟動速度
 class CSVProcessor:
     def __init__(self, app):
         self.app = app
@@ -304,13 +306,13 @@ class CSVProcessor:
             with open(csv_file, 'r', encoding=encoding, errors='ignore') as f:
                 lines = []
                 for i, line in enumerate(f):
-                    if i >= 20:  # 只檢查前20行
+                    if i >= 50:  # 增加檢查範圍到前50行
                         break
                     lines.append(line.strip())
             
-            # 常見的列標題關鍵字
+            # 常見的列標題關鍵字（增加更多細化關鍵字）
             common_headers = ['serial', 'id', 'time', 'result', 'test', 'project', 'station', 
-                            'factory', 'operator', 'cycle', 'diag', 'gui', 'fixture']
+                            'factory', 'operator', 'cycle', 'diag', 'gui', 'fixture', 'error']
             
             header_row_index = None
             metadata_rows = []
@@ -323,17 +325,19 @@ class CSVProcessor:
                 parts = line.split(sep)
                 line_lower = line.lower()
                 
-                # 檢查是否包含常見的列標題關鍵字（至少3個匹配）
+                # 檢查是否包含常見的列標題關鍵字
+                # 降低門檻：只要有 2 個關鍵字匹配且欄位數大於 5，或者包含 serial_id 這種強特徵
                 matches = sum(1 for header in common_headers if header in line_lower)
                 
-                # 如果匹配度夠高，且列數合理（至少3列），認為是標題行
-                if matches >= 3 and len(parts) >= 3:
+                if (matches >= 2 and len(parts) >= 5) or ('serial_id' in line_lower):
                     header_row_index = i
                     metadata_rows = lines[:i]  # 前面的行都是元數據
+                    print(f"[DEBUG] Found header at row {i}: {line[:50]}...")
                     break
             
             return header_row_index, metadata_rows
-        except:
+        except Exception as e:
+            print(f"[DEBUG] detect_header_row error: {e}")
             return None, []
     
     def parse_metadata(self, metadata_rows):
@@ -383,13 +387,14 @@ class CSVProcessor:
                     try:
                         # 先檢測標題行位置
                         header_row, metadata = self.detect_header_row(csv_file, encoding, sep)
-                        import pandas as pd
                         if header_row is not None:
                             # 使用檢測到的標題行讀取
+                            # 增加 low_memory=False 以處理混合類型，使用 engine='python' 處理異常行
                             df = pd.read_csv(csv_file, encoding=encoding, sep=sep,
                                             skiprows=header_row,
                                             engine='python', on_bad_lines='skip',
-                                            keep_default_na=False, na_values=[''])
+                                            keep_default_na=False, na_values=[''],
+                                            quoting=0) # 預設引號處理
                             
                             if len(df) > 0:
                                 encoding_used = encoding
@@ -397,7 +402,7 @@ class CSVProcessor:
                                 header_row_index = header_row
                                 metadata_rows = metadata
                                 metadata_info = self.parse_metadata(metadata)
-                                print(f"✓ 檢測到元數據行（前{header_row}行），使用編碼 {encoding} 和分隔符 '{sep}'")
+                                print(f"[OK] 檢測到元數據行（前{header_row}行），使用編碼 {encoding} 和分隔符 '{sep}'")
                                 break
                         else:
                             # 如果沒檢測到，嘗試第一行作為標題
@@ -407,27 +412,24 @@ class CSVProcessor:
                             if len(df) > 0:
                                 encoding_used = encoding
                                 separator_used = sep
-                                print(f"✓ 使用編碼 {encoding} 和分隔符 '{sep}' 讀取檔案（無元數據行）")
+                                print(f"[OK] 使用編碼 {encoding} 和分隔符 '{sep}' 讀取檔案（無元數據行）")
                                 break
-                    except (UnicodeDecodeError, pd.errors.EmptyDataError):
-                        continue
                     except Exception as e:
                         continue
                 
                 if df is not None and len(df) > 0:
                     break
             
-            # 如果還是失敗，嘗試自動檢測分隔符
+            # 如果還是失敗，嘗試自動檢測分隔符 (不指定 sep)
             if df is None or len(df) == 0:
                 for encoding in encodings:
                     try:
-                        import pandas as pd
                         df = pd.read_csv(csv_file, encoding=encoding, sep=None, 
                                         engine='python', on_bad_lines='skip',
                                         keep_default_na=False, na_values=[''])
                         if len(df) > 0:
                             encoding_used = encoding
-                            print(f"✓ 使用編碼 {encoding} (自動檢測分隔符) 讀取檔案")
+                            print(f"[OK] 使用編碼 {encoding} (自動檢測分隔符) 讀取檔案")
                             break
                     except:
                         continue
@@ -438,7 +440,7 @@ class CSVProcessor:
             # 驗證資料完整性
             print(f"  原始CSV行數: {original_line_count}, 讀取行數: {len(df)}, 列數: {len(df.columns)}")
             if original_line_count > 0 and len(df) < (original_line_count - 1) * 0.9:
-                print(f"  ⚠️ 警告：讀取的行數可能少於原始檔案（可能因編碼或格式問題）")
+                print(f"  [WARN] 警告：讀取的行數可能少於原始檔案（可能因編碼或格式問題）")
             
             # 將元數據信息附加到DataFrame
             df.attrs['metadata'] = metadata_info
@@ -484,16 +486,16 @@ class CSVProcessor:
         
         # 創建主要數據工作表（放在第一個）
         ws_data = wb.active
-        ws_data.title = "📋 數據明細"
+        ws_data.title = "數據明細"
         self.create_data_sheet(ws_data, df)
         
         # 創建統計摘要工作表
-        ws_summary = wb.create_sheet("📊 統計摘要", 0)
+        ws_summary = wb.create_sheet("統計摘要", 0)
         self.create_summary_sheet(ws_summary, df, csv_file, metadata_info, metadata_rows)
         
         # 儲存檔案
         wb.save(output_file)
-        print(f"✓ 已處理並儲存: {os.path.basename(output_file)}")
+        print(f"[OK] 已處理並儲存: {os.path.basename(output_file)}")
     
     def create_summary_sheet(self, ws, df, csv_file, metadata_info=None, metadata_rows=None):
         """創建統計摘要工作表 - 改進版，支持元數據和錯誤代碼分類"""
@@ -522,7 +524,7 @@ class CSVProcessor:
         
         # 標題
         ws.merge_cells(f'A{current_row}:D{current_row}')
-        title_cell = ws.cell(row=current_row, column=1, value="📊 CSV 數據分析報表")
+        title_cell = ws.cell(row=current_row, column=1, value="CSV 數據分析報表")
         title_cell.fill = title_fill
         title_cell.font = title_font
         title_cell.alignment = Alignment(horizontal='center', vertical='center')
@@ -530,7 +532,7 @@ class CSVProcessor:
         
         # 元數據信息（如果有）
         if metadata_info or metadata_rows:
-            ws.cell(row=current_row, column=1, value="📋 元數據信息:").font = Font(bold=True, size=11, color="4472C4")
+            ws.cell(row=current_row, column=1, value="元數據信息:").font = Font(bold=True, size=11, color="4472C4")
             current_row += 1
             
             if metadata_info.get('contact'):
@@ -609,7 +611,7 @@ class CSVProcessor:
         current_row += 1
         
         # PASS統計
-        ws.cell(row=current_row, column=1, value="✓ PASS").fill = pass_fill
+        ws.cell(row=current_row, column=1, value="[PASS]").fill = pass_fill
         ws.cell(row=current_row, column=1).font = Font(bold=True, size=10)
         ws.cell(row=current_row, column=1).border = border
         ws.cell(row=current_row, column=2, value=pass_count).fill = pass_fill
@@ -624,7 +626,7 @@ class CSVProcessor:
         current_row += 1
         
         # FAIL統計
-        ws.cell(row=current_row, column=1, value="✗ FAIL").fill = fail_fill
+        ws.cell(row=current_row, column=1, value="[FAIL]").fill = fail_fill
         ws.cell(row=current_row, column=1).font = Font(bold=True, size=10)
         ws.cell(row=current_row, column=1).border = border
         ws.cell(row=current_row, column=2, value=fail_count).fill = fail_fill
@@ -670,7 +672,7 @@ class CSVProcessor:
         
         # 錯誤代碼分類統計（如果有）
         if fail_codes:
-            ws.cell(row=current_row, column=1, value="🔍 錯誤代碼分類:").font = Font(bold=True, size=11, color="FF0000")
+            ws.cell(row=current_row, column=1, value="錯誤代碼分類:").font = Font(bold=True, size=11, color="FF0000")
             current_row += 1
             
             # 錯誤代碼表格標題

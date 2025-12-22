@@ -65,6 +65,9 @@ class FileHandlerMixin:
         # 儲存路徑設定 (取第一個檔案的目錄)
         self.settings['last_log_path'] = file_paths[0]
         self._save_settings_silent()
+        
+        # 記錄原始路徑用於 UI 顯示
+        self.original_log_path = file_paths if len(file_paths) > 1 else file_paths[0]
 
         # 檢查是否包含壓縮檔
         has_archives = any(self._is_archive_file(f) for f in file_paths)
@@ -173,6 +176,9 @@ class FileHandlerMixin:
         # 儲存路徑
         self.settings['last_folder_path'] = folder_path
         self._save_settings_silent()
+        
+        # 記錄原始路徑用於 UI 顯示
+        self.original_log_path = folder_path
 
         # 智能判斷：如果只選了一個檔案，檢查同目錄下是否有其他 LOG 檔案
         if len(file_paths) == 1:
@@ -320,6 +326,9 @@ class FileHandlerMixin:
 
     def _process_compressed_folder_path(self, folder_path):
         """處理壓縮檔資料夾的實際邏輯 (從 _select_compressed_folder 分離出來)"""
+        # 記錄原始路徑用於 UI 顯示
+        self.original_log_path = folder_path
+        
         # 讓使用者挑選要處理的壓縮檔
         archives = []
         for root, dirs, files in os.walk(folder_path):
@@ -412,6 +421,8 @@ class FileHandlerMixin:
 
     def _process_selected_archives_direct(self, selected_archives, folder_path):
         """處理已經選好的壓縮檔列表（跳過選擇對話框）"""
+        # 記錄原始路徑用於 UI 顯示
+        self.original_log_path = folder_path
         # 更新UI顯示選中的壓縮檔名稱
         if len(selected_archives) == 1:
             display_name = os.path.basename(selected_archives[0])
@@ -745,6 +756,9 @@ class FileHandlerMixin:
 
     def _process_compressed_file(self, compressed_path):
         """處理壓縮檔案 (Threading wrapper)"""
+        # 記錄原始路徑用於 UI 顯示
+        self.original_log_path = compressed_path
+        
         filename = os.path.basename(compressed_path)
         self._show_progress("處理中", f"正在解壓縮 {filename}...")
         

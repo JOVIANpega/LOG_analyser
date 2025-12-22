@@ -60,15 +60,15 @@ class EnhancedText:
         self.text.tag_configure('step_bg_2', background='#F0E8FF')  # 淺紫
         
         # PASS/FAIL文字顏色
-        self.text.tag_configure('pass_text', foreground='green', font=('Arial', 10, 'bold'))
-        self.text.tag_configure('fail_text', foreground='red', font=('Arial', 10, 'bold'))
+        self.text.tag_configure('pass_text', foreground='green', font=('Consolas', 11, 'bold'))
+        self.text.tag_configure('fail_text', foreground='red', font=('Consolas', 11, 'bold'))
         
         # 嚴重錯誤樣式
-        self.text.tag_configure('critical_error', foreground='darkred', font=('Arial', 10, 'bold'), background='#FFE6E6')
+        self.text.tag_configure('critical_error', foreground='darkred', font=('Consolas', 11, 'bold'), background='#FFE6E6')
         
         # 指令和回應樣式
-        self.text.tag_configure('command', foreground='blue', font=('Arial', 9, 'bold'))
-        self.text.tag_configure('response', foreground='purple', font=('Arial', 9))
+        self.text.tag_configure('command', foreground='blue', font=('Consolas', 11, 'bold'))
+        self.text.tag_configure('response', foreground='purple', font=('Consolas', 11))
         
         # 錯誤區塊樣式
         self.text.tag_configure('error_block', background='#FFE4E1', foreground='red')
@@ -78,6 +78,12 @@ class EnhancedText:
         
         # 置頂Header樣式 (綠底黑字，放大)
         self.text.tag_configure('header_style', background='#90EE90', foreground='black', font=('Consolas', 14, 'bold'))
+        
+        # 摘要/日誌樣式 (統一字體與大小，提升專業感)
+        self.text.tag_configure('summary_info', foreground='#0056b3', font=('Consolas', 11, 'bold'))
+        self.text.tag_configure('summary_path', background='#FFFF00', foreground='black', font=('Consolas', 11, 'bold'))
+        self.text.tag_configure('summary_success', foreground='#28a745', font=('Consolas', 11, 'bold'))
+        self.text.tag_configure('summary_warning', foreground='#ffc107', font=('Consolas', 11, 'bold'))
         
         # 綁定點擊事件
         self.text.tag_bind('step_clickable', '<Button-1>', self._on_step_click)

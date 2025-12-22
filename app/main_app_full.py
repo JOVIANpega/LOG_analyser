@@ -138,6 +138,8 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
                 self.config_manager.set('auto_analyze', self.auto_analyze_var.get())
             if hasattr(self, 'remember_path_var'):
                  self.config_manager.set('remember_path', self.remember_path_var.get())
+            if hasattr(self, 'skip_no_test_time_var'):
+                 self.config_manager.set('skip_no_test_time', self.skip_no_test_time_var.get())
                  
             self.config_manager.save()
             print("設定已保存")
@@ -227,6 +229,8 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
                  self.config_manager.set('auto_analyze', self.auto_analyze_var.get())
             if hasattr(self, 'remember_path_var'):
                  self.config_manager.set('remember_path', self.remember_path_var.get())
+            if hasattr(self, 'skip_no_test_time_var'):
+                 self.config_manager.set('skip_no_test_time', self.skip_no_test_time_var.get())
             
             # 保存
             self.config_manager.save()

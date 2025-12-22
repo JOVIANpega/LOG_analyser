@@ -135,6 +135,13 @@ class UIBuilderMixin:
         self._build_enhanced_fail_tab()
         self._build_enhanced_log_tab()
         self._build_enhanced_settings_tab()
+        
+        # 初始隱藏 PASS / FAIL 標籤 (使用者要求：剛打開不顯示)
+        self.notebook.hide(self.tab_pass)
+        self.notebook.hide(self.tab_fail)
+        
+        # 預設選中「原始LOG」
+        self.notebook.select(self.tab_log)
     
     def _setup_tab_styles(self):
         """設定標籤頁樣式"""
@@ -236,38 +243,49 @@ class UIBuilderMixin:
         self.log_text_enhanced.pack(fill=tk.BOTH, expand=1)
 
     def _build_enhanced_settings_tab(self):
-        """建立設定標籤頁"""
+        """建立設定標籤頁 (移除捲軸)"""
         self.tab_settings = ttk.Frame(self.notebook)
         self.notebook.add(self.tab_settings, text="⚙️ 設定")
         
-        # 建立滾動框架
-        canvas = tk.Canvas(self.tab_settings)
-        scrollbar = ttk.Scrollbar(self.tab_settings, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
+        # 建立內容框架
+        container = ttk.Frame(self.tab_settings)
+        container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # 設定區域
-        self._build_settings_content(scrollable_frame)
-        
-        # 打包滾動元件
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        # 綁定滾動事件
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        # 直接建構內容
+        build_settings_content(self, container)
     
     def _build_settings_content(self, parent):
         """建立設定內容（抽離至模組）"""
         build_settings_content(self, parent)
+    
+    
+    def _update_tabs_visibility(self, pass_count, fail_count, is_multiple=True):
+        """根據分析結果動態顯示標籤頁"""
+        # 先獲取目前的標籤列表（用於判斷是否已存在）
+        visible_tabs = self.notebook.tabs()
+        
+        # 單一檔案模式：pass/fail 都顯示 (由使用者要求)
+        if not is_multiple:
+            if str(self.tab_pass) not in visible_tabs:
+                self.notebook.insert(0, self.tab_pass, text="✅ PASS測項")
+            if str(self.tab_fail) not in visible_tabs:
+                self.notebook.insert(1, self.tab_fail, text="❌ FAIL測項")
+            return
+
+        # 多檔案模式：有資料才顯示
+        if pass_count > 0:
+            if str(self.tab_pass) not in visible_tabs:
+                self.notebook.insert(0, self.tab_pass, text="✅ PASS測項")
+        else:
+            self.notebook.hide(self.tab_pass)
+            
+        if fail_count > 0:
+            if str(self.tab_fail) not in visible_tabs:
+                # 確保在 PASS 之後，LOG 之前
+                pos = 1 if str(self.tab_pass) in self.notebook.tabs() else 0
+                self.notebook.insert(pos, self.tab_fail, text="❌ FAIL測項")
+        else:
+            self.notebook.hide(self.tab_fail)
         
     def _open_markdown_help(self):
         """開啟並顯示 dioc/README.md 或 QUICK_START.md 內容"""

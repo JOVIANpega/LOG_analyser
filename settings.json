@@ -1,11 +1,11 @@
 {
   "ui_font_size": 13,
   "content_font_size": 11,
-  "last_log_path": "D:/((Python TOOL/解析LOG2/MINE/result/1+4cam stitching1 test-1110250394-20251205092343-B7PL011-135.7z",
+  "last_log_path": "D:/((Python TOOL/解析LOG2/MINE/result/stitching1/1+4cam stitching1 test-1110250391-20251127140607-IOCD041-74Y.log",
   "last_folder_path": "C:/Users/pega_user/Desktop/TEMP ASIAOPT/LOG/20251217",
   "window_width": 1902,
   "window_height": 1033,
-  "pane_width": 248,
+  "pane_width": 331,
   "app_title": "PEGA test log Aanlyser",
   "gui_header": "ONLY FOR CENTIMANIA LOG",
   "auto_analyze": true,
@@ -16,5 +16,6 @@
   "csv_max_display_length": 50,
   "csv_pass_color": "#90EE90",
   "csv_fail_color": "#FFB6C1",
-  "theme": "pulse"
+  "theme": "pulse",
+  "skip_no_test_time": true
 }

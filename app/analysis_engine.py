@@ -10,6 +10,7 @@ from tkinter import messagebox
 import traceback
 import threading
 import time
+import re
 
 class AnalysisEngineMixin:
     """Mixin for handling analysis orchestration in the Log Analyzer"""
@@ -71,22 +72,35 @@ class AnalysisEngineMixin:
         self._update_progress("正在啟動背景解析...")
         threading.Thread(target=self._single_file_worker, daemon=True).start()
 
-    def _ui_log(self, message, clear=False):
+    def _ui_log(self, message, clear=False, tag=None):
         """在 UI 的原始 LOG 視窗顯示訊息 (Thread-safe)"""
+        # ANSI 顏色代碼映射 (簡單處理常用的幾核色)
+        ANSI_CLEAN = re.compile(r'\033\[[0-9;]*m')
+        
         def _append():
             if hasattr(self, 'log_text_enhanced'):
                 if clear:
                     self.log_text_enhanced.clear()
-                self.log_text_enhanced.append(message)
-                # 捲動由 EnhancedText.append 處理了，這裡保險加一下
+                
+                # 若沒提供 tag 但訊息中有 ANSI 色碼，嘗試自動對應
+                final_tag = tag
+                if not final_tag:
+                    if "\033[92m" in str(message): final_tag = 'summary_success'
+                    elif "\033[93m" in str(message): final_tag = 'summary_path'
+                    elif "\033[94m" in str(message) or "\033[96m" in str(message): final_tag = 'summary_info'
+                
+                # 對於 Text Widget，需要過濾掉 ANSI 代碼
+                clean_msg = ANSI_CLEAN.sub('', str(message))
+                self.log_text_enhanced.append(clean_msg, tag=final_tag)
                 try:
-                    import tkinter as tk
                     self.log_text_enhanced.text.see(tk.END)
                 except:
                     pass
         
         if hasattr(self, 'root'):
             self.root.after(0, _append)
+        
+        # 終端機輸出 (保留顏色)
         print(f"[UI_LOG] {message}")
 
     def _single_file_worker(self):
@@ -218,8 +232,7 @@ class AnalysisEngineMixin:
         self._update_progress("完成！")
         
         # 根據分析結果動態顯示/隱藏標籤頁
-        if hasattr(self, '_update_tab_visibility'):
-            self._update_tab_visibility(pass_items, fail_items)
+        self._update_tabs_visibility(len(pass_items), len(fail_items), is_multiple=False)
 
         # 自動切換到相關Tab
         if fail_items:
@@ -357,7 +370,14 @@ class AnalysisEngineMixin:
     def _analyze_enhanced_multiple_files(self):
         """分析多個檔案（增強版）- 啟動背景執行緒"""
         # 清除並切換到原始LOG標籤，用來顯示處理日誌
-        self._ui_log("=== 開始多檔分析流程 ===", clear=True)
+        self._ui_log("\033[96m=== 開始多檔分析流程 ===\033[0m", clear=True)
+        
+        # 顯示路徑並反白 (凸顯位置)
+        # 優先使用原路徑 (避免顯示 Temp 路徑)
+        display_path = getattr(self, 'original_log_path', self.current_log_path)
+        path_str = str(display_path)
+        self._ui_log(f"\033[93m路徑: {path_str}\033[0m", tag='summary_path')
+        
         if hasattr(self, 'notebook'):
             try:
                 # 假設「原始LOG」是第三個標籤 (索引 2)
@@ -415,6 +435,7 @@ class AnalysisEngineMixin:
             
             pass_logs = []
             fail_logs = []
+            skip_count = 0
             
             # 3. 逐一分析
             for i, file_path in enumerate(target_files):
@@ -432,6 +453,7 @@ class AnalysisEngineMixin:
                     
                     # 提取測試時間日誌
                     test_time = "未知"
+                    should_skip = False
                     try:
                         secs, time_logs = self.excel_writer._extract_total_secs(result['raw_lines'])
                         # 將詳細日誌輸出到 UI
@@ -440,9 +462,17 @@ class AnalysisEngineMixin:
                             
                         if secs: 
                             test_time = f"{secs:.2f} 秒"
+                        elif self.settings.get('skip_no_test_time', True):
+                            self._ui_log(f"[\033[93mSKIP\033[0m] {fname}: 未找到測試總時間，已忽略", tag='summary_warning')
+                            should_skip = True
+                            skip_count += 1
                     except: 
                         pass
                     
+                    if should_skip:
+                        continue
+                    
+                    # 分析完成 (改為一般黑色，不使用綠色凸顯)
                     self._ui_log(f"[{i+1}/{total_files}] 分析完成: {fname} (時間: {test_time})")
                     
                     # 整理資料結構
@@ -474,7 +504,13 @@ class AnalysisEngineMixin:
             if not self._cancel_flag:
                 # 分析完畢，但進度條不應到達 100%，而是保留一步給 Excel
                 self._safe_update_progress(total_files, total_steps, "分析完成，正在準備產生 Excel 報告...")
-                self._ui_log(f"分析結束。成功: {len(pass_logs)}, 失敗: {len(fail_logs)}")
+                final_summary = f"分析結束。pass logs : {len(pass_logs)}, fail logs: {len(fail_logs)}"
+                if skip_count > 0:
+                    final_summary += f", 忽略: {skip_count} log"
+                self._ui_log(final_summary, tag='summary_info')
+                
+                # 根據成果動態顯示標籤頁
+                self.root.after(0, lambda: self._update_tabs_visibility(len(pass_logs), len(fail_logs), is_multiple=True))
                 try:
                     # 決定輸出目錄
                     out_dir = ""
@@ -527,8 +563,9 @@ class AnalysisEngineMixin:
                             out_dir, pass_logs, fail_logs
                         )
                         # 生成完成
-                        self._safe_update_progress(total_steps, total_steps, f"Excel 生成成功！耗時 {int(time.time() - self.progress_manager._start_time)}s")
-                        self._ui_log(f"Excel 生成成功！\nPASS: {os.path.basename(pass_path)}\nFAIL: {os.path.basename(fail_path)}")
+                        msg_success = f"\033[92mExcel 生成成功！\033[0m 耗時 {int(time.time() - self.progress_manager._start_time)}s"
+                        self._safe_update_progress(total_steps, total_steps, msg_success)
+                        self._ui_log(f"\033[92mExcel 生成成功！\033[0m\n\033[96mPASS: {os.path.basename(pass_path)}\nFAIL: {os.path.basename(fail_path)}\033[0m", tag='summary_success')
                         # 使用 root.after 確保在主執行緒彈出
                         # 參數: out_dir, total_files, pass_count, fail_count, pass_path, fail_path
                         self.root.after(100, lambda: self._show_open_folder_prompt(
