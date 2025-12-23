@@ -70,6 +70,7 @@ class LogParser:
         
         # 結束行匹配模式：@STEPxxx@Name Test is Pass
         # 允許結尾有 ! 或其他字符，也允許大小寫變化
+        end_pattern = re.compile(r'@(STEP\d+)@(.*?)Test is Pass', re.IGNORECASE)
         # 額外支援 Run 行作為開始信號，用於拆分合併的區塊
         run_pattern = re.compile(r'Run ([A-Z0-9]+-\d+):(.*?)Mode:', re.IGNORECASE)
         
