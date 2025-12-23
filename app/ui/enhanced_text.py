@@ -284,67 +284,32 @@ class EnhancedText:
         # DEBUG: 輸出測試項目信息
         print(f"[DEBUG] 開始折疊處理: {len(pass_items)} PASS, {len(fail_items)} FAIL")
         
-        # 建立測試項目索引（根據 step_name 匹配）
+        # 建立測試項目索引（使用 start_idx 直接定位）
         item_map = {}  # {line_number: {'item': item_data, 'type': 'pass'/'fail'}}
         
-        # 處理 PASS 項目
+        # 處理 PASS 項目 - 使用 start_idx 直接定位
         for idx, item in enumerate(pass_items):
+            start_idx = item.get('start_idx')
             step_name = item.get('step_name', '').strip()
-            if not step_name:
-                continue
             
-            print(f"[DEBUG] PASS #{idx+1}: 尋找 '{step_name}'")
-            
-            # 找到對應的行號（更靈活的匹配）
-            found = False
-            for i, line in enumerate(lines):
-                # 跳過已經匹配的行
-                if i in item_map:
-                    continue
-                
-                # 嘗試多種匹配模式
-                line_clean = line.strip()
-                if (step_name in line and 
-                    ('Do @STEP' in line or 
-                     'Execute Phase' in line or
-                     line_clean.startswith(step_name) or
-                     f'[1] {step_name}' in line)):
-                    item_map[i] = {'item': item, 'type': 'pass', 'step_name': step_name}
-                    print(f"[DEBUG]   ✓ 找到於行 {i+1}: {line[:60]}...")
-                    found = True
-                    break
-            
-            if not found:
-                print(f"[DEBUG]   ✗ 未找到匹配行")
+            if start_idx is not None and start_idx < len(lines):
+                # 直接使用 start_idx 作為行號
+                item_map[start_idx] = {'item': item, 'type': 'pass', 'step_name': step_name}
+                print(f"[DEBUG] PASS #{idx+1}: '{step_name}' 於行 {start_idx+1}")
+            else:
+                print(f"[DEBUG] PASS #{idx+1}: '{step_name}' 無 start_idx，跳過")
         
-        # 處理 FAIL 項目
+        # 處理 FAIL 項目 - 使用 start_idx 直接定位
         for idx, item in enumerate(fail_items):
+            start_idx = item.get('start_idx')
             step_name = item.get('step_name', '').strip()
-            if not step_name:
-                continue
             
-            print(f"[DEBUG] FAIL #{idx+1}: 尋找 '{step_name}'")
-            
-            found = False
-            for i, line in enumerate(lines):
-                # 跳過已經匹配的行
-                if i in item_map:
-                    continue
-                    
-                # 嘗試多種匹配模式
-                line_clean = line.strip()
-                if (step_name in line and 
-                    ('Do @STEP' in line or 
-                     'Execute Phase' in line or
-                     line_clean.startswith(step_name) or
-                     f'[1] {step_name}' in line)):
-                    item_map[i] = {'item': item, 'type': 'fail', 'step_name': step_name}
-                    print(f"[DEBUG]   ✓ 找到於行 {i+1}: {line[:60]}...")
-                    found = True
-                    break
-            
-            if not found:
-                print(f"[DEBUG]   ✗ 未找到匹配行")
+            if start_idx is not None and start_idx < len(lines):
+                # 直接使用 start_idx 作為行號
+                item_map[start_idx] = {'item': item, 'type': 'fail', 'step_name': step_name}
+                print(f"[DEBUG] FAIL #{idx+1}: '{step_name}' 於行 {start_idx+1}")
+            else:
+                print(f"[DEBUG] FAIL #{idx+1}: '{step_name}' 無 start_idx，跳過")
         
         print(f"[DEBUG] 總共匹配到 {len(item_map)} 個測試項目")
         
