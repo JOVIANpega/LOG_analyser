@@ -263,19 +263,28 @@ class EnhancedText:
         if not log_content:
             return
         
+        # 計算 Header 佔用的行數偏移量
+        # 獲取插入點的當前行號 (整數)
+        try:
+            current_pos = self.text.index(tk.INSERT)
+            header_offset = int(current_pos.split('.')[0]) - 1
+        except:
+            header_offset = 0
+            
         # 獲取 pass_items 和 fail_items
         pass_items = test_results.get('pass_items', [])
         fail_items = test_results.get('fail_items', [])
         
-        # 如果有測試項目，使用折疊模式
-        if pass_items or fail_items:
-            self._insert_with_folding(log_content, pass_items, fail_items)
-        else:
-            # 否則使用原始的高亮模式
-            self._insert_without_folding(log_content)
+        # 1. 始終使用無折疊的線性插入模式 (回應使用者需求：還原折疊，但保留高亮)
+        # 用戶反饋折疊功能容易錯亂，因此回歸最穩定的純文本顯示
+        self._insert_without_folding(log_content)
         
-        # 預設折疊所有 PASS 項目（延遲執行以確保內容已完全插入）
-        self.text.after(100, self._delayed_fold_pass_items)
+        # 2. 額外處理 FAIL 區域的高亮顯示
+        if fail_items:
+            self._highlight_fail_regions(fail_items, header_offset)
+        
+        # 停用延遲折疊 (因為已經不使用折疊功能)
+        # self.text.after(100, self._delayed_fold_pass_items)
     
     def _insert_with_folding(self, log_content, pass_items, fail_items):
         """插入帶折疊功能的LOG"""
@@ -682,8 +691,61 @@ class EnhancedText:
     def unfold_all_items(self):
         """展開所有項目"""
         for item_id, item_data in self.folded_items.items():
-            if item_data['is_folded']:
-                self._unfold_item(item_id)
+            if not item_data['is_folded']:
+                continue
+            self._unfold_item(item_id)
+
+    def _highlight_fail_regions(self, fail_items, header_offset):
+        """將所有FAIL項目區域標記為紅色高亮"""
+        # 注意：end_idx 是 inclusive 的，但在 Tkinter 中我們需要多加一行來包含它
+        # Tkinter index 格式: 'line.char'
+        
+        # 統計總行數，防止索引越界
+        try:
+           # 注意：tk.END 是 index，需要轉換
+           # 獲取最後一行的行號
+           last_idx = self.text.index("end-1c")
+           total_lines = int(last_idx.split('.')[0])
+        except:
+           total_lines = 999999
+        
+        for item in fail_items:
+            start_idx = item.get('start_idx')
+            end_idx = item.get('end_idx')
+            
+            if start_idx is not None:
+                # 處理 end_idx 為 None 的防禦性邏輯
+                if end_idx is None:
+                    end_idx = start_idx
+                
+                # 轉換為 Tkinter 行號 (1-based)
+                # item['start_idx'] 是 0-based，加上 1 變成 1-based
+                # 加上 header_offset 因為 LOG 前面可能插入了 Header
+                
+                start_line = start_idx + 1 + header_offset
+                end_line = end_idx + 1 + header_offset
+                
+                # 邊界檢查
+                if start_line > total_lines: continue
+                
+                start_pos = f"{start_line}.0"
+                # end_line + 1 因為我們要包含最後一行
+                end_pos = f"{end_line + 1}.0"
+                
+                # 應用紅色樣式
+                self.text.tag_add('error_block', start_pos, end_pos)
+                self.text.tag_add('fail_text', start_pos, end_pos)
+                
+        # 滾動到第一個錯誤處
+        if fail_items:
+            try:
+                first_fail = fail_items[0]
+                start_idx = first_fail.get('start_idx')
+                if start_idx is not None:
+                     start_line = start_idx + 1 + header_offset
+                     self.text.see(f"{start_line}.0")
+            except:
+                pass
     
     def fold_all_fail_items(self):
         """折疊所有 FAIL 項目"""
