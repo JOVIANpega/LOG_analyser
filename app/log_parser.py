@@ -113,7 +113,15 @@ class LogParser:
                 current_step['full_log'].append(line)
                 
                 # 檢查是否為測項結束行（@STEPxxx@ Test is Pass !）
-                if self._is_step_end_line(line, current_step.get('step_number', '')):
+                is_end = self._is_step_end_line(line, current_step.get('step_number', ''))
+                
+                # 如果標準檢查失敗，嘗試寬鬆檢查
+                if not is_end:
+                     is_end = self._is_step_end_line_relaxed(line, current_step.get('step_number', ''))
+                     if is_end:
+                         print(f"[DEBUG] 使用寬鬆模式找到結束行: {line[:50]}...")
+                
+                if is_end:
                     current_step['end_idx'] = idx
                     self._finalize_pass_step(current_step, pass_items, no_command_steps)
                     current_step = None
@@ -159,7 +167,22 @@ class LogParser:
         # @STEP048@CHECK SD  Inserted Test is Pass !
         # @STEP048@ Test is Pass !
         end_pattern = re.compile(rf'@{step_number}@.*Test is Pass !', re.IGNORECASE)
-        return end_pattern.search(line) is not None
+        is_end = end_pattern.search(line) is not None
+        
+        if is_end:
+            print(f"[DEBUG] 找到結束行 STEP{step_number}: {line[:80]}")
+        
+        return is_end
+    
+    def _is_step_end_line_relaxed(self, line, step_number):
+        """更寬鬆的結束行檢查"""
+        if not step_number:
+            return False
+            
+        # 只要包含 @STEPxxx@ 和 Pass 關鍵字
+        # 排除掉 "Test is Pass !" 出現在中間的情況，通常它是在結尾附近
+        pattern = re.compile(rf'@{step_number}@.*Pass', re.IGNORECASE)
+        return pattern.search(line) is not None
     
     def _finalize_pass_step(self, step, pass_items, no_command_steps):
         """完成PASS步驟的處理"""
