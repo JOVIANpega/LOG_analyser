@@ -126,6 +126,18 @@ class LogParser:
             if any(self.step_pattern.search(l) for l in leftover_lines):
                  # 簡單處理剩下的
                  pass # Too complex to handle leftover merged steps, leave as is
+
+        # 處理"未找到指令"的集合
+        self._consolidate_no_command_steps(pass_items, no_command_steps)
+        
+        return {
+            'pass_items': pass_items,
+            'fail_items': [],
+            'raw_lines': raw_lines,
+            'last_fail': None,
+            'fail_line_idx': None,
+            'log_type': 'PASS'
+        }
     
     def _process_split_blocks(self, block_lines, global_start_idx, run_indices, end_step_number, end_step_name, pass_items, no_command_steps):
         """拆分包含多個步驟的區塊"""
@@ -177,52 +189,8 @@ class LogParser:
             
             self._finalize_pass_step(step_info, pass_items, no_command_steps)
             
-        if start_idx < len(raw_lines):
-            leftover_lines = raw_lines[start_idx:]
-            # 簡單檢查是否包含錯誤或有價值信息
-            if any(self.step_pattern.search(l) for l in leftover_lines):
-                # 如果包含 Do @STEP 但沒有結束行，視為未完成項目
-                step_match = None
-                for l in leftover_lines:
-                    step_match = self.step_pattern.search(l)
-                    if step_match: break
-                
-                step_name = step_match.group(1) if step_match else "Unknown Step"
-                step_info = {
-                    'step_name': step_name,
-                    'test_id': '',
-                    'command': '',
-                    'response': '',
-                    'result': 'UNKNOWN',
-                    'retry': 0,
-                    'error': '',
-                    'start_idx': start_idx,
-                    'end_idx': len(raw_lines) - 1,
-                    'raw_idx': start_idx,
-                    'full_log': leftover_lines,
-                    'has_retry_but_pass': False,
-                    'step_number': ''
-                }
-                # 簡單解析內容
-                cmd_match = None
-                for l in leftover_lines:
-                    cmd_match = self.cmd_pattern.search(l)
-                    if cmd_match: break
-                if cmd_match: step_info['command'] = cmd_match.group(1).strip()
-                
-                self._finalize_pass_step(step_info, pass_items, no_command_steps)
         
         # 處理"未找到指令"的集合
-        self._consolidate_no_command_steps(pass_items, no_command_steps)
-        
-        return {
-            'pass_items': pass_items,
-            'fail_items': [],
-            'raw_lines': raw_lines,
-            'last_fail': None,
-            'fail_line_idx': None,
-            'log_type': 'PASS'
-        }
     
     def _analyze_block_content(self, lines, step_number, step_name_raw):
         """解析一個測試區塊的內容"""
