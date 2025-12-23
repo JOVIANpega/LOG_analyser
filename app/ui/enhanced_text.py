@@ -281,25 +281,72 @@ class EnhancedText:
         """插入帶折疊功能的LOG"""
         lines = log_content.split('\n')
         
-        # 建立測試項目索引（根據行號）
+        # DEBUG: 輸出測試項目信息
+        print(f"[DEBUG] 開始折疊處理: {len(pass_items)} PASS, {len(fail_items)} FAIL")
+        
+        # 建立測試項目索引（根據 step_name 匹配）
         item_map = {}  # {line_number: {'item': item_data, 'type': 'pass'/'fail'}}
         
         # 處理 PASS 項目
-        for item in pass_items:
-            step_name = item.get('step_name', '')
-            # 找到對應的行號（簡化：使用 step_name 搜尋）
+        for idx, item in enumerate(pass_items):
+            step_name = item.get('step_name', '').strip()
+            if not step_name:
+                continue
+            
+            print(f"[DEBUG] PASS #{idx+1}: 尋找 '{step_name}'")
+            
+            # 找到對應的行號（更靈活的匹配）
+            found = False
             for i, line in enumerate(lines):
-                if step_name in line and 'Do @STEP' in line:
+                # 跳過已經匹配的行
+                if i in item_map:
+                    continue
+                
+                # 嘗試多種匹配模式
+                line_clean = line.strip()
+                if (step_name in line and 
+                    ('Do @STEP' in line or 
+                     'Execute Phase' in line or
+                     line_clean.startswith(step_name) or
+                     f'[1] {step_name}' in line)):
                     item_map[i] = {'item': item, 'type': 'pass', 'step_name': step_name}
+                    print(f"[DEBUG]   ✓ 找到於行 {i+1}: {line[:60]}...")
+                    found = True
                     break
+            
+            if not found:
+                print(f"[DEBUG]   ✗ 未找到匹配行")
         
         # 處理 FAIL 項目
-        for item in fail_items:
-            step_name = item.get('step_name', '')
+        for idx, item in enumerate(fail_items):
+            step_name = item.get('step_name', '').strip()
+            if not step_name:
+                continue
+            
+            print(f"[DEBUG] FAIL #{idx+1}: 尋找 '{step_name}'")
+            
+            found = False
             for i, line in enumerate(lines):
-                if step_name in line and 'Do @STEP' in line:
+                # 跳過已經匹配的行
+                if i in item_map:
+                    continue
+                    
+                # 嘗試多種匹配模式
+                line_clean = line.strip()
+                if (step_name in line and 
+                    ('Do @STEP' in line or 
+                     'Execute Phase' in line or
+                     line_clean.startswith(step_name) or
+                     f'[1] {step_name}' in line)):
                     item_map[i] = {'item': item, 'type': 'fail', 'step_name': step_name}
+                    print(f"[DEBUG]   ✓ 找到於行 {i+1}: {line[:60]}...")
+                    found = True
                     break
+            
+            if not found:
+                print(f"[DEBUG]   ✗ 未找到匹配行")
+        
+        print(f"[DEBUG] 總共匹配到 {len(item_map)} 個測試項目")
         
         # 插入LOG並創建折疊結構
         current_item_id = None
