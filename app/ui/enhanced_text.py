@@ -313,73 +313,101 @@ class EnhancedText:
         
         print(f"[DEBUG] 總共匹配到 {len(item_map)} 個測試項目")
         
-        # 插入LOG並創建折疊結構
-        current_item_id = None
-        current_item_start = None
-        current_item_content = []
+        # 重新組織：按照測試項目的範圍來插入
+        # 先建立所有測試項目的範圍
+        item_ranges = []  # [(start_idx, end_idx, item_data, type)]
         
-        for i, line in enumerate(lines):
+        for idx, item in enumerate(pass_items):
+            start_idx = item.get('start_idx')
+            end_idx = item.get('end_idx')
+            step_name = item.get('step_name', '').strip()
+            
+            if start_idx is not None and end_idx is not None:
+                item_ranges.append((start_idx, end_idx, item, 'pass', step_name))
+        
+        for idx, item in enumerate(fail_items):
+            start_idx = item.get('start_idx')
+            end_idx = item.get('end_idx')
+            step_name = item.get('step_name', '').strip()
+            
+            if start_idx is not None and end_idx is not None:
+                item_ranges.append((start_idx, end_idx, item, 'fail', step_name))
+        
+        # 按 start_idx 排序
+        item_ranges.sort(key=lambda x: x[0])
+        
+        print(f"[DEBUG] 建立了 {len(item_ranges)} 個項目範圍")
+        
+        # 逐行插入，根據範圍決定是否創建折疊項目
+        current_range_idx = 0
+        i = 0
+        
+        while i < len(lines):
+            # 檢查是否進入新的測試項目範圍
+            if current_range_idx < len(item_ranges):
+                start_idx, end_idx, item, item_type, step_name = item_ranges[current_range_idx]
+                
+                if i == start_idx:
+                    # 創建折疊項目
+                    self.item_counter += 1
+                    item_id = str(self.item_counter)
+                    
+                    header_start = self.text.index(tk.INSERT)
+                    
+                    # 插入折疊圖示和摘要
+                    icon = "▼ "
+                    tag_type = 'fold_header_pass' if item_type == 'pass' else 'fold_header_fail'
+                    icon_tag = 'fold_icon' if item_type == 'pass' else 'fold_icon_fail'
+                    label = f"[PASS] {step_name}" if item_type == 'pass' else f"[FAIL] {step_name}"
+                    
+                    self.text.insert(tk.INSERT, icon, (icon_tag, f'fold_item_{item_id}', 'foldable'))
+                    self.text.insert(tk.INSERT, label + "\n", (tag_type, f'fold_item_{item_id}', 'foldable'))
+                    
+                    header_end = self.text.index(tk.INSERT)
+                    content_start = self.text.index(tk.INSERT)
+                    
+                    # 收集項目內容（從 start_idx 到 end_idx）
+                    content_lines = []
+                    for j in range(start_idx, end_idx + 1):
+                        if j < len(lines):
+                            line_number = j + 1
+                            content_lines.append(f"{line_number:4d} {lines[j]}\n")
+                    
+                    content_text = ''.join(content_lines)
+                    
+                    # 插入內容
+                    self.text.insert(content_start, content_text)
+                    content_end = self.text.index(f"{content_start} + {len(content_text)}c")
+                    
+                    # 如果是 FAIL 項目，套用紅色樣式
+                    if item_type == 'fail':
+                        self.text.tag_add('fail_text', content_start, content_end)
+                    
+                    # 保存折疊項目數據
+                    self.folded_items[item_id] = {
+                        'type': item_type,
+                        'step_name': step_name,
+                        'header_start': header_start,
+                        'header_end': header_end,
+                        'content_start': content_start,
+                        'content_end': content_end,
+                        'content': content_text,
+                        'is_folded': False
+                    }
+                    
+                    print(f"[DEBUG] 創建折疊項目 #{item_id}: [{item_type.upper()}] {step_name} (行 {start_idx+1}-{end_idx+1})")
+                    
+                    # 跳過這個範圍的所有行
+                    i = end_idx + 1
+                    current_range_idx += 1
+                    continue
+            
+            # 不屬於任何測試項目的行（直接插入）
             line_number = i + 1
-            
-            # 檢查是否是新的測試項目
-            if i in item_map:
-                # 先完成前一個項目
-                if current_item_id is not None:
-                    self._finalize_folded_item(current_item_id, current_item_start, current_item_content)
-                
-                # 開始新項目
-                item_data = item_map[i]
-                item_type = item_data['type']
-                step_name = item_data['step_name']
-                result = item_data['item'].get('result', '')
-                
-                # 創建摘要行
-                self.item_counter += 1
-                current_item_id = str(self.item_counter)
-                
-                header_start = self.text.index(tk.INSERT)
-                
-                # 插入折疊圖示和摘要
-                icon = "▼ "
-                tag_type = 'fold_header_pass' if item_type == 'pass' else 'fold_header_fail'
-                icon_tag = 'fold_icon' if item_type == 'pass' else 'fold_icon_fail'
-                label = f"[PASS] {step_name}" if item_type == 'pass' else f"[FAIL] {step_name}"
-                
-                self.text.insert(tk.INSERT, icon, (icon_tag, f'fold_item_{current_item_id}', 'foldable'))
-                self.text.insert(tk.INSERT, label + "\n", (tag_type, f'fold_item_{current_item_id}', 'foldable'))
-                
-                header_end = self.text.index(tk.INSERT)
-                
-                # 初始化折疊項目數據
-                current_item_start = self.text.index(tk.INSERT)
-                current_item_content = []
-                
-                self.folded_items[current_item_id] = {
-                    'type': item_type,
-                    'step_name': step_name,
-                    'header_start': header_start,
-                    'header_end': header_end,
-                    'content_start': current_item_start,
-                    'content_end': current_item_start,
-                    'content': '',
-                    'is_folded': False
-                }
-                
-                continue
-            
-            # 收集當前項目的內容
-            if current_item_id is not None:
-                formatted_line = f"{line_number:4d} {line}\n"
-                current_item_content.append(formatted_line)
-            else:
-                # 不屬於任何項目的行（直接插入）
-                line_start = self.text.index(tk.INSERT)
-                self.text.insert(tk.INSERT, f"{line_number:4d} ", 'line_number')
-                self.text.insert(tk.INSERT, line + "\n")
-        
-        # 完成最後一個項目
-        if current_item_id is not None:
-            self._finalize_folded_item(current_item_id, current_item_start, current_item_content)
+            line_start = self.text.index(tk.INSERT)
+            self.text.insert(tk.INSERT, f"{line_number:4d} ", 'line_number')
+            self.text.insert(tk.INSERT, lines[i] + "\n")
+            i += 1
     
     def _finalize_folded_item(self, item_id, start_pos, content_lines):
         """完成折疊項目的內容插入"""
