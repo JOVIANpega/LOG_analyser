@@ -96,6 +96,7 @@ class EnhancedText:
         self.text.tag_configure('fold_header_pass', foreground='#28a745', font=('Consolas', 11, 'bold'), background='#e8f5e9')
         self.text.tag_configure('fold_header_fail', foreground='#dc3545', font=('Consolas', 11, 'bold'), background='#ffebee')
         self.text.tag_configure('fold_icon', foreground='#666', font=('Consolas', 12, 'bold'))
+        self.text.tag_configure('fold_icon_fail', foreground='#dc3545', font=('Consolas', 12, 'bold'))  # FAIL 項目的紅色圖示
         
         # 綁定折疊點擊事件
         self.text.tag_bind('foldable', '<Button-1>', self._on_fold_click)
@@ -273,8 +274,8 @@ class EnhancedText:
             # 否則使用原始的高亮模式
             self._insert_without_folding(log_content)
         
-        # 預設折疊所有 PASS 項目
-        self.fold_all_pass_items()
+        # 預設折疊所有 PASS 項目（延遲執行以確保內容已完全插入）
+        self.text.after(100, self._delayed_fold_pass_items)
     
     def _insert_with_folding(self, log_content, pass_items, fail_items):
         """插入帶折疊功能的LOG"""
@@ -329,9 +330,10 @@ class EnhancedText:
                 # 插入折疊圖示和摘要
                 icon = "▼ "
                 tag_type = 'fold_header_pass' if item_type == 'pass' else 'fold_header_fail'
+                icon_tag = 'fold_icon' if item_type == 'pass' else 'fold_icon_fail'
                 label = f"[PASS] {step_name}" if item_type == 'pass' else f"[FAIL] {step_name}"
                 
-                self.text.insert(tk.INSERT, icon, ('fold_icon', f'fold_item_{current_item_id}', 'foldable'))
+                self.text.insert(tk.INSERT, icon, (icon_tag, f'fold_item_{current_item_id}', 'foldable'))
                 self.text.insert(tk.INSERT, label + "\n", (tag_type, f'fold_item_{current_item_id}', 'foldable'))
                 
                 header_end = self.text.index(tk.INSERT)
@@ -372,16 +374,28 @@ class EnhancedText:
         if item_id not in self.folded_items:
             return
         
+        item_data = self.folded_items[item_id]
         content_text = ''.join(content_lines)
         
         # 插入內容
         self.text.insert(start_pos, content_text)
         content_end = self.text.index(f"{start_pos} + {len(content_text)}c")
         
+        # 如果是 FAIL 項目，套用紅色樣式
+        if item_data['type'] == 'fail':
+            self.text.tag_add('fail_text', start_pos, content_end)
+        
         # 更新折疊項目數據
         self.folded_items[item_id]['content'] = content_text
         self.folded_items[item_id]['content_start'] = start_pos
         self.folded_items[item_id]['content_end'] = content_end
+    
+    def _delayed_fold_pass_items(self):
+        """延遲折疊 PASS 項目（確保內容已完全插入）"""
+        try:
+            self.fold_all_pass_items()
+        except Exception as e:
+            print(f"延遲折疊失敗: {e}")
     
     def _insert_without_folding(self, log_content):
         """插入不帶折疊的LOG（原始高亮模式）"""
@@ -574,7 +588,8 @@ class EnhancedText:
             icon_start = f"{header_start} linestart"
             icon_end = f"{header_start} linestart +2c"
             self.text.delete(icon_start, icon_end)
-            self.text.insert(icon_start, "▶ ", ('fold_icon', f'fold_item_{item_id}', 'foldable'))
+            icon_tag = 'fold_icon' if item_data['type'] == 'pass' else 'fold_icon_fail'
+            self.text.insert(icon_start, "▶ ", (icon_tag, f'fold_item_{item_id}', 'foldable'))
             
             # 更新狀態
             item_data['is_folded'] = True
@@ -600,7 +615,8 @@ class EnhancedText:
             icon_start = f"{header_start} linestart"
             icon_end = f"{header_start} linestart +2c"
             self.text.delete(icon_start, icon_end)
-            self.text.insert(icon_start, "▼ ", ('fold_icon', f'fold_item_{item_id}', 'foldable'))
+            icon_tag = 'fold_icon' if item_data['type'] == 'pass' else 'fold_icon_fail'
+            self.text.insert(icon_start, "▼ ", (icon_tag, f'fold_item_{item_id}', 'foldable'))
             
             # 在摘要行後插入內容
             insert_pos = f"{header_end}"
