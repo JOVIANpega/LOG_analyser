@@ -202,7 +202,9 @@ class FailListBuilder:
             chart.height = 13
             chart.width = 18
             
-            # 放置在表格下方一點的位置 (避免跟表格或資料擠在一起)
-            ws.add_chart(chart, f"E{table_start_row + 2}")
+            # 放置在表格下方 (數據結束行 + 6，即空5行)
+            # 表格佔用 Col 1-3，圖表放在 Col A 會比較整齊
+            chart_row = max_r + 6
+            ws.add_chart(chart, f"A{chart_row}")
         except Exception as e:
             print(f"[WARNING] 圓餅圖生成失敗: {e}")
