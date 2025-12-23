@@ -20,6 +20,11 @@ class EnhancedText:
         self.item_counter = 0  # 用於生成唯一 item_id
         self.setup_search_functionality()
         self.setup_scrollbars()
+        
+        # 綁定滑鼠移動事件 (用於行高亮)
+        self.text.bind('<Motion>', self._on_mouse_move)
+        self.text.bind('<Leave>', self._on_mouse_leave)
+        self.last_highlighted_line = None
     
     def setup_scrollbars(self):
         """設定滾動條"""
@@ -54,6 +59,9 @@ class EnhancedText:
     
     def setup_tags(self):
         """設定文字標籤樣式"""
+        # 滑鼠懸停高亮 (淡黃色背景) -- 優先級需要動態調整，這裡先定義
+        self.text.tag_configure('current_line_highlight', background='#FFF9C4')
+        
         # 行號樣式
         self.text.tag_configure('line_number', foreground='gray', font=('Consolas', 9))
         
@@ -476,4 +484,40 @@ class EnhancedText:
                      self.text.see(f"{start_line}.0")
             except:
                 pass
+
+    def _on_mouse_move(self, event):
+        """處理滑鼠移動，高亮當前行"""
+        try:
+            # 獲取滑鼠當前位置的索引
+            index = self.text.index(f"@{event.x},{event.y}")
+            # 獲取整行的範圍
+            # linestart 到 lineend + 1c (包含換行符，讓背景色延伸到行尾)
+            line_start = f"{index} linestart"
+            line_end = f"{index} lineend + 1c"
+            
+            # 獲取行號 (為了比較，避免重複渲染)
+            current_line =  self.text.index(index).split('.')[0]
+            
+            # 如果行號沒變，這一步就跳過
+            if current_line == self.last_highlighted_line:
+                return
+            
+            # 移除舊的高亮
+            self.text.tag_remove('current_line_highlight', '1.0', tk.END)
+            
+            # 添加新高亮
+            self.text.tag_add('current_line_highlight', line_start, line_end)
+            
+            # 提升優先級，確保它覆蓋其他背景色 (如 FAIL 的淺紅)
+            self.text.tag_raise('current_line_highlight')
+            
+            self.last_highlighted_line = current_line
+            
+        except Exception:
+            pass
+
+    def _on_mouse_leave(self, event):
+        """滑鼠離開時移除高亮"""
+        self.text.tag_remove('current_line_highlight', '1.0', tk.END)
+        self.last_highlighted_line = None
     
