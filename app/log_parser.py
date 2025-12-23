@@ -60,90 +60,83 @@ class LogParser:
     
     def _parse_pass_log(self, raw_lines, file_path):
         """
-        PASS分析模式：
-        - 從頭到尾逐行讀取
-        - Do @STEPxxx@ 行視為測項開始
-        - @STEPxxx@ Test is Pass ! 行視為測項結束
-        - 結果一律標記 "PASS"
-        - 檢查是否有 "Retry: N" 關鍵字，若有且N>1 不需要紅字註記了，用黑色文字
-        - 將"未找到指令"的項目集合成一大塊，顯示為"未找到指令xN"
+        PASS分析模式（重構版）：
+        - 基於 'Test is Pass' 結束行來劃分測試項目
+        - 每個項目範圍：上一個結束行下一行 -> 當前結束行
+        - 這樣可以確保折疊範圍正確，即使缺少 'Do @STEP'
         """
         pass_items = []
-        current_step = None
-        no_command_steps = []  # 收集"未找到指令"的步驟
+        no_command_steps = []
         
+        # 結束行匹配模式：@STEPxxx@Name Test is Pass
+        # 允許結尾有 ! 或其他字符，也允許大小寫變化
+        end_pattern = re.compile(r'@(STEP\d+)@(.*?)Test is Pass', re.IGNORECASE)
+        
+        start_idx = 0
+        
+        # 尋找所有測試項目的結束行
         for idx, line in enumerate(raw_lines):
-            # 找到 Do @STEPxxx@ 行 - 測項開始
-            step_match = self.step_pattern.search(line)
-            if step_match:
-                # 完成前一個測項
-                if current_step:
-                    current_step['end_idx'] = idx - 1
-                    self._finalize_pass_step(current_step, pass_items, no_command_steps)
+            match = end_pattern.search(line)
+            if match:
+                # 找到一個測試項目的結束
+                step_number = match.group(1)
+                step_name_raw = match.group(2).strip()
                 
-                # 開始新測項
-                step_name_clean = step_match.group(1).strip()
-                # 提取STEP號碼
-                step_number = ''
-                if step_name_clean.startswith('@STEP') and '@' in step_name_clean[1:]:
-                    # 提取STEP號碼，例如 @STEP048@CHECK SD 提取 048
-                    step_parts = step_name_clean.split('@')
-                    if len(step_parts) >= 2:
-                        step_number = step_parts[1]
-                    step_name_clean = step_name_clean.split('@', 2)[-1]
+                # 定義區塊範圍
+                block_start = start_idx
+                block_end = idx
+                block_lines = raw_lines[block_start : block_end + 1]
                 
-                current_step = {
-                    'step_name': step_name_clean,
+                # 在區塊內解析 Command, Response, Retry
+                step_info = self._analyze_block_content(block_lines, step_number, step_name_raw)
+                
+                # 補充位置信息
+                step_info['start_idx'] = block_start
+                step_info['end_idx'] = block_end
+                step_info['raw_idx'] = block_start # 用開始行作為索引
+                step_info['full_log'] = block_lines
+                
+                # 加入結果列表
+                self._finalize_pass_step(step_info, pass_items, no_command_steps)
+                
+                # 更新下一個項目的起始位置
+                start_idx = idx + 1
+        
+        # 處理剩餘部分（如果有的話，且包含有意義的內容）
+        if start_idx < len(raw_lines):
+            leftover_lines = raw_lines[start_idx:]
+            # 簡單檢查是否包含錯誤或有價值信息
+            if any(self.step_pattern.search(l) for l in leftover_lines):
+                # 如果包含 Do @STEP 但沒有結束行，視為未完成項目
+                step_match = None
+                for l in leftover_lines:
+                    step_match = self.step_pattern.search(l)
+                    if step_match: break
+                
+                step_name = step_match.group(1) if step_match else "Unknown Step"
+                step_info = {
+                    'step_name': step_name,
                     'test_id': '',
                     'command': '',
                     'response': '',
-                    'result': 'PASS',
+                    'result': 'UNKNOWN',
                     'retry': 0,
                     'error': '',
-                    'raw_idx': idx,
-                    'full_log': [line],  # 完整測試過程
+                    'start_idx': start_idx,
+                    'end_idx': len(raw_lines) - 1,
+                    'raw_idx': start_idx,
+                    'full_log': leftover_lines,
                     'has_retry_but_pass': False,
-                    'start_idx': idx,
-                    'end_idx': None,
-                    'step_number': step_number
+                    'step_number': ''
                 }
-                continue
-            
-            if current_step:
-                current_step['full_log'].append(line)
+                # 簡單解析內容
+                cmd_match = None
+                for l in leftover_lines:
+                    cmd_match = self.cmd_pattern.search(l)
+                    if cmd_match: break
+                if cmd_match: step_info['command'] = cmd_match.group(1).strip()
                 
-                # 檢查是否為測項結束行（@STEPxxx@ Test is Pass !）
-                is_end = self._is_step_end_line(line, current_step.get('step_number', ''))
-                
-                # 如果標準檢查失敗，嘗試寬鬆檢查
-                if not is_end:
-                     is_end = self._is_step_end_line_relaxed(line, current_step.get('step_number', ''))
-                     if is_end:
-                         print(f"[DEBUG] 使用寬鬆模式找到結束行: {line[:50]}...")
-                
-                if is_end:
-                    current_step['end_idx'] = idx
-                    self._finalize_pass_step(current_step, pass_items, no_command_steps)
-                    current_step = None
-                    continue
-                
-                # 檢查是否為指令行
-                cmd_match = self.cmd_pattern.search(line)
-                if cmd_match:
-                    # 第一條指令
-                    if not current_step['command']:
-                        current_step['command'] = cmd_match.group(1).strip()
-                
-                # 第一個回應 - 測項開始後第一個 < 行
-                if not current_step['response']:
-                    resp_match = self.resp_pattern.search(line)
-                    if resp_match:
-                        current_step['response'] = resp_match.group(1).strip()
-        
-        # 處理最後一個測項
-        if current_step:
-            current_step['end_idx'] = len(raw_lines) - 1
-            self._finalize_pass_step(current_step, pass_items, no_command_steps)
+                self._finalize_pass_step(step_info, pass_items, no_command_steps)
         
         # 處理"未找到指令"的集合
         self._consolidate_no_command_steps(pass_items, no_command_steps)
@@ -155,6 +148,35 @@ class LogParser:
             'last_fail': None,
             'fail_line_idx': None,
             'log_type': 'PASS'
+        }
+    
+    def _analyze_block_content(self, lines, step_number, step_name_raw):
+        """解析一個測試區塊的內容"""
+        command = ''
+        response = ''
+        
+        # 尋找 Command 和 Response
+        for line in lines:
+            if not command:
+                cmd_match = self.cmd_pattern.search(line)
+                if cmd_match:
+                     command = cmd_match.group(1).strip()
+            
+            if not response:
+                resp_match = self.resp_pattern.search(line)
+                if resp_match:
+                    response = resp_match.group(1).strip()
+        
+        return {
+            'step_name': step_name_raw,
+            'test_id': '',
+            'command': command,
+            'response': response,
+            'result': 'PASS',
+            'retry': 0,
+            'error': '',
+            'has_retry_but_pass': False,
+            'step_number': step_number
         }
     
     def _is_step_end_line(self, line, step_number):
