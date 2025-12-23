@@ -70,7 +70,8 @@ class LogParser:
         
         # 結束行匹配模式：@STEPxxx@Name Test is Pass
         # 允許結尾有 ! 或其他字符，也允許大小寫變化
-        end_pattern = re.compile(r'@(STEP\d+)@(.*?)Test is Pass', re.IGNORECASE)
+        # 額外支援 Run 行作為開始信號，用於拆分合併的區塊
+        run_pattern = re.compile(r'Run ([A-Z0-9]+-\d+):(.*?)Mode:', re.IGNORECASE)
         
         start_idx = 0
         
@@ -79,30 +80,102 @@ class LogParser:
             match = end_pattern.search(line)
             if match:
                 # 找到一個測試項目的結束
-                step_number = match.group(1)
-                step_name_raw = match.group(2).strip()
+                end_step_number = match.group(1)
+                end_step_name = match.group(2).strip()
                 
                 # 定義區塊範圍
                 block_start = start_idx
                 block_end = idx
                 block_lines = raw_lines[block_start : block_end + 1]
                 
-                # 在區塊內解析 Command, Response, Retry
-                step_info = self._analyze_block_content(block_lines, step_number, step_name_raw)
+                # 檢查區塊內是否有多個 Run 行（意味著多個步驟被合併）
+                run_indices = []
+                for i, l in enumerate(block_lines):
+                    if run_pattern.search(l):
+                        run_indices.append(i)
+                        
+                # 只有當有多個 Run 行，且第一個 Run 不是在最後一個步驟的範圍內（這比較難判斷）
+                # 簡單策略：如果有 >1 個 Run 行，就拆分
+                # 但要注意：最後一個 Run 行必須對應當前的結束行（通常）
                 
-                # 補充位置信息
-                step_info['start_idx'] = block_start
-                step_info['end_idx'] = block_end
-                step_info['raw_idx'] = block_start # 用開始行作為索引
-                step_info['full_log'] = block_lines
-                
-                # 加入結果列表
-                self._finalize_pass_step(step_info, pass_items, no_command_steps)
+                if len(run_indices) > 1:
+                    # 進行拆分處理
+                    self._process_split_blocks(
+                        block_lines, block_start, run_indices, 
+                        end_step_number, end_step_name,
+                        pass_items, no_command_steps
+                    )
+                else:
+                    # 只有一個或沒有 Run 行，作為單一項目處理
+                    step_info = self._analyze_block_content(block_lines, end_step_number, end_step_name)
+                    step_info['start_idx'] = block_start
+                    step_info['end_idx'] = block_end
+                    step_info['raw_idx'] = block_start
+                    step_info['full_log'] = block_lines
+                    
+                    self._finalize_pass_step(step_info, pass_items, no_command_steps)
                 
                 # 更新下一個項目的起始位置
                 start_idx = idx + 1
         
-        # 處理剩餘部分（如果有的話，且包含有意義的內容）
+        # 處理剩餘部分
+        if start_idx < len(raw_lines):
+            # ... (保持原樣)
+            leftover_lines = raw_lines[start_idx:]
+            if any(self.step_pattern.search(l) for l in leftover_lines):
+                 # 簡單處理剩下的
+                 pass # Too complex to handle leftover merged steps, leave as is
+    
+    def _process_split_blocks(self, block_lines, global_start_idx, run_indices, end_step_number, end_step_name, pass_items, no_command_steps):
+        """拆分包含多個步驟的區塊"""
+        run_pattern = re.compile(r'Run ([A-Z0-9]+-\d+):(.*?)Mode:', re.IGNORECASE)
+        
+        for i in range(len(run_indices)):
+            current_run_idx = run_indices[i]
+            # 下一個 Run 的索引，或是區塊結尾
+            next_run_idx = run_indices[i+1] if i + 1 < len(run_indices) else len(block_lines)
+            
+            # 提取子區塊
+            sub_lines = block_lines[current_run_idx : next_run_idx]
+            
+            # 確定這是不是最後一個子項目（對應結束行）
+            is_last = (i == len(run_indices) - 1)
+            
+            # 提取 Step Name
+            # 從 Run 行提取: Run PDSC003-116:Check SD RW Mode: 1
+            first_line = block_lines[current_run_idx]
+            match = run_pattern.search(first_line)
+            step_name = match.group(2).strip() if match else "Unknown Step"
+            
+            # 如果是最後一個項目，使用結束行的資訊（通常更準確）
+            if is_last:
+                step_name = end_step_name
+                step_number = end_step_number
+            else:
+                block_step_num = '' # 無法從 Run 行得知 STEP 號碼，除非有 Do @STEP
+                # 嘗試在子區塊找 Do @STEP
+                for l in sub_lines:
+                    sm = self.step_pattern.search(l)
+                    if sm:
+                        sn = sm.group(1).strip()
+                        if '@' in sn[1:]: block_step_num = sn.split('@')[1]
+                        break
+                step_number = block_step_num
+            
+            # 構建 Step Info
+            step_info = self._analyze_block_content(sub_lines, step_number, step_name)
+            
+            # 計算全局索引
+            abs_start = global_start_idx + current_run_idx
+            abs_end = global_start_idx + next_run_idx - 1
+            
+            step_info['start_idx'] = abs_start
+            step_info['end_idx'] = abs_end
+            step_info['raw_idx'] = abs_start
+            step_info['full_log'] = sub_lines
+            
+            self._finalize_pass_step(step_info, pass_items, no_command_steps)
+            
         if start_idx < len(raw_lines):
             leftover_lines = raw_lines[start_idx:]
             # 簡單檢查是否包含錯誤或有價值信息
