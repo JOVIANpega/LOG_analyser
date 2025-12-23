@@ -190,10 +190,10 @@ class FailListBuilder:
             chart.dataLabels.showCatName = True
             chart.dataLabels.showSerName = False 
             
-            # 設定字體大小 (12pt)
+            # 設定字體大小 (14pt)
             try:
                 from openpyxl.drawing.text import CharacterProperties, Paragraph, ParagraphProperties, RichTextProperties
-                cp = CharacterProperties(sz=1200)
+                cp = CharacterProperties(sz=1400)  # 14pt
                 chart.dataLabels.txPr = RichTextProperties(p=[Paragraph(pPr=ParagraphProperties(defRPr=cp), endParaRPr=cp)])
             except:
                 pass

@@ -16,6 +16,8 @@ class EnhancedText:
         self.text = tk.Text(self.frame, **kwargs)
         self.setup_tags()
         self.step_positions = {}  # 儲存每個step的位置
+        self.folded_items = {}  # 儲存折疊項目的內容 {item_id: {'start': index, 'end': index, 'content': str, 'is_folded': bool, 'type': 'pass'/'fail'}}
+        self.item_counter = 0  # 用於生成唯一 item_id
         self.setup_search_functionality()
         self.setup_scrollbars()
     
@@ -89,6 +91,16 @@ class EnhancedText:
         self.text.tag_bind('step_clickable', '<Button-1>', self._on_step_click)
         self.text.tag_bind('step_clickable', '<Enter>', self._on_step_hover)
         self.text.tag_bind('step_clickable', '<Leave>', self._on_step_leave)
+        
+        # 折疊相關樣式
+        self.text.tag_configure('fold_header_pass', foreground='#28a745', font=('Consolas', 11, 'bold'), background='#e8f5e9')
+        self.text.tag_configure('fold_header_fail', foreground='#dc3545', font=('Consolas', 11, 'bold'), background='#ffebee')
+        self.text.tag_configure('fold_icon', foreground='#666', font=('Consolas', 12, 'bold'))
+        
+        # 綁定折疊點擊事件
+        self.text.tag_bind('foldable', '<Button-1>', self._on_fold_click)
+        self.text.tag_bind('foldable', '<Enter>', lambda e: self.text.config(cursor='hand2'))
+        self.text.tag_bind('foldable', '<Leave>', lambda e: self.text.config(cursor='xterm'))
     
     def setup_search_functionality(self):
         """設定搜尋功能"""
@@ -391,4 +403,109 @@ class EnhancedText:
                     break
         except Exception as e:
             print(f"聚焦錯誤行失敗: {e}")
-
+    
+    def _on_fold_click(self, event):
+        """處理折疊/展開點擊事件"""
+        try:
+            # 獲取點擊位置的所有標籤
+            index = self.text.index(tk.CURRENT)
+            tags = self.text.tag_names(index)
+            
+            # 找到對應的 item_id
+            item_id = None
+            for tag in tags:
+                if tag.startswith('fold_item_'):
+                    item_id = tag.replace('fold_item_', '')
+                    break
+            
+            if item_id and item_id in self.folded_items:
+                item_data = self.folded_items[item_id]
+                if item_data['is_folded']:
+                    self._unfold_item(item_id)
+                else:
+                    self._fold_item(item_id)
+        except Exception as e:
+            print(f"折疊點擊處理失敗: {e}")
+    
+    def _fold_item(self, item_id):
+        """折疊指定項目"""
+        try:
+            if item_id not in self.folded_items:
+                return
+            
+            item_data = self.folded_items[item_id]
+            if item_data['is_folded']:
+                return  # 已經折疊
+            
+            # 獲取摘要行的位置
+            header_start = item_data['header_start']
+            content_start = item_data['content_start']
+            content_end = item_data['content_end']
+            
+            # 刪除內容部分
+            self.text.delete(content_start, content_end)
+            
+            # 更新折疊圖示 (▶)
+            icon_start = f"{header_start} linestart"
+            icon_end = f"{header_start} linestart +2c"
+            self.text.delete(icon_start, icon_end)
+            self.text.insert(icon_start, "▶ ", ('fold_icon', f'fold_item_{item_id}', 'foldable'))
+            
+            # 更新狀態
+            item_data['is_folded'] = True
+            
+        except Exception as e:
+            print(f"折疊項目失敗: {e}")
+    
+    def _unfold_item(self, item_id):
+        """展開指定項目"""
+        try:
+            if item_id not in self.folded_items:
+                return
+            
+            item_data = self.folded_items[item_id]
+            if not item_data['is_folded']:
+                return  # 已經展開
+            
+            # 獲取摘要行的位置
+            header_start = item_data['header_start']
+            header_end = item_data['header_end']
+            
+            # 更新折疊圖示 (▼)
+            icon_start = f"{header_start} linestart"
+            icon_end = f"{header_start} linestart +2c"
+            self.text.delete(icon_start, icon_end)
+            self.text.insert(icon_start, "▼ ", ('fold_icon', f'fold_item_{item_id}', 'foldable'))
+            
+            # 在摘要行後插入內容
+            insert_pos = f"{header_end}"
+            self.text.insert(insert_pos, item_data['content'])
+            
+            # 更新 content_end 位置
+            new_end = self.text.index(f"{insert_pos} + {len(item_data['content'])}c")
+            item_data['content_end'] = new_end
+            item_data['content_start'] = insert_pos
+            
+            # 更新狀態
+            item_data['is_folded'] = False
+            
+        except Exception as e:
+            print(f"展開項目失敗: {e}")
+    
+    def fold_all_pass_items(self):
+        """折疊所有 PASS 項目"""
+        for item_id, item_data in self.folded_items.items():
+            if item_data['type'] == 'pass' and not item_data['is_folded']:
+                self._fold_item(item_id)
+    
+    def unfold_all_items(self):
+        """展開所有項目"""
+        for item_id, item_data in self.folded_items.items():
+            if item_data['is_folded']:
+                self._unfold_item(item_id)
+    
+    def fold_all_fail_items(self):
+        """折疊所有 FAIL 項目"""
+        for item_id, item_data in self.folded_items.items():
+            if item_data['type'] == 'fail' and not item_data['is_folded']:
+                self._fold_item(item_id)
