@@ -248,9 +248,11 @@ class EnhancedText:
         self.text.config(cursor='xterm')
     
     def insert_log_with_highlighting(self, log_content, test_results, header_content=None):
-        """插入log內容並進行語法高亮"""
+        """插入log內容並進行語法高亮（帶折疊功能）"""
         self.text.delete('1.0', tk.END)
         self.step_positions.clear()
+        self.folded_items.clear()
+        self.item_counter = 0
         
         # 插入置頂資訊 (Header)
         if header_content:
@@ -259,7 +261,130 @@ class EnhancedText:
         
         if not log_content:
             return
+        
+        # 獲取 pass_items 和 fail_items
+        pass_items = test_results.get('pass_items', [])
+        fail_items = test_results.get('fail_items', [])
+        
+        # 如果有測試項目，使用折疊模式
+        if pass_items or fail_items:
+            self._insert_with_folding(log_content, pass_items, fail_items)
+        else:
+            # 否則使用原始的高亮模式
+            self._insert_without_folding(log_content)
+        
+        # 預設折疊所有 PASS 項目
+        self.fold_all_pass_items()
+    
+    def _insert_with_folding(self, log_content, pass_items, fail_items):
+        """插入帶折疊功能的LOG"""
+        lines = log_content.split('\n')
+        
+        # 建立測試項目索引（根據行號）
+        item_map = {}  # {line_number: {'item': item_data, 'type': 'pass'/'fail'}}
+        
+        # 處理 PASS 項目
+        for item in pass_items:
+            step_name = item.get('step_name', '')
+            # 找到對應的行號（簡化：使用 step_name 搜尋）
+            for i, line in enumerate(lines):
+                if step_name in line and 'Do @STEP' in line:
+                    item_map[i] = {'item': item, 'type': 'pass', 'step_name': step_name}
+                    break
+        
+        # 處理 FAIL 項目
+        for item in fail_items:
+            step_name = item.get('step_name', '')
+            for i, line in enumerate(lines):
+                if step_name in line and 'Do @STEP' in line:
+                    item_map[i] = {'item': item, 'type': 'fail', 'step_name': step_name}
+                    break
+        
+        # 插入LOG並創建折疊結構
+        current_item_id = None
+        current_item_start = None
+        current_item_content = []
+        
+        for i, line in enumerate(lines):
+            line_number = i + 1
             
+            # 檢查是否是新的測試項目
+            if i in item_map:
+                # 先完成前一個項目
+                if current_item_id is not None:
+                    self._finalize_folded_item(current_item_id, current_item_start, current_item_content)
+                
+                # 開始新項目
+                item_data = item_map[i]
+                item_type = item_data['type']
+                step_name = item_data['step_name']
+                result = item_data['item'].get('result', '')
+                
+                # 創建摘要行
+                self.item_counter += 1
+                current_item_id = str(self.item_counter)
+                
+                header_start = self.text.index(tk.INSERT)
+                
+                # 插入折疊圖示和摘要
+                icon = "▼ "
+                tag_type = 'fold_header_pass' if item_type == 'pass' else 'fold_header_fail'
+                label = f"[PASS] {step_name}" if item_type == 'pass' else f"[FAIL] {step_name}"
+                
+                self.text.insert(tk.INSERT, icon, ('fold_icon', f'fold_item_{current_item_id}', 'foldable'))
+                self.text.insert(tk.INSERT, label + "\n", (tag_type, f'fold_item_{current_item_id}', 'foldable'))
+                
+                header_end = self.text.index(tk.INSERT)
+                
+                # 初始化折疊項目數據
+                current_item_start = self.text.index(tk.INSERT)
+                current_item_content = []
+                
+                self.folded_items[current_item_id] = {
+                    'type': item_type,
+                    'step_name': step_name,
+                    'header_start': header_start,
+                    'header_end': header_end,
+                    'content_start': current_item_start,
+                    'content_end': current_item_start,
+                    'content': '',
+                    'is_folded': False
+                }
+                
+                continue
+            
+            # 收集當前項目的內容
+            if current_item_id is not None:
+                formatted_line = f"{line_number:4d} {line}\n"
+                current_item_content.append(formatted_line)
+            else:
+                # 不屬於任何項目的行（直接插入）
+                line_start = self.text.index(tk.INSERT)
+                self.text.insert(tk.INSERT, f"{line_number:4d} ", 'line_number')
+                self.text.insert(tk.INSERT, line + "\n")
+        
+        # 完成最後一個項目
+        if current_item_id is not None:
+            self._finalize_folded_item(current_item_id, current_item_start, current_item_content)
+    
+    def _finalize_folded_item(self, item_id, start_pos, content_lines):
+        """完成折疊項目的內容插入"""
+        if item_id not in self.folded_items:
+            return
+        
+        content_text = ''.join(content_lines)
+        
+        # 插入內容
+        self.text.insert(start_pos, content_text)
+        content_end = self.text.index(f"{start_pos} + {len(content_text)}c")
+        
+        # 更新折疊項目數據
+        self.folded_items[item_id]['content'] = content_text
+        self.folded_items[item_id]['content_start'] = start_pos
+        self.folded_items[item_id]['content_end'] = content_end
+    
+    def _insert_without_folding(self, log_content):
+        """插入不帶折疊的LOG（原始高亮模式）"""
         lines = log_content.split('\n')
         current_step = None
         step_counter = 0

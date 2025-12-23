@@ -72,6 +72,19 @@ class UIBuilderMixin:
         # 同步更新字體大小設定，確保樣式一致
         if hasattr(self, '_apply_font_size'):
             self._apply_font_size()
+        
+        # 當切換到 FAIL TAB 時，自動折疊原始LOG中的 PASS 項目
+        try:
+            selected_tab = self.notebook.select()
+            if hasattr(self, 'tab_fail') and selected_tab == str(self.tab_fail):
+                if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'fold_all_pass_items'):
+                    self.log_text_enhanced.fold_all_pass_items()
+            # 當切換到 PASS TAB 時，可以選擇展開所有項目（可選）
+            # elif hasattr(self, 'tab_pass') and selected_tab == str(self.tab_pass):
+            #     if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'unfold_all_items'):
+            #         self.log_text_enhanced.unfold_all_items()
+        except Exception as e:
+            print(f"TAB切換折疊處理失敗: {e}")
     
     def _set_initial_pane_width(self, width):
         """設定初始面板寬度"""
