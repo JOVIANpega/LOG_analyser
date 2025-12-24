@@ -94,19 +94,17 @@ class CSVProcessor:
         list_frame = tk.Frame(main_frame)
         list_frame.pack(fill=tk.BOTH, expand=True)
         
-        # 創建Treeview with checkboxes
-        columns = ('選擇', '檔案名稱', '檔案大小', '修改時間')
+        # 創建 Treeview with checkboxes (移除檔案大小，加寬檔案名稱)
+        columns = ('選擇', '檔案名稱', '修改時間')
         self.tree = ttk.Treeview(list_frame, columns=columns, show='headings')
         
         # 設定欄位寬度
         self.tree.heading('選擇', text='選擇')
         self.tree.heading('檔案名稱', text='檔案名稱')
-        self.tree.heading('檔案大小', text='檔案大小')
         self.tree.heading('修改時間', text='修改時間')
         
         self.tree.column('選擇', width=60, anchor='center')
-        self.tree.column('檔案名稱', width=300)
-        self.tree.column('檔案大小', width=100)
+        self.tree.column('檔案名稱', width=450)
         self.tree.column('修改時間', width=150)
         
         # 添加檔案資訊
@@ -114,7 +112,6 @@ class CSVProcessor:
         
         for i, file_path in enumerate(self.csv_files):
             file_name = os.path.basename(file_path)
-            file_size = os.path.getsize(file_path)
             mod_time = os.path.getmtime(file_path)
             
             # 創建checkbox變數
@@ -122,11 +119,10 @@ class CSVProcessor:
             var.set(i == 0)  # 預設第一個打勾
             self.checkbox_vars.append(var)
             
-            # 插入資料
+            # 插入資料 (對應新的欄位數量)
             self.tree.insert('', 'end', values=(
                 '☑' if var.get() else '☐',  # checkbox顯示
                 file_name,
-                f"{file_size:,} bytes",
                 datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M:%S')
             ))
             
@@ -242,43 +238,63 @@ class CSVProcessor:
     
     def copy_and_process_files(self):
         """複製檔案並逐一處理"""
+        success_count = 0
+        fail_count = 0
+        
+        # 建立進度視窗
         progress_window = self.create_progress_window()
         
+        # 同步啟動主畫面的閃爍 LOGO 與狀態列
+        if hasattr(self.app, '_show_progress'):
+            self.app._show_progress("處理CSV檔案", f"準備處理 {len(self.selected_files)} 個檔案...")
+            self.app._progress_set_determinate(len(self.selected_files))
+        
+        output_files = []
         for i, csv_file in enumerate(self.selected_files):
             try:
-                # 更新進度
-                progress_window.update_progress(i, len(self.selected_files), os.path.basename(csv_file))
+                msg = os.path.basename(csv_file)
+                # 更新進度視窗
+                progress_window.update_progress(i, len(self.selected_files), msg)
+                
+                # 同步更新主畫面狀態列與進度條
+                if hasattr(self.app, '_safe_update_progress'):
+                    self.app._safe_update_progress(i, len(self.selected_files), f"正在處理: {msg}")
                 
                 # 複製檔案
                 copied_file = self.copy_file(csv_file)
                 
                 # 處理CSV檔案
-                self.process_csv_file(copied_file)
+                output_file = self.create_output_filename(csv_file)
+                if self.process_csv_file(copied_file, output_file):
+                    output_files.append(output_file)
+                    success_count += 1
+                else:
+                    fail_count += 1
                 
             except Exception as e:
                 print(f"處理檔案 {csv_file} 時發生錯誤: {e}")
+                fail_count += 1
         
+        # 結束進度
         progress_window.complete()
+        if hasattr(self.app, '_close_progress'):
+            self.app._close_progress()
         
-        # 處理完成後詢問是否開啟檔案
-        self.ask_open_files()
+        # 處理完成後依據結果顯示訊息
+        if success_count > 0:
+            self.ask_open_files(success_count, fail_count, output_files)
+        else:
+            messagebox.showerror("失敗", f"所有檔案處理皆失敗 ({fail_count} 個檔案)。請檢查錯誤訊息。")
     
-    def ask_open_files(self):
+    def ask_open_files(self, success_count, fail_count, output_files):
         """詢問使用者是否要開啟處理後的檔案"""
-        # 獲取所有生成的Excel檔案
-        excel_files = []
-        for file in os.listdir(self.analysis_dir):
-            if file.endswith('.xlsx'):
-                excel_files.append(os.path.join(self.analysis_dir, file))
+        msg = f"CSV檔案處理完成！\n\n成功: {success_count} 個"
+        if fail_count > 0:
+            msg += f"\n失敗: {fail_count} 個"
         
-        if not excel_files:
-            messagebox.showinfo("完成", "CSV檔案處理完成！")
-            return
-        
-        # 詢問是否開啟檔案
         result = messagebox.askyesno(
             "處理完成", 
-            f"CSV檔案處理完成！\n\n已生成 {len(excel_files)} 個Excel檔案。\n\n是否要開啟Analysis_CSV_FILE資料夾？"
+            f"{msg}\n\n是否要開啟報表檔案與資料夾？"
         )
         
         if result:
@@ -286,6 +302,15 @@ class CSVProcessor:
             import subprocess
             import platform
             
+            # 開啟生成的 Excel 檔案 (最多 5 個避免當機)
+            for i, f in enumerate(output_files):
+                if i >= 5: break 
+                try:
+                    os.startfile(f) if platform.system() == "Windows" else subprocess.run(["open", f])
+                except:
+                    pass
+
+            # 最後開啟目錄
             if platform.system() == "Windows":
                 subprocess.run(["explorer", self.analysis_dir])
             elif platform.system() == "Darwin":  # macOS
@@ -364,7 +389,7 @@ class CSVProcessor:
         
         return metadata
     
-    def process_csv_file(self, csv_file):
+    def process_csv_file(self, csv_file, output_file=None):
         """處理單個CSV檔案 - 改進版，支持元數據行檢測"""
         try:
             df = None
@@ -447,14 +472,26 @@ class CSVProcessor:
             df.attrs['header_row'] = header_row_index
             df.attrs['metadata_rows'] = metadata_rows
             
-            # 創建新的Excel檔案
-            output_file = self.create_output_filename(csv_file)
-            self.create_formatted_excel(df, output_file, csv_file)
+            # 數據排序：將 FAIL 放在最上面
+            # 建立一個排序參考列
+            def get_sort_score(row):
+                if self.is_fail_row(row): return 0
+                if self.is_pass_row(row): return 1
+                return 2
             
+            df['_sort_key'] = df.apply(get_sort_score, axis=1)
+            df = df.sort_values('_sort_key').drop(columns=['_sort_key'])
+            
+            # 創建新的Excel檔案
+            if output_file is None:
+                output_file = self.create_output_filename(csv_file)
+            self.create_formatted_excel(df, output_file, csv_file)
+            return True
         except Exception as e:
             error_msg = f"處理CSV檔案 {os.path.basename(csv_file)} 失敗: {e}"
             print(error_msg)
             messagebox.showerror("錯誤", error_msg)
+            return False
     
     def count_csv_lines(self, csv_file):
         """計算CSV檔案的原始行數（用於驗證）"""
@@ -487,11 +524,15 @@ class CSVProcessor:
         # 創建主要數據工作表（放在第一個）
         ws_data = wb.active
         ws_data.title = "數據明細"
-        self.create_data_sheet(ws_data, df)
+        self.create_data_sheet(ws_data, df, metadata_info)
         
         # 創建統計摘要工作表
         ws_summary = wb.create_sheet("統計摘要", 0)
         self.create_summary_sheet(ws_summary, df, csv_file, metadata_info, metadata_rows)
+
+        # 創建進階分析 (基於建議)
+        self.create_analysis_charts_sheet(wb, df, metadata_info)
+        self.create_spc_analysis_sheet(wb, df, metadata_info)
         
         # 儲存檔案
         wb.save(output_file)
@@ -504,10 +545,13 @@ class CSVProcessor:
             metadata_info = {}
         if metadata_rows is None:
             metadata_rows = []
-        # 樣式定義
-        title_font = Font(bold=True, size=14, color="FFFFFF")
-        header_font = Font(bold=True, size=11, color="FFFFFF")
-        normal_font = Font(size=10)
+        # 樣式定義 - 統一使用 Calibri (內容 11, 標題 14)
+        font_name = 'Calibri'
+        title_font = Font(name=font_name, bold=True, size=14, color="FFFFFF")
+        header_font = Font(name=font_name, bold=True, size=11, color="FFFFFF")
+        normal_font = Font(name=font_name, size=11)
+        bold_font = Font(name=font_name, bold=True, size=11)
+        
         title_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
         header_fill = PatternFill(start_color="5B9BD5", end_color="5B9BD5", fill_type="solid")
         info_fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
@@ -522,39 +566,23 @@ class CSVProcessor:
         
         current_row = 1
         
-        # 標題
+        # --- 新增說明區塊 ---
+        ws.merge_cells(f'A{current_row}:D{current_row}')
+        desc_cell = ws.cell(row=current_row, column=1, value="【說明】本頁彙總了檔案的整體測試量與良率，並自動分類主要錯誤代碼。")
+        desc_cell.font = Font(name=font_name, size=11, italic=True, color="555555")
+        current_row += 1
+        ws.merge_cells(f'A{current_row}:D{current_row}')
+        desc_cell2 = ws.cell(row=current_row, column=1, value="您可以從下方的「錯誤代碼分類」找出最主要的失效原因 (Pareto)。")
+        desc_cell2.font = Font(name=font_name, size=11, italic=True, color="555555")
+        current_row += 2
+        # ------------------
+
         ws.merge_cells(f'A{current_row}:D{current_row}')
         title_cell = ws.cell(row=current_row, column=1, value="CSV 數據分析報表")
         title_cell.fill = title_fill
         title_cell.font = title_font
         title_cell.alignment = Alignment(horizontal='center', vertical='center')
         current_row += 2
-        
-        # 元數據信息（如果有）
-        if metadata_info or metadata_rows:
-            ws.cell(row=current_row, column=1, value="元數據信息:").font = Font(bold=True, size=11, color="4472C4")
-            current_row += 1
-            
-            if metadata_info.get('contact'):
-                contact_text = metadata_info['contact'][:100]  # 限制長度
-                ws.cell(row=current_row, column=1, value="聯繫信息:").font = Font(bold=True, size=10)
-                ws.cell(row=current_row, column=2, value=contact_text).font = normal_font
-                ws.merge_cells(f'B{current_row}:D{current_row}')
-                current_row += 1
-            
-            if metadata_info.get('limits', {}).get('upper'):
-                ws.cell(row=current_row, column=1, value="上限值:").font = Font(bold=True, size=10)
-                ws.cell(row=current_row, column=2, value=metadata_info['limits']['upper']).font = normal_font
-                ws.merge_cells(f'B{current_row}:D{current_row}')
-                current_row += 1
-            
-            if metadata_info.get('limits', {}).get('lower'):
-                ws.cell(row=current_row, column=1, value="下限值:").font = Font(bold=True, size=10)
-                ws.cell(row=current_row, column=2, value=metadata_info['limits']['lower']).font = normal_font
-                ws.merge_cells(f'B{current_row}:D{current_row}')
-                current_row += 1
-            
-            current_row += 1
         
         # 檔案資訊
         ws.cell(row=current_row, column=1, value="檔案名稱:").font = Font(bold=True, size=10)
@@ -714,48 +742,25 @@ class CSVProcessor:
             
             current_row += 1
         
-        # 欄位資訊
-        ws.cell(row=current_row, column=1, value="欄位列表:").font = Font(bold=True, size=11)
-        current_row += 1
-        
-        ws.cell(row=current_row, column=1, value="欄位名稱").fill = header_fill
-        ws.cell(row=current_row, column=1).font = header_font
-        ws.cell(row=current_row, column=1).border = border
-        ws.cell(row=current_row, column=2, value="資料類型").fill = header_fill
-        ws.cell(row=current_row, column=2).font = header_font
-        ws.cell(row=current_row, column=2).border = border
-        ws.cell(row=current_row, column=3, value="非空值數量").fill = header_fill
-        ws.cell(row=current_row, column=3).font = header_font
-        ws.cell(row=current_row, column=3).border = border
-        current_row += 1
-        
-        for col in df.columns:
-            ws.cell(row=current_row, column=1, value=str(col)).font = normal_font
-            ws.cell(row=current_row, column=1).border = border
-            ws.cell(row=current_row, column=2, value=str(df[col].dtype)).font = normal_font
-            ws.cell(row=current_row, column=2).border = border
-            non_null_count = df[col].notna().sum()
-            ws.cell(row=current_row, column=3, value=non_null_count).font = normal_font
-            ws.cell(row=current_row, column=3).border = border
-            ws.cell(row=current_row, column=3).alignment = Alignment(horizontal='center')
-            current_row += 1
-        
-        # 調整欄寬
         ws.column_dimensions['A'].width = 20
         ws.column_dimensions['B'].width = 15
         ws.column_dimensions['C'].width = 15
         ws.column_dimensions['D'].width = 30
     
-    def create_data_sheet(self, ws, df):
-        """創建數據明細工作表"""
-        # 樣式定義
+    def create_data_sheet(self, ws, df, metadata_info=None):
+        """創建數據明細工作表處理 (插入上下限並凍結)"""
+        if metadata_info is None: metadata_info = {}
+        # 樣式定義 - 統一使用 Calibri (內容 11)
         from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+        font_name = 'Calibri'
         pass_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # 淺綠色
         fail_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # 淺紅色
-        warning_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # 淺黃色
+        limit_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")  # 淺灰色 (上下限用)
         header_fill = PatternFill(start_color="5B9BD5", end_color="5B9BD5", fill_type="solid")  # 淺藍色
-        header_font = Font(bold=True, size=11, color="FFFFFF")
-        normal_font = Font(size=10)
+        header_font = Font(name=font_name, bold=True, size=11, color="FFFFFF")
+        normal_font = Font(name=font_name, size=11)
+        fail_font = Font(name=font_name, size=11, bold=True)
+        limit_font = Font(name=font_name, size=11, italic=True, color="444444")
         border = Border(
             left=Side(style='thin'),
             right=Side(style='thin'),
@@ -780,9 +785,25 @@ class CSVProcessor:
             cell.font = header_font
             cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
             cell.border = border
+
+        # 寫入 UpperLimit (Row 2) 與 LowerLimit (Row 3)
+        upper_row = metadata_info.get('limits', {}).get('upper', '').split(',')
+        lower_row = metadata_info.get('limits', {}).get('lower', '').split(',')
         
-        # 寫入資料並設定樣式
-        for row_num, (_, row) in enumerate(df.iterrows(), 2):
+        for row_idx, limit_data in enumerate([upper_row, lower_row], 2):
+            for col_num in range(1, len(headers) + 1):
+                val = ""
+                if col_num - 1 < len(limit_data):
+                    val = limit_data[col_num - 1].strip()
+                
+                cell = ws.cell(row=row_idx, column=col_num, value=val)
+                cell.fill = limit_fill
+                cell.font = limit_font
+                cell.border = border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # 寫入資料並設定樣式 (從 Row 4 開始)
+        for row_num, (_, row) in enumerate(df.iterrows(), 4):
             row_is_pass = self.is_pass_row(row)
             row_is_fail = self.is_fail_row(row)
             fail_code = None
@@ -808,7 +829,7 @@ class CSVProcessor:
                 elif row_is_fail:
                     cell.fill = fail_fill
                     # FAIL行使用粗體字體以突出顯示
-                    cell.font = Font(size=10, bold=True)
+                    cell.font = fail_font
                 else:
                     cell.font = normal_font
                 
@@ -822,13 +843,15 @@ class CSVProcessor:
         # 自動調整欄寬（優化版本）
         self.auto_adjust_column_width_optimized(ws)
         
-        # 設定行高
-        ws.row_dimensions[1].height = 25  # 標題行更高
-        for row_idx in range(2, len(df) + 2):
-            ws.row_dimensions[row_idx].height = 18
+        # 凍結視窗 (凍結前3行：標題 + 上限 + 下限)
+        ws.freeze_panes = 'A4'
         
-        # 凍結第一行（標題行）
-        ws.freeze_panes = 'A2'
+        # 設定行高 (優化)
+        ws.row_dimensions[1].height = 35  # 表頭加高以利換行顯示
+        ws.row_dimensions[2].height = 20  # UpperLimit
+        ws.row_dimensions[3].height = 20  # LowerLimit
+        for row_idx in range(4, ws.max_row + 1):
+            ws.row_dimensions[row_idx].height = 18
         
         # 啟用自動篩選（確保標題行正確）
         if len(df) > 0 and len(headers) > 0:
@@ -981,8 +1004,219 @@ class CSVProcessor:
             adjusted_width = max(adjusted_width, 8)  # 最小寬度
             adjusted_width = min(adjusted_width, 80)  # 最大寬度（增加到80）
             
+            # 設定最小和最大寬度
+            adjusted_width = max(adjusted_width, 10)  # 稍微放寬最小值以防擠壓
+            adjusted_width = min(adjusted_width, 60)  # 將上限從 80 縮減到 60, 更為緊湊
+            
             ws.column_dimensions[column_letter].width = adjusted_width
     
+    def create_analysis_charts_sheet(self, wb, df, metadata_info):
+        """創建分析圖表工作表（柏拉圖和趨勢圖）"""
+        from openpyxl.chart import BarChart, LineChart, Reference
+        from openpyxl.styles import Font, PatternFill, Alignment
+        
+        ws = wb.create_sheet("分析圖表")
+        font_name = 'Calibri'
+        
+        # --- 新增說明區塊 --- (字體調整為 12)
+        ws.cell(row=1, column=1, value="【說明】柏拉圖 (Pareto Chart) 顯示前幾大失效來源；趨勢圖追蹤關鍵測量值的波動。").font = Font(name=font_name, size=12, italic=True)
+        ws.cell(row=2, column=1, value="若趨勢圖呈現劇烈上下震盪，表示測試不穩定或產品一致性較差。").font = Font(name=font_name, size=12, italic=True)
+        # ------------------
+        
+        start_data_row = 4
+        # 1. 錯誤分佈數據 (Pareto)
+        fail_codes = {}
+        for _, row in df.iterrows():
+            if self.is_fail_row(row):
+                code = self.extract_fail_code(row) or "未知錯誤"
+                fail_codes[code] = fail_codes.get(code, 0) + 1
+        
+        if fail_codes:
+            ws.cell(row=start_data_row+1, column=1, value="錯誤代碼分佈數據").font = Font(name=font_name, bold=True, size=14)
+            ws.cell(row=start_data_row+2, column=1, value="錯誤代碼")
+            ws.cell(row=start_data_row+2, column=2, value="數量")
+            
+            sorted_codes = sorted(fail_codes.items(), key=lambda x: x[1], reverse=True)
+            for i, (code, count) in enumerate(sorted_codes, start_data_row+3):
+                ws.cell(row=i, column=1, value=code)
+                ws.cell(row=i, column=2, value=count)
+            
+            # 創建直方圖 (字體調整為 13)
+            chart = BarChart()
+            chart.title = "錯誤分佈 (Pareto Chart)"
+            
+            # 設定圖表文字字體大小 (13pt) - 修正相容性問題
+            try:
+                from openpyxl.drawing.text import CharacterProperties, Paragraph, ParagraphProperties, RichTextProperties
+                cp13 = CharacterProperties(sz=1300) # 13pt = 1300
+                # 修正：部分版本不支援 p 參數，改用更安全的方式
+                if not hasattr(chart.title, 'txPr') or chart.title.txPr is None:
+                    chart.title.txPr = RichTextProperties()
+                chart.title.txPr.p = [Paragraph(pPr=ParagraphProperties(defRPr=cp13), endParaRPr=cp13)]
+            except Exception as e:
+                print(f"[DEBUG] Chart font setting failed: {e}")
+            
+            # ... 下方代碼 ...
+            data = Reference(ws, min_col=2, min_row=start_data_row+2, max_row=start_data_row+2+len(fail_codes))
+            cats = Reference(ws, min_col=1, min_row=start_data_row+3, max_row=start_data_row+2+len(fail_codes))
+            chart.add_data(data, titles_from_data=True)
+            chart.set_categories(cats)
+            chart.legend = None
+            ws.add_chart(chart, "F4") # 往右移一點，避免蓋到數據表格
+            
+        # 2. 趨勢圖 (關鍵數值分析)
+        # 尋找包含 PixelsShift, Brightness, discontinue 的數值欄位
+        numeric_cols = []
+        for col in df.columns:
+            if any(key in str(col).lower() for key in ['pixelsshift', 'brightness', 'discontinue']):
+                # 檢查是否真的含有數值
+                try:
+                    pd.to_numeric(df[col], errors='raise')
+                    numeric_cols.append(col)
+                except:
+                    continue
+        
+        if numeric_cols and len(df) > 1:
+            start_row = 30
+            ws.cell(row=start_row, column=1, value="關鍵數值趨勢數據 (前3個欄位)").font = Font(name=font_name, bold=True, size=14)
+            
+            # 為了避免 Excel 太大，我們只在分析表放前3個關鍵數值的趨勢
+            display_cols = numeric_cols[:3]
+            for c_idx, col_name in enumerate(display_cols, 1):
+                ws.cell(row=start_row+1, column=c_idx, value=str(col_name))
+                # 數據已經在 "數據明細" 表，我們可以引用或者複製一部分
+                # 這裡為了方便繪圖，簡化處理
+            
+            # 繪製趨勢圖 (引用 數據明細 表)
+            ws_data = wb["數據明細"]
+            data_max_row = min(len(df) + 1, 1000) # 限制繪圖點數
+            
+            for c_idx, col_name in enumerate(display_cols):
+                # 找到該列在數據明細中的索引
+                df_col_idx = list(df.columns).index(col_name) + 1
+                
+                lchart = LineChart()
+                lchart.title = f"趨勢圖: {col_name}"
+                lchart.style = 13
+                
+                # 設定字體 13pt - 修正相容性問題
+                try:
+                    cp13 = CharacterProperties(sz=1300)
+                    if not hasattr(lchart.title, 'txPr') or lchart.title.txPr is None:
+                        lchart.title.txPr = RichTextProperties()
+                    lchart.title.txPr.p = [Paragraph(pPr=ParagraphProperties(defRPr=cp13), endParaRPr=cp13)]
+                except Exception as e:
+                    print(f"[DEBUG] LineChart font setting failed: {e}")
+                
+                lchart.y_axis.title = "測量值"
+                lchart.x_axis.title = "測試序號"
+                
+                data = Reference(ws_data, min_col=df_col_idx, min_row=1, max_row=data_max_row)
+                lchart.add_data(data, titles_from_data=True)
+                ws.add_chart(lchart, f"F{start_row + c_idx*15}") # 往右移避免蓋到文字
+
+        # 統一設定字體 (內容大小 11)
+        for row in ws.rows:
+            for cell in row:
+                if cell.font.size != 14: # 不覆蓋標題大小
+                    cell.font = Font(name=font_name, size=11)
+
+    def create_spc_analysis_sheet(self, wb, df, metadata_info):
+        """創建 SPC & Cpk 分析工作表"""
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        ws = wb.create_sheet("SPC品質分析")
+        font_name = 'Calibri'
+        
+        # --- 新增說明區塊 ---
+        ws.merge_cells('A1:J1')
+        ws.cell(row=1, column=1, value="【說明】本表提供測量數據的統計特性。Mean 是平均值，Std 是標準差。").font = Font(name=font_name, size=11, italic=True)
+        ws.merge_cells('A2:J2')
+        ws.cell(row=2, column=1, value="Cpk 模型評估製程穩健度：Cpk < 1.33 時(黃色標示) 表示生產波動大或容易超出範圍，建議調教測試機。").font = Font(name=font_name, size=11, italic=True)
+        # ------------------
+        
+        headers = ["測量項目", "樣本數", "平均值 (Mean)", "標準差 (Std)", "最大值", "最小值", "LSL", "USL", "Cp", "Cpk"]
+        
+        # 樣式
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_font = Font(name=font_name, bold=True, color="FFFFFF")
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+        
+        for c, h in enumerate(headers, 1):
+            cell = ws.cell(row=4, column=c, value=h) # 從第 4 行開始
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center')
+            cell.border = border
+            
+        # 獲取 Limit 信息
+        limits_raw = metadata_info.get('limits', {})
+        upper_limit_row = limits_raw.get('upper', '').split(',') if limits_raw.get('upper') else []
+        lower_limit_row = limits_raw.get('lower', '').split(',') if limits_raw.get('lower') else []
+        
+        current_row = 5
+        for col_idx, col in enumerate(df.columns):
+            # 針對數值型且非 Metadata 的列 (包含 PixelsShift, Brightness, discontinue, cycle_time)
+            col_search = str(col).lower()
+            if any(key in col_search for key in ['pixelsshift', 'brightness', 'discontinue', 'cycle_time']):
+                try:
+                    data = pd.to_numeric(df[col], errors='coerce').dropna()
+                    if len(data) < 2: continue
+                    
+                    mean = data.mean()
+                    std = data.std()
+                    max_v = data.max()
+                    min_v = data.min()
+                    count = len(data)
+                    
+                    # 嘗試從 Metadata 獲取 Limit (假設索引一致)
+                    # 這裡需要找到標題在 CSV 中的實際索引
+                    # 目前簡化：如果 metadata_rows 的長度匹配 columns
+                    lsl = None
+                    usl = None
+                    try:
+                        # 補償 metadata 行前面的 header_row 偏差
+                        # 實際上應該要有更好的對齊邏輯，這裡先嘗試匹配
+                        if len(upper_limit_row) > col_idx:
+                            val = upper_limit_row[col_idx].strip()
+                            if val and val != 'Upperlimit' and val != 'NULL': usl = float(val)
+                        if len(lower_limit_row) > col_idx:
+                            val = lower_limit_row[col_idx].strip()
+                            if val and val != 'Lowerlimit' and val != 'NULL': lsl = float(val)
+                    except: pass
+                    
+                    cp = ""
+                    cpk = ""
+                    if std > 0:
+                        if lsl is not None and usl is not None:
+                            cp = (usl - lsl) / (6 * std)
+                            cpk = min((usl - mean) / (3 * std), (mean - lsl) / (3 * std))
+                        elif usl is not None:
+                            cpk = (usl - mean) / (3 * std)
+                        elif lsl is not None:
+                            cpk = (mean - lsl) / (3 * std)
+                    
+                    # 寫入資料
+                    vals = [str(col), count, round(mean, 4), round(std, 4), max_v, min_v, lsl, usl, 
+                            round(cp, 3) if isinstance(cp, float) else cp, 
+                            round(cpk, 3) if isinstance(cpk, float) else cpk]
+                    
+                    for c, v in enumerate(vals, 1):
+                        cell = ws.cell(row=current_row, column=c, value=v)
+                        cell.border = border
+                        cell.font = Font(name=font_name, size=11)
+                    
+                    # Cpk 著色 (Cpk < 1.33 警告)
+                    if isinstance(cpk, float) and cpk < 1.33:
+                        ws.cell(row=current_row, column=10).fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+                    
+                    current_row += 1
+                except: continue
+        
+        # 調整欄寬
+        for i in range(1, len(headers) + 1):
+            ws.column_dimensions[get_column_letter(i)].width = 15
+        ws.column_dimensions['A'].width = 35
+
     def create_progress_window(self):
         """創建進度視窗"""
         return ProgressWindow(self.app.root, "處理CSV檔案")
@@ -1000,11 +1234,11 @@ class ProgressWindow:
         self.progress_bar.pack(pady=20, padx=20, fill=tk.X)
         
         # 狀態標籤
-        self.status_label = tk.Label(self.window, text="準備中...", font=('Arial', 10))
+        self.status_label = tk.Label(self.window, text="準備中...", font=('Calibri', 10))
         self.status_label.pack(pady=10)
         
         # 檔案名稱標籤
-        self.file_label = tk.Label(self.window, text="", font=('Arial', 9), fg='gray')
+        self.file_label = tk.Label(self.window, text="", font=('Calibri', 9), fg='gray')
         self.file_label.pack()
         
         self.window.update()
