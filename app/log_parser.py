@@ -747,6 +747,30 @@ class LogParser:
         """產生UI標註資訊"""
         annotations = []
         
+        # 預先尋找最後一個 "doesn't match" 的位置
+        last_doesnt_match_idx = -1
+        for idx in range(len(raw_lines)-1, -1, -1):
+            if "doesn't match" in raw_lines[idx].lower():
+                last_doesnt_match_idx = idx
+                break
+        
+        # 定義高亮區塊範圍
+        highlight_start = -1
+        highlight_end = -1
+        if last_doesnt_match_idx != -1:
+            # 往上找起點 (例如看到 SPEC_FAIL 或 往上 2 行)
+            highlight_start = max(0, last_doesnt_match_idx - 2)
+            for i in range(last_doesnt_match_idx, max(0, last_doesnt_match_idx - 10), -1):
+                if 'SPEC_FAIL' in raw_lines[i] or 'SPEC_PASS' in raw_lines[i]:
+                    highlight_start = i
+                    break
+            # 往下找終點 (例如看到 All Test Aborted 或 往下 5 行)
+            highlight_end = min(len(raw_lines) - 1, last_doesnt_match_idx + 5)
+            for i in range(last_doesnt_match_idx, min(len(raw_lines), last_doesnt_match_idx + 20)):
+                if 'All Test Aborted' in raw_lines[i] or 'executes fail' in raw_lines[i]:
+                    highlight_end = i
+                    break
+
         for idx, line in enumerate(raw_lines):
             annotation = {
                 'line_idx': idx,
@@ -775,6 +799,11 @@ class LogParser:
                 annotation['color'] = 'blue'
             elif self.resp_pattern.search(line):
                 annotation['color'] = 'purple'
+            
+            # 特殊高亮區塊 (doesn't match 最後一個區塊)
+            if highlight_start <= idx <= highlight_end:
+                annotation['background'] = '#FFFF00' # 黃色背景
+                annotation['color'] = 'red'          # 紅色文字
             
             annotations.append(annotation)
         

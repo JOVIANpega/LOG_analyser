@@ -487,6 +487,11 @@ class CSVProcessor:
                 output_file = self.create_output_filename(csv_file)
             self.create_formatted_excel(df, output_file, csv_file)
             return True
+        except PermissionError:
+            error_msg = f"無法儲存檔案！請先關閉已開啟的 Excel 報表：\n{os.path.basename(output_file)}"
+            print(error_msg)
+            messagebox.showerror("檔案被佔用", error_msg)
+            return False
         except Exception as e:
             error_msg = f"處理CSV檔案 {os.path.basename(csv_file)} 失敗: {e}"
             print(error_msg)
@@ -585,19 +590,19 @@ class CSVProcessor:
         current_row += 2
         
         # 檔案資訊
-        ws.cell(row=current_row, column=1, value="檔案名稱:").font = Font(bold=True, size=10)
+        ws.cell(row=current_row, column=1, value="檔案名稱:").font = bold_font
         ws.cell(row=current_row, column=2, value=os.path.basename(csv_file)).font = normal_font
         current_row += 1
         
-        ws.cell(row=current_row, column=1, value="處理時間:").font = Font(bold=True, size=10)
+        ws.cell(row=current_row, column=1, value="處理時間:").font = bold_font
         ws.cell(row=current_row, column=2, value=datetime.now().strftime('%Y-%m-%d %H:%M:%S')).font = normal_font
         current_row += 1
         
-        ws.cell(row=current_row, column=1, value="總行數:").font = Font(bold=True, size=10)
+        ws.cell(row=current_row, column=1, value="總行數:").font = bold_font
         ws.cell(row=current_row, column=2, value=f"{len(df):,}").font = normal_font
         current_row += 1
         
-        ws.cell(row=current_row, column=1, value="總列數:").font = Font(bold=True, size=10)
+        ws.cell(row=current_row, column=1, value="總列數:").font = bold_font
         ws.cell(row=current_row, column=2, value=f"{len(df.columns)}").font = normal_font
         current_row += 2
         
@@ -640,7 +645,7 @@ class CSVProcessor:
         
         # PASS統計
         ws.cell(row=current_row, column=1, value="[PASS]").fill = pass_fill
-        ws.cell(row=current_row, column=1).font = Font(bold=True, size=10)
+        ws.cell(row=current_row, column=1).font = bold_font
         ws.cell(row=current_row, column=1).border = border
         ws.cell(row=current_row, column=2, value=pass_count).fill = pass_fill
         ws.cell(row=current_row, column=2).font = normal_font
@@ -655,7 +660,7 @@ class CSVProcessor:
         
         # FAIL統計
         ws.cell(row=current_row, column=1, value="[FAIL]").fill = fail_fill
-        ws.cell(row=current_row, column=1).font = Font(bold=True, size=10)
+        ws.cell(row=current_row, column=1).font = bold_font
         ws.cell(row=current_row, column=1).border = border
         ws.cell(row=current_row, column=2, value=fail_count).fill = fail_fill
         ws.cell(row=current_row, column=2).font = normal_font
@@ -671,7 +676,7 @@ class CSVProcessor:
         # 其他統計
         if other_count > 0:
             ws.cell(row=current_row, column=1, value="○ 其他").fill = info_fill
-            ws.cell(row=current_row, column=1).font = Font(bold=True, size=10)
+            ws.cell(row=current_row, column=1).font = bold_font
             ws.cell(row=current_row, column=1).border = border
             ws.cell(row=current_row, column=2, value=other_count).fill = info_fill
             ws.cell(row=current_row, column=2).font = normal_font
@@ -725,7 +730,7 @@ class CSVProcessor:
             
             for code, count in sorted_codes:
                 ws.cell(row=current_row, column=1, value=code).fill = fail_fill
-                ws.cell(row=current_row, column=1).font = Font(bold=True, size=10)
+                ws.cell(row=current_row, column=1).font = bold_font
                 ws.cell(row=current_row, column=1).border = border
                 
                 ws.cell(row=current_row, column=2, value=count).fill = fail_fill
@@ -1138,7 +1143,7 @@ class CSVProcessor:
         
         # 樣式
         header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-        header_font = Font(name=font_name, bold=True, color="FFFFFF")
+        header_font = Font(name=font_name, bold=True, size=11, color="FFFFFF")
         border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
         
         for c, h in enumerate(headers, 1):
@@ -1211,6 +1216,38 @@ class CSVProcessor:
                     
                     current_row += 1
                 except: continue
+        
+        # --- 新增 CPK 圖表 ---
+        if current_row > 5: # 表示有數據
+            from openpyxl.chart import BarChart, Reference
+            chart = BarChart()
+            chart.type = "col"
+            chart.title = "Cpk 品質指標分佈"
+            chart.y_axis.title = "Cpk 數值"
+            chart.x_axis.title = "測量項目"
+            
+            # 設定圖表文字字體大小 (13pt)
+            try:
+                from openpyxl.drawing.text import CharacterProperties, Paragraph, ParagraphProperties, RichTextProperties
+                cp13 = CharacterProperties(sz=1300)
+                chart.title.txPr = RichTextProperties(p=[Paragraph(pPr=ParagraphProperties(defRPr=cp13), endParaRPr=cp13)])
+            except: pass
+            
+            data = Reference(ws, min_col=11, min_row=4, max_row=current_row-1) # 第11欄是原代碼邏輯中寫入 Cpk 的位置?
+            # 不對，我在 vals 裡 Cpk 是第 11 個元素 (索引 10)，所以對應 Excel 第 11 欄 (K欄)
+            # 檢查 vals: [str(col), count, mean, std, max, min, lsl, usl, cp, cpk]
+            # 1:項目, 2:樣本數, 3:Mean, 4:Std, 5:Max, 6:Min, 7:LSL, 8:USL, 9:Cp, 10:Cpk
+            # 所以 Cpk 在第 10 欄 (J 欄)
+            
+            data = Reference(ws, min_col=10, min_row=4, max_row=current_row-1)
+            cats = Reference(ws, min_col=1, min_row=5, max_row=current_row-1)
+            chart.add_data(data, titles_from_data=True)
+            chart.set_categories(cats)
+            chart.legend = None
+            
+            # 放置圖表
+            ws.add_chart(chart, "L4") # 放在表格右側
+        # ------------------
         
         # 調整欄寬
         for i in range(1, len(headers) + 1):

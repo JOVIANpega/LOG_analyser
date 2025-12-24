@@ -69,7 +69,11 @@ class ExcelWriter:
         wb = openpyxl.Workbook()
         
         # 1. 建立 Summary (使用者要求回復)
-        self.summary_builder.create_summary_sheet(wb, logs, title="Summary")
+        sws = self.summary_builder.create_summary_sheet(wb, logs, title="Summary")
+        try:
+            sws.sheet_properties.tabColor = '0000FF' # 藍色標籤
+        except:
+            pass
         
         # 2. 建立 FAIL_LIST
         self.fail_builder.build_fail_list_sheet(wb, logs)
@@ -92,7 +96,11 @@ class ExcelWriter:
         wb = openpyxl.Workbook()
         
         # 1. 建立 Summary
-        self.summary_builder.create_summary_sheet(wb, logs, title="Summary")
+        sws = self.summary_builder.create_summary_sheet(wb, logs, title="Summary")
+        try:
+            sws.sheet_properties.tabColor = '0000FF' # 藍色標籤
+        except:
+            pass
         
         # 2. 建立每個檔案的頁面
         for entry in logs:
@@ -120,9 +128,10 @@ class ExcelWriter:
         # 3. 原始 LOG
         raw_lines = entry.get('raw_lines', [])
         annotations = entry.get('ui_annotations', [])
-        content_font = Font(name='Consolas', size=10)
+        fail_items = entry.get('fail_items', []) # 獲取失敗項目以識別區塊
+        content_font = Font(name='Calibri', size=11)
         
-        write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font)
+        write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=fail_items)
         
         auto_fit_columns(ws, {1: 100})
 

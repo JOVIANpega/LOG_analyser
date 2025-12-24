@@ -271,25 +271,23 @@ class AnalysisEngineMixin:
                 (r'(ISN=[^\n]+)', 'ISN'),
                 (r'(Script File is [^\n]+)', 'Script File'),
                 (r'(SFIS is [^\n]+)', 'SFIS'),
-                (r'(All phase Total Test Time.+?[\d\.]+\s*Sec)', 'Test Time'), # 保留原本
-                (r'All phase Total Test Time[\s!:\-]+([\d\.]+)\s*Sec', 'Test Time Regex 2') # 修正後的增強版 Regex
             ]
-            
-            # 用檔案名作為備選（但在多檔模式下不使用）
-            # filename = os.path.basename(self.current_log_path)
-            # info_lines.append(f"File: {filename}")
             
             for pattern, label in patterns:
                 match = re.search(pattern, content, re.IGNORECASE)
                 if match:
-                    if label == 'Test Time Regex 2':
-                        # 如果是 Regex 2，match.group(1) 是秒數，我們手動組裝
-                        info_lines.append(f"All phase Total Test Time ! ----- {match.group(1)} Sec.")
-                    else:
-                        info_lines.append(match.group(1).strip())
+                    info_lines.append(match.group(1).strip())
             
-            # 如果沒有找到 ISN，嘗試從檔名提取
-            # ...
+            # 專門尋找測試總時間 (通常在檔尾)
+            time_content = "\n".join(raw_lines[-200:]) # 搜尋最後 200 行
+            time_match = re.search(r'All phase Total Test Time[\s!:\-]+([\d\.]+)\s*Sec', time_content, re.IGNORECASE)
+            if time_match:
+                info_lines.append(f"All phase Total Test Time ! ----- {time_match.group(1)} Sec.")
+            else:
+                # 嘗試另一種格式 "Total Test Time is 727.947 Sec"
+                time_match2 = re.search(r'Total Test Time is[^0-9]*?([\d\.]+)\s*sec', time_content, re.IGNORECASE)
+                if time_match2:
+                    info_lines.append(f"All phase Total Test Time ! ----- {time_match2.group(1)} Sec.")
             
             return "\n".join(info_lines) if info_lines else "無法提取 Header 資訊"
             

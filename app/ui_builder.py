@@ -180,7 +180,7 @@ class UIBuilderMixin:
         
         # 使用增強型TreeView
         pass_columns = ("測項名稱", "指令", "收到指令", "PASS/FAIL")
-        self.pass_tree_enhanced = EnhancedTreeview(self.tab_pass, pass_columns)
+        self.pass_tree_enhanced = EnhancedTreeview(self.tab_pass, pass_columns, settings=self.settings)
         self.pass_tree_enhanced.pack_with_scrollbars(fill=tk.BOTH, expand=1)
     
     def _build_enhanced_fail_tab(self):
@@ -195,7 +195,7 @@ class UIBuilderMixin:
         # 上半部 - FAIL測項列表
         self.fail_upper_frame = ttk.Frame(self.fail_paned)
         fail_columns = ("測項名稱", "指令", "錯誤回應", "Retry次數", "FAIL原因")
-        self.fail_tree_enhanced = EnhancedTreeview(self.fail_upper_frame, fail_columns)
+        self.fail_tree_enhanced = EnhancedTreeview(self.fail_upper_frame, fail_columns, settings=self.settings)
         self.fail_tree_enhanced.pack_with_scrollbars(fill=tk.BOTH, expand=1)
         self.fail_paned.add(self.fail_upper_frame, weight=3) # 分配權重
         

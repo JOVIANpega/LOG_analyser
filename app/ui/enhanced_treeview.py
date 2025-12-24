@@ -1,17 +1,18 @@
 # ui_enhanced.py
 # 用途：提供進階的GUI元件，包含顏色標籤、hover效果、文字格式化等
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import re
 
 class EnhancedTreeview:
     """增強型TreeView，支援顏色標籤和hover效果"""
     
-    def __init__(self, parent, columns, show='headings'):
+    def __init__(self, parent, columns, show='headings', settings=None):
         self.tree = ttk.Treeview(parent, columns=columns, show=show)
         self.full_content_storage = {}  # 用字典存儲完整內容
         self.all_items_data = []  # 存儲所有測試項的資料
         self.font_size = 11
+        self.settings = settings or {}
         self._hover_popup = None
         self._hover_row = None
         self.setup_styles()
@@ -692,17 +693,43 @@ class EnhancedTreeview:
             search_entry = tk.Entry(btn_frame, width=25, font=('Arial', 9))
             search_entry.pack(side=tk.LEFT, padx=2)
             
-            # 綁定Enter鍵跳轉到下一個搜尋結果
-            search_entry.bind('<Return>', lambda event: self._jump_to_next_search_result(text_widget, search_entry.get()))
-            
             # 綁定輸入框內容變化，即時搜尋
             search_entry.bind('<KeyRelease>', lambda event: self._highlight_search_results(text_widget, search_entry.get()))
+            
+            # --- 使用者自義定高亮關鍵字介面 ---
+            def add_to_user_keywords():
+                new_kw = search_entry.get().strip()
+                if not new_kw: return
+                
+                # 獲取目前列表
+                kw_str = self.settings.get('user_highlight_keywords', 'SPEC_FAIL, spec_issue:')
+                kw_list = [k.strip() for k in kw_str.split(',') if k.strip()]
+                
+                if new_kw not in kw_list:
+                    kw_list.append(new_kw)
+                    new_kw_str = ', '.join(kw_list)
+                    self.settings['user_highlight_keywords'] = new_kw_str
+                    
+                    # 儲存設定
+                    from ..settings_loader import save_settings
+                    save_settings(self.settings)
+                    
+                    # 重新套用高亮
+                    self._apply_syntax_highlighting(text_widget, text_widget.get('1.0', tk.END))
+                    messagebox.showinfo("高亮設定", f"已將 '{new_kw}' 加到高亮關鍵字！")
+            
+            # 建立小按鈕
+            plus_btn = tk.Button(btn_frame, text="+ 高亮", 
+                                command=add_to_user_keywords,
+                                relief=tk.RAISED, bd=1, bg='#FFF176', fg='#333333',
+                                font=('Arial', 8, 'bold'), padx=5)
+            plus_btn.pack(side=tk.LEFT, padx=2)
             
 
             
             # 設定按鈕hover效果
             self._setup_button_hover_effects(prev_btn, next_btn)
-            self._setup_button_hover_effects(copy_btn, search_btn)
+            self._setup_button_hover_effects(copy_btn, plus_btn)
             
             # 更新導航按鈕狀態
             self._update_navigation_buttons_in_window(detail_window, current_index)
@@ -1301,6 +1328,28 @@ class EnhancedTreeview:
                 else:
                     text_widget.tag_add('normal', line_start, line_end)
                     text_widget.tag_configure('normal', foreground='black')
+
+            # --- 使用者自定義高亮關鍵字 ---
+            kw_str = self.settings.get('user_highlight_keywords', 'SPEC_FAIL, spec_issue:')
+            user_kws = [k.strip() for k in kw_str.split(',') if k.strip()]
+            
+            if user_kws:
+                # 定義高亮標籤底色 (淺黃帶加強邊框或是淡粉色)
+                text_widget.tag_configure('user_keyword_line', background='#FFFF00', foreground='black', font=('Consolas', self.font_size, 'bold'))
+                
+                for kw in user_kws:
+                    start_pos = '1.0'
+                    while True:
+                        pos = text_widget.search(kw, start_pos, tk.END, nocase=True)
+                        if not pos: break
+                        
+                        # 高亮整行
+                        line_num = pos.split('.')[0]
+                        line_start_idx = f"{line_num}.0"
+                        line_end_idx = f"{line_num}.end"
+                        text_widget.tag_add('user_keyword_line', line_start_idx, line_end_idx)
+                        
+                        start_pos = f"{line_num}.end + 1c"
         except Exception as e:
             print(f"語法高亮應用失敗: {e}")
     
