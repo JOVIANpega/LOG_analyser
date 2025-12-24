@@ -79,10 +79,10 @@ class UIBuilderMixin:
             if hasattr(self, 'tab_fail') and selected_tab == str(self.tab_fail):
                 if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'fold_all_pass_items'):
                     self.log_text_enhanced.fold_all_pass_items()
-            # 當切換到 PASS TAB 時，可以選擇展開所有項目（可選）
-            # elif hasattr(self, 'tab_pass') and selected_tab == str(self.tab_pass):
-            #     if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'unfold_all_items'):
-            #         self.log_text_enhanced.unfold_all_items()
+            # 當切換到 原始LOG TAB 時，自動聚焦錯誤位置
+            elif hasattr(self, 'tab_log') and selected_tab == str(self.tab_log):
+                if hasattr(self, 'log_text_enhanced'):
+                    self.log_text_enhanced.focus_first_error_line()
         except Exception as e:
             print(f"TAB切換折疊處理失敗: {e}")
     
@@ -122,10 +122,6 @@ class UIBuilderMixin:
         # 建立頂部檔案資訊框架
         top_frame = ttk.Frame(parent)
         top_frame.pack(fill=tk.X, padx=5, pady=2)
-        
-        # 狀態指示燈 (放在右側)
-        self.status_light = ttk.Label(top_frame, text="●", foreground='gray', font=('Arial', 24))
-        self.status_light.pack(side=tk.RIGHT, padx=5)
         
         # 檔案資訊標籤 (放在左側，佔滿剩餘空間)
         # User requested black color for better visibility

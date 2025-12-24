@@ -21,7 +21,6 @@ class ProgressManager:
         # Embedded widgets
         self._status_label = None
         self._main_progress_bar = None
-        self._status_light = None
         self._header_label = None # Left sidebar title label
         self._header_frame = None # Left sidebar title frame
         self._is_flashing = False
@@ -29,11 +28,10 @@ class ProgressManager:
         self._start_time = None
         self._cancel_flag = False
         
-    def set_widgets(self, status_label, progress_bar, status_light=None, header_label=None, header_frame=None, percentage_label=None):
+    def set_widgets(self, status_label, progress_bar, header_label=None, header_frame=None, percentage_label=None):
         """設定主視窗的狀態列與標題元件"""
         self._status_label = status_label
         self._main_progress_bar = progress_bar
-        self._status_light = status_light
         self._header_label = header_label
         self._header_frame = header_frame
         self._percentage_label = percentage_label
@@ -43,14 +41,6 @@ class ProgressManager:
         if not self._is_flashing:
             return
             
-        # 1. 狀態燈閃爍 (Bright Green <-> Bright Yellow)
-        if self._status_light:
-            try:
-                curr = self._status_light.cget('fg')
-                # 綠色 (#00FF00) <-> 黃色 (#FFFF00)
-                self._status_light.config(fg='#00FF00' if curr != '#00FF00' else '#FFFF00')
-            except: pass
-
         # 2. 標題標籤與框架閃爍 (綠色 <-> 鮮豔黃色)
         if self._header_label or self._header_frame:
             try:
@@ -86,10 +76,6 @@ class ProgressManager:
     def _stop_flashing(self):
         """停止閃爍"""
         self._is_flashing = False
-        if self._status_light:
-            try:
-                self._status_light.config(foreground='gray')
-            except: pass
         if self._header_label:
             try:
                 # 恢復為 ttkbootstrap 的樣式顏色

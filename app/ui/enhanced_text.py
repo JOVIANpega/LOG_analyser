@@ -94,6 +94,7 @@ class EnhancedText:
         self.text.tag_configure('summary_path', background='#FFFF00', foreground='black', font=('Consolas', 11, 'bold'))
         self.text.tag_configure('summary_success', foreground='#28a745', font=('Consolas', 11, 'bold'))
         self.text.tag_configure('summary_warning', foreground='#ffc107', font=('Consolas', 11, 'bold'))
+        self.text.tag_configure('summary_highlight', background='#FFFF00', foreground='black', font=('Consolas', 14, 'bold'))
         
         # 綁定點擊事件
         self.text.tag_bind('step_clickable', '<Button-1>', self._on_step_click)

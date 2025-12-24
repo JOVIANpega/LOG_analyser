@@ -70,15 +70,12 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         
         # Connect Progress Manager to Status Bar
         if hasattr(self, 'status_label') and hasattr(self, 'main_progress_bar'):
-            # Check for optional status_light and left_title_label
-            status_light_widget = getattr(self, 'status_light', None)
             header_label_widget = getattr(self, 'left_title_label', None)
             header_frame_widget = getattr(self, 'left_title_frame', None)
             percentage_label_widget = getattr(self, 'percentage_label', None)
             self.progress_manager.set_widgets(
                 self.status_label, 
                 self.main_progress_bar, 
-                status_light_widget,
                 header_label_widget,
                 header_frame_widget,
                 percentage_label_widget

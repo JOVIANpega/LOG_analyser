@@ -244,16 +244,7 @@ class AnalysisEngineMixin:
                 if hasattr(self, '_switch_to_log_and_focus_error'):
                     self.root.after(500, self._switch_to_log_and_focus_error)
                 
-                # 如果是FAIL Log，彈出顯示主要錯誤原因 (Priority Error)
-                if last_fail:
-                    error_msg = last_fail.get('error', 'Unknown Error')
-                    cmd = last_fail.get('command', 'Unknown Command')
-                    step = last_fail.get('step_name', 'Unknown Step')
-                    
-                    is_match_error = "doesn't match" in str(error_msg).lower() or "doesn't match" in str(last_fail.get('full_log', '')).lower()
-                    priority_text = "主要錯誤 (RETEST Logic)" if is_match_error else "主要錯誤"
-                    details = f"Step: {step}\nCommand: {cmd}\nError: {error_msg}"
-                    messagebox.showinfo(priority_text, details)
+                    pass
                     
             except Exception as e:
                 print(f"切換到FAIL分頁或顯示錯誤失敗: {e}")
@@ -373,9 +364,19 @@ class AnalysisEngineMixin:
         self._ui_log("\033[96m=== 開始多檔分析流程 ===\033[0m", clear=True)
         
         # 顯示路徑並反白 (凸顯位置)
-        # 優先使用原路徑 (避免顯示 Temp 路徑)
         display_path = getattr(self, 'original_log_path', self.current_log_path)
-        path_str = str(display_path)
+        
+        path_str = ""
+        if isinstance(display_path, (list, tuple)) and len(display_path) > 1:
+            # 檢查是否所有檔案都在同一個目錄
+            dirs = set(os.path.dirname(p) for p in display_path)
+            if len(dirs) == 1:
+                path_str = f"資料夾: {list(dirs)[0]}"
+            else:
+                path_str = str(display_path)
+        else:
+            path_str = str(display_path)
+            
         self._ui_log(f"\033[93m路徑: {path_str}\033[0m", tag='summary_path')
         
         if hasattr(self, 'notebook'):
@@ -554,7 +555,7 @@ class AnalysisEngineMixin:
                     else:
                         out_dir = os.getcwd()
 
-                    self._ui_log(f"正在產生 Excel 至: {out_dir}")
+                    self._ui_log(f"正在產生 Excel 至: {out_dir}", tag='summary_highlight')
                     # 此時更新進度到 100% 或幾乎 100%
                     self._safe_update_progress(total_files, total_steps, "正在產生 Excel 報告...")
                     
@@ -565,7 +566,8 @@ class AnalysisEngineMixin:
                         # 生成完成
                         msg_success = f"\033[92mExcel 生成成功！\033[0m 耗時 {int(time.time() - self.progress_manager._start_time)}s"
                         self._safe_update_progress(total_steps, total_steps, msg_success)
-                        self._ui_log(f"\033[92mExcel 生成成功！\033[0m\n\033[96mPASS: {os.path.basename(pass_path)}\nFAIL: {os.path.basename(fail_path)}\033[0m", tag='summary_success')
+                        self._ui_log(f"\033[92mExcel 生成成功！\033[0m", tag='summary_highlight')
+                        self._ui_log(f"\033[96mPASS: {os.path.basename(pass_path)}\nFAIL: {os.path.basename(fail_path)}\033[0m", tag='summary_success')
                         # 使用 root.after 確保在主執行緒彈出
                         # 參數: out_dir, total_files, pass_count, fail_count, pass_path, fail_path
                         self.root.after(100, lambda: self._show_open_folder_prompt(
