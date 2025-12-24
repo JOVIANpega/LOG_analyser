@@ -487,29 +487,29 @@ class EnhancedText:
                 pass
 
     def _on_mouse_move(self, event):
-        """處理滑鼠移動，高亮當前行"""
+        """處理滑鼠移動，高亮當前行 (優化效能)"""
         try:
             # 獲取滑鼠當前位置的索引
-            index = self.text.index(f"@{event.x},{event.y}")
-            # 獲取整行的範圍
-            # linestart 到 lineend + 1c (包含換行符，讓背景色延伸到行尾)
-            line_start = f"{index} linestart"
-            line_end = f"{index} lineend + 1c"
+            pos = f"@{event.x},{event.y}"
+            index = self.text.index(pos)
             
-            # 獲取行號 (為了比較，避免重複渲染)
-            current_line =  self.text.index(index).split('.')[0]
+            # 獲取行號
+            current_line = index.split('.')[0]
             
             # 如果行號沒變，這一步就跳過
             if current_line == self.last_highlighted_line:
                 return
             
-            # 移除舊的高亮
-            self.text.tag_remove('current_line_highlight', '1.0', tk.END)
+            # 移除舊的高亮 (僅針對上一行)
+            if self.last_highlighted_line:
+                self.text.tag_remove('current_line_highlight', f"{self.last_highlighted_line}.0", f"{self.last_highlighted_line}.end+1c")
             
             # 添加新高亮
+            line_start = f"{current_line}.0"
+            line_end = f"{current_line}.end+1c"
             self.text.tag_add('current_line_highlight', line_start, line_end)
             
-            # 提升優先級，確保它覆蓋其他背景色 (如 FAIL 的淺紅)
+            # 提升優先級
             self.text.tag_raise('current_line_highlight')
             
             self.last_highlighted_line = current_line
@@ -519,6 +519,7 @@ class EnhancedText:
 
     def _on_mouse_leave(self, event):
         """滑鼠離開時移除高亮"""
-        self.text.tag_remove('current_line_highlight', '1.0', tk.END)
+        if self.last_highlighted_line:
+            self.text.tag_remove('current_line_highlight', f"{self.last_highlighted_line}.0", f"{self.last_highlighted_line}.end+1c")
         self.last_highlighted_line = None
     

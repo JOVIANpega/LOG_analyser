@@ -220,14 +220,14 @@
       <h2>一、左側按鈕區</h2>
       <ul>
         <li><strong>📁 選擇檔案 (Log/壓縮檔)</strong>：挑一個或多個 <code>.log</code> 或壓縮檔進行分析。支援一次載入多份 Log。</li>
-        <li><strong>📂 選擇資料夾 (自動識別)</strong>：一次分析資料夾內所有檔案，並自動在該資料夾下建立 <code>LOG集總整理/</code>。
-        </li>
+        <li><strong>📂 選擇資料夾 (自動識別)</strong>：一次分析資料夾內所有檔案。</li>
         <li><strong>🗑️ 清除結果</strong>：清空所有顯示結果與暫存狀態。</li>
         <li><strong>🔍 搜尋功能</strong>：輸入關鍵字後可跨標籤頁搜尋，找到的文字會以黃底高亮顯示。</li>
-        <li><strong>⚡ 執行中動畫</strong>：當分析檔案開始時，左上方的標題「PEGA LOG ANALYZER」會呈現閃爍效果，直到處理完成為止。</li>
+        <li><strong>⚡ 執行中動畫</strong>：當分析檔案開始時，左側 Owl Logo 與標題「PEGA LOG ANALYZER」會呈現顯眼的<strong>綠/黃</strong>色彩閃爍，代表正在運算中。
+        </li>
         <li><strong>📖 查看操作說明(HTML)</strong>：點擊即可開啟本頁面進行快速查閱。</li>
       </ul>
-      <p class="tip">左上標題與介面字體大小可於「設定」標籤頁中即時調整並看到效果。</p>
+      <p class="tip">移除原有的狀態指示燈，改以標題閃爍作為主要的處理中視覺回饋。</p>
     </div>
 
     <div class="section" id="section2">
@@ -255,9 +255,12 @@
     <div class="section" id="section4">
       <h2>四、📄 原始LOG 標籤頁</h2>
       <ul>
-        <li>顯示完整原始 LOG 文字。</li>
-        <li>若有錯誤行，會自動捲動到錯誤處並套用醒目標示。</li>
+        <li>顯示完整原始 LOG 文字，採用<strong>高效率線性顯式</strong>。</li>
+        <li><strong>自動聚焦</strong>：切換到此標籤頁時，程式會自動尋找第一個錯誤行（如 FAIL 或 Exception）並捲動到該位置。</li>
+        <li><strong>滑鼠懸停高亮</strong>：滑鼠滑過的行會即時加亮（優化後的局部更新技術，即使萬行 Log 也不卡頓）。</li>
+        <li><strong>醒目標示</strong>：FAIL/ERROR 區域會以淺紅色背景標註，方便一眼看出故障範圍。</li>
       </ul>
+      <p class="tip">考慮到穩定性，新版本已移除舊有的摺疊功能，改以色彩標註與快速對焦替代。</p>
     </div>
 
     <div class="section" id="section5">
