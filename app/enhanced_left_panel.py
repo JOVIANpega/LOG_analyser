@@ -70,26 +70,26 @@ def build_left_panel(parent, app):
     app.left_title_frame = title_frame
     
     # 檔案選擇區域
-    file_frame = ttk.LabelFrame(parent, text=" 📁 檔案選擇 ", padding=(10, 10))
+    file_frame = tk.LabelFrame(parent, text=" 📁 檔案來源 ", padx=10, pady=10)
     file_frame.pack(fill=tk.X, padx=10, pady=5)
     
-    # 檔案選擇區域
-    file_frame = tk.LabelFrame(parent, text="檔案選擇", padx=10, pady=10)
-    file_frame.pack(fill=tk.X, padx=10, pady=5)
+    # 智能選擇按鈕 (整合單檔/多檔/資料夾)
+    btn_smart = tk.Button(file_frame, text="📂 選擇 LOG 來源 (檔案/資料夾) ▼", 
+                          bg='#673AB7', fg='white', font=('Arial', 10, 'bold'))
+    btn_smart.pack(fill=tk.X, pady=5, ipady=5)
+    app.font_scaler.register(btn_smart)
+    _create_tooltip(btn_smart, "點擊選擇 LOG 來源\n支援單個/多個檔案、壓縮檔或整個資料夾")
     
-    # 統一檔案選擇 (多選, 支援 Log/壓縮檔)
-    btn_files = tk.Button(file_frame, text="📄 選擇檔案 (Log/壓縮檔)", 
-                          command=app._select_files_unified, bg='#4CAF50', fg='white')
-    btn_files.pack(fill=tk.X, pady=2)
-    app.font_scaler.register(btn_files)
-    _create_tooltip(btn_files, "選擇一個或多個檔案\n支援 .log 以及 .zip/.7z/.rar 壓縮檔")
+    # 創建下拉選單
+    selection_menu = tk.Menu(btn_smart, tearoff=0)
+    selection_menu.add_command(label="📄 選擇檔案 (Log/壓縮檔)...", command=app._select_files_unified)
+    selection_menu.add_command(label="📁 選擇資料夾 (批次處理)...", command=app._select_folder_unified)
     
-    # 統一資料夾選擇 (自動識別)
-    btn_folder = tk.Button(file_frame, text="📂 選擇資料夾 (自動識別)", 
-                          command=app._select_folder_unified, bg='#2196F3', fg='white')
-    btn_folder.pack(fill=tk.X, pady=2)
-    app.font_scaler.register(btn_folder)
-    _create_tooltip(btn_folder, "選擇資料夾\n自動識別內容為 Log 檔案或壓縮檔\n若混合存在將詢問處理方式")
+    # 綁定點擊事件顯示選單
+    def show_smart_menu(event):
+        selection_menu.post(event.x_root, event.y_root)
+        
+    btn_smart.bind("<Button-1>", show_smart_menu)
     
     # 壓縮檔處理按鈕 - 已移除，功能整合至上述按鈕
 

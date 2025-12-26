@@ -83,14 +83,21 @@ class ExcelWriter:
         except:
             pass
         
-        # 2. 建立 FAIL_LIST
-        self.fail_builder.build_fail_list_sheet(wb, logs)
+        # 2. 建立 FAIL_LIST (在填寫詳細內容之前，先計算錯誤行位置)
+        # 註：我們需要先填寫詳細內容，才能得到精確的 error_excel_row
+        # 所以這裡先暫存 FAIL_LIST 的建立，等詳細內容填完再建立
         
-        # 3. 填寫詳細內容
+        # 3. 填寫詳細內容並記錄錯誤行位置
         for entry in logs:
             sheet_name = entry['sheet_name']
             ws = wb[sheet_name]
-            self._write_detailed_log(ws, entry)
+            error_row = self._write_detailed_log(ws, entry)
+            # 將精確的錯誤行號存回 entry，供 FAIL_LIST 使用
+            if error_row:
+                entry['error_excel_row'] = error_row
+        
+        # 現在建立 FAIL_LIST (此時 entry 中已有 error_excel_row)
+        self.fail_builder.build_fail_list_sheet(wb, logs)
         
         if "Sheet" in wb.sheetnames:
             del wb["Sheet"]
@@ -147,9 +154,12 @@ class ExcelWriter:
         raw_lines = entry.get('raw_lines', [])
         annotations = entry.get('ui_annotations', [])
         fail_items = entry.get('fail_items', []) 
+        log_type = entry.get('log_type', 'UNKNOWN')  # ⚠️ 關鍵：取得日誌類型
         content_font = Font(name='Consolas', size=11)
         
-        last_row = write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=fail_items)
+        # ⚠️ 傳入 log_type，確保 PASS 日誌不會生成錯誤預覽框
+        # ⚠️ 接收返回的錯誤行位置信息
+        last_row, error_excel_row = write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=fail_items, log_type=log_type)
         
         # 4. 置底 [回到 Summary] 連結 - Font 16, 深藍底白字
         bottom_row = last_row + 2
@@ -160,6 +170,9 @@ class ExcelWriter:
         c_bot.alignment = Alignment(horizontal='center')
         
         auto_fit_columns(ws, {1: 100})
+        
+        # 返回錯誤行位置 (供 FAIL_LIST 超鏈接使用)
+        return error_excel_row
 
     # 向下相容
     def export(self, pass_items, fail_items, output_path):

@@ -208,15 +208,27 @@ class AnalysisEngineMixin:
         if raw_lines and hasattr(self, 'log_text_enhanced'):
             log_content = '\n'.join(raw_lines)
             
-            # This is heavy. Assume insert_log_with_highlighting handles it or it blocks for a bit.
-            # We can't easily chunk text widget insertion without changing EnhancedText.
-            # But the yield before this gives a breath.
+            # === 新增：提取錯誤預覽段落（將錯誤區塊置頂顯示）===
+            error_preview_text = None
+            # 只有 FAIL 日志才生成預覽 (判斷依據: fail_items 存在且非空)
+            if fail_items:
+                preview_lines = []
+                if result.get('ui_annotations'):
+                    for ann in result['ui_annotations']:
+                        # 提取所有標記為錯誤背景的行 (COLOR_ERROR_BG = #FFE1E1)
+                        if ann.get('background') == '#FFE1E1':
+                            preview_lines.append("  >> " + ann.get('line_content', ''))
+                
+                if preview_lines:
+                    error_preview_text = "\n".join(preview_lines)
+
+            # NOTE: 已延遲插入以優化性能 (yield)
             # 現在傳入 ui_annotations 以便進行精確的行高亮（包含 Criteria 的綠色/紅粉色）
             self.log_text_enhanced.insert_log_with_highlighting(log_content, {
                 'fail_line_idx': fail_line_idx,
                 'pass_items': pass_items,
                 'fail_items': fail_items
-            }, header_content=header_info, ui_annotations=result.get('ui_annotations'))
+            }, header_content=header_info, ui_annotations=result.get('ui_annotations'), error_preview_text=error_preview_text)
             
             if fail_line_idx is not None and fail_line_idx < len(raw_lines):
                 self.log_text_enhanced.highlight_error_block(fail_line_idx + 1, fail_line_idx + 1)

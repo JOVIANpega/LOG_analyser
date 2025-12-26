@@ -101,6 +101,8 @@ class EnhancedText:
         self.text.tag_bind('step_clickable', '<Enter>', self._on_step_hover)
         self.text.tag_bind('step_clickable', '<Leave>', self._on_step_leave)
         
+        # 搜尋高亮樣式
+        self.text.tag_configure('search_highlight', background='yellow', foreground='black')
         
     
     def setup_search_functionality(self):
@@ -248,7 +250,7 @@ class EnhancedText:
         # 恢復游標樣式
         self.text.config(cursor='xterm')
     
-    def insert_log_with_highlighting(self, log_content, test_results, header_content=None, ui_annotations=None):
+    def insert_log_with_highlighting(self, log_content, test_results, header_content=None, ui_annotations=None, error_preview_text=None):
         """插入log內容並進行語法高亮（使用解析器提供的標註）"""
         self.text.delete('1.0', tk.END)
         self.step_positions.clear()
@@ -259,6 +261,20 @@ class EnhancedText:
         if header_content:
             self.text.insert(tk.INSERT, header_content + "\n", 'header_style')
             self.text.insert(tk.INSERT, "\n") # 空一行
+            
+        # === 插入錯誤原因預覽 (置頂顯示錯誤區塊) ===
+        if error_preview_text:
+            # 設定預覽框樣式 (同步 Excel)
+            if 'error_preview_box' not in self.text.tag_names():
+                self.text.tag_configure('error_preview_box', 
+                                      background='#FFE1E1', foreground='#C00000', 
+                                      font=('Consolas', 11, 'bold'))
+                self.text.tag_configure('preview_title', 
+                                      foreground='red', font=('Arial', 12, 'bold'))
+
+            self.text.insert(tk.INSERT, "┌──────────────── [ 發現錯誤點 (預覽) ] ────────────────┐\n", 'preview_title')
+            self.text.insert(tk.INSERT, error_preview_text + "\n", 'error_preview_box')
+            self.text.insert(tk.INSERT, "└───────────────────────────────────────────────────────┘\n\n", 'preview_title')
         
         if not log_content:
             return
@@ -285,72 +301,90 @@ class EnhancedText:
             self._highlight_fail_regions(fail_items, header_offset)
     
     def _insert_with_annotations(self, annotations):
-        """使用解析器的 UI 標註資訊逐行插入並著色"""
-        bg_toggle = True
+        """使用解析器的 UI 標註資訊逐行插入並著色 (同步 Excel 視覺邏輯)"""
         
-        # 預先定義樣式 (亮綠色、白字、大字、加粗)
-        if 'step_separator_style' not in self.text.tag_names():
-            self.text.tag_configure('step_separator_style', 
+        # 預先定義統一風格標籤
+        if 'phase_separator' not in self.text.tag_names():
+            self.text.tag_configure('phase_separator', 
                                  background='#2E7D32', foreground='white', 
-                                 font=('Consolas', 12, 'bold'))
+                                 font=('Consolas', 12, 'bold'), justify='center')
 
         for i, ann in enumerate(annotations):
             line_content = ann.get('line_content', '')
             
-            # --- 智慧型分隔線插入 (遵循解析器的標註) ---
+            # --- PHASE 大章節標頭 (同步 Excel 綠色能量條) ---
             if ann.get('show_separator'):
-                # 標題文字樣式
                 title = ann.get('separator_title', 'TEST PHASE')
-                # 依要求：不使用綠色底，改回黑色文字
-                separator_text = f" [ {title[:80]} ]\n"
-                
-                tag_name = 'step_separator_style'
-                # 改為黑色文字，移除綠色底
-                self.text.tag_configure(tag_name, foreground='black', font=('Courier New', 12, 'bold'), justify='center')
+                # 建立一個佔滿寬度的標題行
+                sep_text = f"\n [ {title} ] \n\n"
                 
                 sep_start = self.text.index(tk.INSERT)
-                self.text.insert(tk.INSERT, " --  " + separator_text, tag_name)
+                self.text.insert(tk.INSERT, sep_text, 'phase_separator')
                 
-                # 記錄跳轉位置 (跳轉到分隔線)
+                # 記錄跳轉位置
                 self.step_positions[title] = sep_start
             
-            # --- 插入正常的 Log 行 ---
+            # --- 插入 LOG 本體 ---
             line_start = self.text.index(tk.INSERT)
             line_number = i + 1
             
-            # 插入行號
-            self.text.insert(tk.INSERT, f"{line_number:4d} ")
+            # 1. 插入行號 (灰字)
+            self.text.insert(tk.INSERT, f"{line_number:5d} ")
             self.text.tag_add('line_number', line_start, self.text.index(tk.INSERT))
             
-            # 插入內容行
+            # 2. 插入內容
             content_start = self.text.index(tk.INSERT)
             self.text.insert(tk.INSERT, line_content + '\n')
             content_end = self.text.index(tk.INSERT)
             
-            # 應用顏色標註
+            # 3. 應用視覺樣式 (解析器主導)
             color = ann.get('color', 'black')
             background = ann.get('background', 'white')
-            tag_name = f"style_{color}_{background.replace('#','')}"
-            if tag_name not in self.text.tag_names():
-                bg_val = background if background.lower() != 'white' else None
-                self.text.tag_configure(tag_name, foreground=color, background=bg_val)
-            self.text.tag_add(tag_name, content_start, content_end)
+            is_bold = ann.get('is_bold', False)
             
-            # 判斷是否為可點擊步驟 (來自原有的 step 標註邏輯)
-            step_match = self.step_re.search(line_content) if hasattr(self, 'step_re') else re.search(r'Do @STEP\d+@([^@\n]+)', line_content)
-            if step_match:
-                step_name = step_match.group(1).strip()
-                step_tag = f"step_{step_name}_clickable"
-                self.text.tag_add(step_tag, line_start, content_end)
-                self.text.tag_add('step_clickable', line_start, content_end)
+            # 動態生成標籤樣式
+            clean_bg = background.replace('#', '')
+            style_tag = f"tag_{color}_{clean_bg}_{'b' if is_bold else 'n'}"
+            
+            if style_tag not in self.text.tag_names():
+                # 獲取當前 Text 元件字體大小
+                try:
+                    current_font = self.text.cget('font')
+                    if isinstance(current_font, (list, tuple)):
+                        f_size = current_font[1]
+                    else:
+                        f_size = 11 # fallback
+                except:
+                    f_size = 11
+                    
+                font_cfg = ['Consolas', f_size]
+                if is_bold:
+                    font_cfg.append('bold')
                 
-                if background.lower() == 'white':
-                    bg_toggle = not bg_toggle
-                    bg_tag = 'step_bg_1' if bg_toggle else 'step_bg_2'
-                    self.text.tag_add(bg_tag, line_start, content_end)
-        
-        # 確保分隔線永遠在最上層
-        self.text.tag_raise('step_separator_style')
+                bg_val = background if background.lower() != 'white' else None
+                self.text.tag_configure(style_tag, foreground=color, background=bg_val, font=tuple(font_cfg))
+            
+            # 著色 (套用到整行，包含行號背景，讓視覺更一致)
+            self.text.tag_add(style_tag, line_start, content_end)
+            
+            # 4. 可點擊元件處理
+            if ann.get('is_clickable'):
+                # 提取測項名稱用於點擊跳轉
+                step_match = re.search(r'Do @STEP\d+@([^@\n]+)', line_content)
+                if step_match:
+                    step_name = step_match.group(1).strip()
+                    click_tag = f"step_jump_{step_name}"
+                    self.text.tag_add(click_tag, content_start, content_end)
+                    self.text.tag_add('step_clickable', content_start, content_end)
+                    # 也可以將此行加入跳轉索引
+                    if step_name not in self.step_positions:
+                        self.step_positions[step_name] = line_start
+
+
+        # 提升高亮優先級 (安全檢查，避免 tag 未定義錯誤)
+        for tag_name in ['step_hover', 'search_highlight', 'phase_separator']:
+            if tag_name in self.text.tag_names():
+                self.text.tag_raise(tag_name)
     
     def _insert_without_folding(self, log_content):
         """插入不帶折疊的LOG（原始備用模式）"""

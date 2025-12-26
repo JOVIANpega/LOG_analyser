@@ -52,79 +52,74 @@ class ResultDisplayMixin:
             print(f"顯示資料夾分析預覽失敗: {e}")
 
     def _extract_main_fail_reason_from_items(self, fail_items):
-        """從FAIL項目列表中提取主要錯誤原因"""
+        """從FAIL項目列表中提取主要錯誤原因（嚴格 Bottom-up 優先級）"""
         if not fail_items:
             return "未知錯誤"
         
-        # 優先找到包含 "is Fail" 的項目
-        for item in fail_items:
+        # 定義優先級檢查函數
+        def search_in_item(item, keyword, case_sensitive=False):
+            """在單個 item 的 full_response 中由下往上搜尋關鍵字"""
             full_response = item.get('full_response', '')
-            if full_response:
-                lines = full_response.split('\n')
-                for line in lines:
-                    # 移除行號前綴（如 "370. "）
-                    clean_line = line
-                    if '. ' in line and line.split('. ', 1)[0].strip().isdigit():
-                        clean_line = line.split('. ', 1)[1]
-                    
-                    # 找到包含 "is Fail" 的行
-                    if "is Fail" in clean_line:
-                        # 處理類似 "VSCH026-043:Chec Frimware version is Fail ! <ErrorCode: BSFR18>" 的格式
-                        if ':' in clean_line and "is Fail" in clean_line:
-                            # 擷取冒號後的部分
-                            after_colon = clean_line.split(":", 1)[1].strip()
-                            # 找到 "is Fail" 的位置
-                            if "is Fail" in after_colon:
-                                fail_pos = after_colon.find("is Fail")
-                                # 擷取到 "is Fail" 結束的部分，去掉後面的 <ErrorCode: xxx> 和時間戳記
-                                test_name_with_fail = after_colon[:fail_pos + 7].strip()  # 7 = len("is Fail")
-                                
-                                # 移除時間戳記（如 "2025/08/07 08:53:36 [1]" 格式）
-                                if '[' in test_name_with_fail and ']' in test_name_with_fail:
-                                    bracket_start = test_name_with_fail.find('[')
-                                    bracket_end = test_name_with_fail.find(']')
-                                    if bracket_start != -1 and bracket_end != -1:
-                                        # 檢查括號前是否有時間戳記格式
-                                        before_bracket = test_name_with_fail[:bracket_start].strip()
-                                        if '/' in before_bracket and ':' in before_bracket:
-                                            # 移除時間戳記部分
-                                            test_name_with_fail = test_name_with_fail[bracket_end + 1:].strip()
-                                
-                                return test_name_with_fail
-                        elif "is Fail" in clean_line:
-                            # 如果沒有冒號但有 "is Fail"，直接擷取到 "is Fail" 結束
-                            fail_pos = clean_line.find("is Fail")
-                            if fail_pos != -1:
-                                # 找到 <ErrorCode: 的位置
-                                error_code_pos = clean_line.find("<ErrorCode:")
-                                if error_code_pos != -1:
-                                    return clean_line[:error_code_pos].strip()
-                                else:
-                                    return clean_line[:fail_pos + 7].strip()
+            if not full_response:
+                return None
+            
+            lines = full_response.split('\n')
+            # 反向遍歷（由下往上）
+            for line in reversed(lines):
+                # 移除行號前綴
+                clean_line = line
+                if '. ' in line and line.split('. ', 1)[0].strip().isdigit():
+                    clean_line = line.split('. ', 1)[1]
+                
+                # 關鍵字匹配
+                if case_sensitive:
+                    if keyword in clean_line:
+                        return clean_line.strip()
+                else:
+                    if keyword.lower() in clean_line.lower():
+                        return clean_line.strip()
+            return None
         
-        # 如果沒有找到 "is Fail"，嘗試找到其他錯誤資訊
+        # === 優先級 1: DOESN'T MATCH （最高優先級）===
         for item in fail_items:
-            full_response = item.get('full_response', '')
-            if full_response:
-                lines = full_response.split('\n')
-                for line in lines:
-                    clean_line = line
-                    if '. ' in line and line.split('. ', 1)[0].strip().isdigit():
-                        clean_line = line.split('. ', 1)[1]
-                    
-                    # 尋找包含 "All Test Aborted" 的行
-                    if "All Test Aborted" in clean_line:
-                        return clean_line
-                    
-                    # 尋找其他嚴重錯誤
-                    line_lower = clean_line.lower()
-                    if any(critical_error in line_lower for critical_error in [
-                        'segmentation fault', 'core dumped', 'executes fail', 
-                        "doesn't match", 'timeout', 'exception'
-                    ]):
-                        return clean_line
+            result = search_in_item(item, "doesn't match", case_sensitive=False)
+            if result:
+                return result
         
-        # 如果都沒有找到，返回第一個項目的錯誤信息
+        # === 優先級 2: is Fail ===
+        for item in fail_items:
+            result = search_in_item(item, "is Fail", case_sensitive=True)
+            if result:
+                # 處理格式: "VSCH026-043:Check Firmware version is Fail ! <ErrorCode: BSFR18>"
+                if ':' in result and "is Fail" in result:
+                    after_colon = result.split(":", 1)[1].strip()
+                    fail_pos = after_colon.find("is Fail")
+                    if fail_pos != -1:
+                        main_part = after_colon[:fail_pos + 7].strip()  # 包含 "is Fail"
+                        # 移除 <ErrorCode: xxx>
+                        if '<ErrorCode:' in main_part:
+                            main_part = main_part.split('<ErrorCode:')[0].strip()
+                        return main_part
+                return result
+        
+        # === 優先級 3: All Test Aborted ===
+        for item in fail_items:
+            result = search_in_item(item, "All Test Aborted", case_sensitive=False)
+            if result:
+                return result
+        
+        # === 優先級 4: 其他關鍵錯誤 ===
+        critical_keywords = [
+            'Status:False', 'executes fail', 'segmentation fault', 
+            'core dumped', 'timeout', 'exception', 'FAIL', 'ERROR'
+        ]
+        for keyword in critical_keywords:
+            for item in fail_items:
+                result = search_in_item(item, keyword, case_sensitive=False)
+                if result:
+                    return result
+        
+        # === 最後備選：使用第一個項目的 error 字段 ===
         return fail_items[0].get('error', '未知錯誤')
 
     def _extract_file_summary(self, parse_result: dict, file_path: str) -> dict:
@@ -418,82 +413,99 @@ class ResultDisplayMixin:
             print(f"切換到LOG標籤頁並聚焦錯誤失敗: {e}")
     
     def _insert_formatted_fail_content(self, content):
-        """插入格式化的FAIL內容，顯示所有錯誤"""
-        # 先插入標題
-        if hasattr(self, 'fail_error_text'):
-            self.fail_error_text.insert(tk.END, "===============錯誤原因====================\n", 'error_title')
+        """插入格式化的FAIL內容，使用 Bottom-up 優先級顯示錯誤（與 Excel 一致）"""
+        if not hasattr(self, 'fail_error_text'):
+            return
         
-            lines = content.split('\n')
-            error_lines = []
-            doesnt_match_lines = []
+        # 標題
+        self.fail_error_text.insert(tk.END, "═══════════════ 錯誤原因 ═══════════════\n\n", 'error_title')
+        
+        lines = content.split('\n')
+        
+        # === Bottom-up 優先級搜索（與 Excel 完全一致）===
+        primary_error_idx = None
+        error_type = None
+        
+        # 優先級 1: doesn't match
+        for i in range(len(lines)-1, -1, -1):
+            if "doesn't match" in lines[i].lower():
+                primary_error_idx = i
+                error_type = "DOESN'T MATCH"
+                break
+        
+        # 優先級 2: is Fail
+        if primary_error_idx is None:
+            for i in range(len(lines)-1, -1, -1):
+                if "is Fail" in lines[i]:
+                    primary_error_idx = i
+                    error_type = "IS FAIL"
+                    break
+        
+        # 優先級 3: All Test Aborted
+        if primary_error_idx is None:
+            for i in range(len(lines)-1, -1, -1):
+                if "All Test Aborted" in lines[i].lower():
+                    primary_error_idx = i
+                    error_type = "TEST ABORTED"
+                    break
+        
+        # 優先級 4: 其他關鍵錯誤
+        if primary_error_idx is None:
+            critical_keywords = ['Status:False', 'executes fail', 'FAIL', 'ERROR', 'NACK', 'TIMEOUT']
+            for keyword in critical_keywords:
+                for i in range(len(lines)-1, -1, -1):
+                    if keyword.lower() in lines[i].lower():
+                        primary_error_idx = i
+                        error_type = keyword.upper()
+                        break
+                if primary_error_idx is not None:
+                    break
+        
+        if primary_error_idx is None:
+            self.fail_error_text.insert(tk.END, "  未找到明確的錯誤原因\n", 'context_line')
+            return
+        
+        # === 提取錯誤區塊 (顯示指令到錯誤行) ===
+        # 往上找指令起點
+        block_start = primary_error_idx
+        for i in range(primary_error_idx, max(-1, primary_error_idx - 50), -1):
+            if '>' in lines[i] or 'Do @STEP' in lines[i]:
+                block_start = i
+                break
+        
+        # 往下延伸 2 行
+        block_end = min(len(lines), primary_error_idx + 2)
+        
+        # 顯示錯誤類型標籤
+        self.fail_error_text.insert(tk.END, f"🔴 發現錯誤 [{error_type}] (Line {primary_error_idx + 1})\n", 'highlight_title')
+        self.fail_error_text.insert(tk.END, "─" * 50 + "\n", 'separator')
+        
+        # 顯示錯誤區塊
+        for i in range(block_start, block_end):
+            line = lines[i]
+            prefix = "  >>> " if i == primary_error_idx else "      "
             
-            # 收集所有錯誤行，特別標記 "doesn't match"
-            for line in lines:
-                line_lower = line.lower()
-                
-                # 檢查不同類型的錯誤
-                if ("is Fail" in line or 
-                    any(critical_error in line_lower for critical_error in [
-                        'segmentation fault', 'core dumped', 'executes fail', 
-                        "doesn't match", 'timeout', 'exception'
-                    ]) or
-                    any(error_keyword in line_lower for error_keyword in [
-                        'error', 'fail', 'wrong'
-                    ]) or
-                    any(keyword in line_lower for keyword in [
-                        'errorcode:', 'test aborted', 'all test aborted'
-                    ])):
-                    error_lines.append(line)
-                    
-                    # 特別標記 "doesn't match" 相關行
-                    if "doesn't match" in line_lower:
-                        doesnt_match_lines.append(line)
-            
-            # 優先顯示 "doesn't match" 錯誤
-            if doesnt_match_lines:
-                self.fail_error_text.insert(tk.END, "\n🔴 突出錯誤 (doesn't match):\n", 'highlight_title')
-                for line in doesnt_match_lines:
-                    self.fail_error_text.insert(tk.END, line + '\n', 'doesnt_match_error')
-                self.fail_error_text.insert(tk.END, "\n" + "=" * 50 + "\n\n", 'separator')
-            
-            # 顯示所有其他錯誤行
-            for line in error_lines:
-                if line not in doesnt_match_lines:  # 避免重複顯示
-                    line_lower = line.lower()
-                    
-                    # 檢查不同類型的錯誤並用不同顏色標記
-                    if "is Fail" in line:
-                        # 主要錯誤：紅色粗體
-                        self.fail_error_text.insert(tk.END, line + '\n', 'fail_red')
-                    elif any(critical_error in line_lower for critical_error in [
-                        'segmentation fault', 'core dumped', 'executes fail', 
-                        'timeout', 'exception'
-                    ]):
-                        # 嚴重錯誤：深紅色粗體
-                        self.fail_error_text.insert(tk.END, line + '\n', 'critical_error')
-                    elif any(error_keyword in line_lower for error_keyword in [
-                        'error', 'fail', 'wrong'
-                    ]) and not "is Fail" in line:
-                        # 一般錯誤關鍵字：橙紅色
-                        self.fail_error_text.insert(tk.END, line + '\n', 'error_keyword')
-                    elif any(keyword in line_lower for keyword in [
-                        'errorcode:', 'test aborted', 'all test aborted'
-                    ]):
-                        # 錯誤代碼：橙色
-                        self.fail_error_text.insert(tk.END, line + '\n', 'error_code')
-                    else:
-                        # 其他錯誤：紅色
-                        self.fail_error_text.insert(tk.END, line + '\n', 'fail_red')
-            
-            # 設定不同的文字標籤樣式
-            self.fail_error_text.tag_configure('error_title', foreground='red', font=('Arial', 14, 'bold'))
-            self.fail_error_text.tag_configure('highlight_title', foreground='darkred', font=('Arial', 12, 'bold'))
-            self.fail_error_text.tag_configure('doesnt_match_error', foreground='darkred', font=('Consolas', 12, 'bold'), background='#FFE6E6')
-            self.fail_error_text.tag_configure('separator', foreground='gray', font=('Consolas', 10))
-            self.fail_error_text.tag_configure('fail_red', foreground='red', font=('Consolas', 12, 'bold'))
-            self.fail_error_text.tag_configure('critical_error', foreground='darkred', font=('Consolas', 12, 'bold'))
-            self.fail_error_text.tag_configure('error_keyword', foreground='orangered', font=('Consolas', 11, 'bold'))
-            self.fail_error_text.tag_configure('error_code', foreground='darkorange', font=('Consolas', 11, 'bold'))
+            # 錯誤行使用特殊樣式
+            if i == primary_error_idx:
+                self.fail_error_text.insert(tk.END, prefix + line + '\n', 'primary_error')
+            elif '>' in line or 'Do @STEP' in line:
+                self.fail_error_text.insert(tk.END, prefix + line + '\n', 'command_line')
+            else:
+                self.fail_error_text.insert(tk.END, prefix + line + '\n', 'context_line')
+        
+        self.fail_error_text.insert(tk.END, "=" * 50 + "\n", 'separator')
+        
+        # 設定標籤樣式（與 Excel 顏色一致）
+        self.fail_error_text.tag_configure('error_title', foreground='#000000', font=('Arial', 14, 'bold'))
+        self.fail_error_text.tag_configure('highlight_title', foreground='#FF0000', font=('Arial', 12, 'bold'))
+        self.fail_error_text.tag_configure('separator', foreground='gray', font=('Consolas', 10))
+        self.fail_error_text.tag_configure('primary_error', 
+                                         foreground='#C00000', 
+                                         font=('Consolas', 11, 'bold'), 
+                                         background='#FFE1E1')
+        self.fail_error_text.tag_configure('command_line', foreground='#007bff', font=('Consolas', 11, 'bold'))
+        self.fail_error_text.tag_configure('context_line', foreground='#333333', font=('Consolas', 10))
+        self.fail_error_text.tag_configure('error_code', foreground='darkorange', font=('Consolas', 11, 'bold'))
             
     def _clear_enhanced_results(self):
         """清除增強版分析結果（供左側按鈕呼叫）"""

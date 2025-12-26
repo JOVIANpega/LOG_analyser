@@ -94,6 +94,51 @@ class FailListBuilder:
             if not reason or reason == 'FAIL':
                 reason = primary_fail.get('response', '')
             
+            # === 新增：計算錯誤行在 Excel 中的實際位置 ===
+            error_excel_row = None
+            sheet_name = entry.get('sheet_name', '')
+            raw_lines = entry.get('raw_lines', [])
+            
+            if raw_lines and sheet_name:
+                # 使用與 FAIL Reason 相同的 bottom-up 優先級查找錯誤行
+                error_line_idx = None
+                dm_pattern = re.compile(r"doesn't match", re.IGNORECASE)
+                is_fail_pattern = re.compile(r"is Fail", re.IGNORECASE)
+                fail_pattern = re.compile(r"FAIL", re.IGNORECASE)
+                
+                # 優先級 1: doesn't match
+                for i in range(len(raw_lines)-1, -1, -1):
+                    if dm_pattern.search(raw_lines[i]):
+                        error_line_idx = i
+                        break
+                
+                # 優先級 2: is Fail
+                if error_line_idx is None:
+                    for i in range(len(raw_lines)-1, -1, -1):
+                        if is_fail_pattern.search(raw_lines[i]):
+                            error_line_idx = i
+                            break
+                
+                # 優先級 3: FAIL
+                if error_line_idx is None:
+                    for i in range(len(raw_lines)-1, -1, -1):
+                        if fail_pattern.search(raw_lines[i]):
+                            error_line_idx = i
+                            break
+                
+                # 計算 Excel 行號 (考慮 header_info 和其他偏移)
+                if error_line_idx is not None:
+                    # Row 1: [回到 Summary]
+                    # Row 3+: Header Info (假設 ~5 行)
+                    # 之後是錯誤預覽框 (如果有的話，動態計算)
+                    # 再之後是實際 Log
+                    # 簡化計算：假設 actual_log_start 約在第 10-15 行
+                    # 更精確的做法是從 entry 中取得，但目前先用估算
+                    header_info_lines = len(entry.get('header_info', '').split('\n')) if entry.get('header_info') else 3
+                    error_preview_lines = 10  # 錯誤預覽框估計佔用行數
+                    actual_log_start = 1 + 1 + header_info_lines + error_preview_lines
+                    error_excel_row = actual_log_start + error_line_idx
+            
             # 統計
             error_counts[fail_item_str] = error_counts.get(fail_item_str, 0) + 1
             
@@ -103,7 +148,9 @@ class FailListBuilder:
                 'item': fail_item_str,
                 'reason': reason,
                 'suggestion': suggestion,
-                'norm_key': fail_item_str
+                'norm_key': fail_item_str,
+                'sheet_name': sheet_name,  # ⚠️ 新增
+                'error_row': error_excel_row  # ⚠️ 新增
             })
         
         # 2. 排序資料 (依內容分類，讓同類型錯誤擺在一起)
@@ -127,7 +174,15 @@ class FailListBuilder:
             for col_idx, value in enumerate(row_values, 1):
                 cell = ws.cell(row=current_row, column=col_idx)
                 cell.font = self.content_font
-                if col_idx in (1, 2, 3, 6): # ISN, Station, FAIL Item, Count 不換行且置中
+                
+                # === ISN 列添加超鏈接 (跳轉到錯誤行) ===
+                if col_idx == 1 and row_data.get('sheet_name') and row_data.get('error_row'):
+                    target_sheet = row_data['sheet_name']
+                    target_row = row_data['error_row']
+                    cell.hyperlink = f"#'{target_sheet}'!A{target_row}"
+                    cell.font = Font(name='Consolas', size=12, color='0563C1', underline='single', bold=True)
+                    cell.alignment = self.center_align
+                elif col_idx in (1, 2, 3, 6): # ISN, Station, FAIL Item, Count 不換行且置中
                     cell.alignment = self.center_align
                 elif col_idx == 4: # FAIL Reason 換行且靠上
                     cell.alignment = self.top_left_align
@@ -145,9 +200,7 @@ class FailListBuilder:
         }
         auto_fit_columns(ws, min_widths=min_widths)
         
-        # 4. 添加統計圖表
-        if error_counts:
-            self._add_pie_chart(ws, error_counts)
+        # 圓餅圖已移除（使用者要求簡化報表）
             
         return ws
 
