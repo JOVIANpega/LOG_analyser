@@ -8,7 +8,7 @@ import os
 import time
 import traceback
 from datetime import datetime
-from openpyxl.styles import Font, Alignment
+from openpyxl.styles import Font, Alignment, PatternFill
 
 # Local imports
 from .excel_utils import (
@@ -127,20 +127,37 @@ class ExcelWriter:
         return safe_save_workbook(wb, output_path)
 
     def _write_detailed_log(self, ws, entry):
-        """寫入詳細的 LOG 內容與標註 (維持穩定性，移除高風險內部連結)"""
-        # 依照使用者要求，優先確保檔案開啟穩定度，移除可能導致 XML 損毀的跳轉連結
+        """寫入詳細的 LOG 內容與標註 (同步 GUI 外觀並補回超連結)"""
         
-        # 1. 置頂資訊 (取代原本的 Jump 連結)
+        # 1. 置頂 [回到 Summary] 連結 - Font 16, 深藍底白字
+        link_font = Font(name='Calibri', size=16, bold=True, color="FFFFFF", underline="single")
+        deep_blue_fill = PatternFill('solid', fgColor='000080')
+        
+        c_top = ws.cell(row=1, column=1, value="[回到 Summary]")
+        c_top.hyperlink = f"#'Summary'!A1"
+        c_top.font = link_font
+        c_top.fill = deep_blue_fill
+        c_top.alignment = Alignment(horizontal='center')
+        
+        # 2. 置頂資訊
         header_info = entry.get('header_info', '')
-        curr_row = insert_header_info(ws, header_info, start_row=1)
+        curr_row = insert_header_info(ws, header_info, start_row=3)
         
-        # 2. 原始 LOG
+        # 3. 原始 LOG (帶有 Premium 背景顏色與文字顏色)
         raw_lines = entry.get('raw_lines', [])
         annotations = entry.get('ui_annotations', [])
         fail_items = entry.get('fail_items', []) 
-        content_font = Font(name='Calibri', size=11)
+        content_font = Font(name='Consolas', size=11)
         
-        write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=fail_items)
+        last_row = write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=fail_items)
+        
+        # 4. 置底 [回到 Summary] 連結 - Font 16, 深藍底白字
+        bottom_row = last_row + 2
+        c_bot = ws.cell(row=bottom_row, column=1, value="[回到 Summary]")
+        c_bot.hyperlink = f"#'Summary'!A1"
+        c_bot.font = link_font
+        c_bot.fill = deep_blue_fill
+        c_bot.alignment = Alignment(horizontal='center')
         
         auto_fit_columns(ws, {1: 100})
 

@@ -3,156 +3,150 @@
 Sheet Builder Module
 Handles detailed log writing and annotation.
 """
+import re
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.cell.rich_text import CellRichText, TextBlock
 from openpyxl.cell.text import InlineFont
 from .excel_utils import sanitize_cell_text
 
-def _get_rich_text_for_line(text, keywords, base_font, highlight_color='FF0000'):
-    """將特定關鍵字轉換為紅色的 CellRichText"""
-    if not text:
-        return ""
-    
-    import re
-    # 建立正則表達式，忽略大小寫
-    pattern = re.compile(f'({"|".join(map(re.escape, keywords))})', re.IGNORECASE)
-    parts = pattern.split(text)
-    
-    if len(parts) <= 1:
-        return text # 沒有關鍵字，回傳純文字節省資源
-        
-    rich_text_elements = []
-    # InlineFont 使用 rFont 而非 name，sz 而非 size
-    h_font = InlineFont(rFont=base_font.name, sz=base_font.size, b=True, color=highlight_color)
-    d_font = InlineFont(rFont=base_font.name, sz=base_font.size, color=base_font.color.rgb if base_font.color else '000000')
-    
-    for part in parts:
-        if not part: continue
-        if pattern.fullmatch(part):
-            rich_text_elements.append(TextBlock(h_font, part))
-        else:
-            rich_text_elements.append(part)
-            
-    return CellRichText(rich_text_elements)
-
 def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotations: list, font, fail_items=None):
-    """將原始 LOG 與顏色標籤寫入 Excel (加強：整區塊變紅)"""
+    """將原始 LOG 與顏色標籤寫入 Excel (同步 GUI 的 Premium 外觀)"""
     color_map = {
         'black': 'FF000000',
-        'red': 'FFE74C3C',
-        'green': 'FF2ECC71',
-        'blue': 'FF3498DB',
-        'purple': 'FF9B59B6',
+        'red': 'FFFF0000',
+        'green': 'FF28a745',
+        'blue': 'FF007bff',
+        'purple': 'FF6f42c1',
+        'pink': 'FFe83e8c'
     }
     
-    error_line_found = False
-    first_error_row = None
+    # 建立一個索引查表
+    anno_lookup = {a['line_idx']: a for a in annotations}
     
-    # 關鍵字清單
-    error_keywords = ['error', 'fail', 'doesn\'t', 'failed', 'timeout', 'exception']
-    
-    # --- 步驟 A: 預先計算「錯誤區塊」範圍 ---
-    # 我們定義一個區塊是從 > (下指令) 開始到下一個指令或 @STEP 前
-    fail_indices = set()
-    
-    # 1. 標記所有包含關鍵字的行
-    raw_error_idxs = []
-    for idx, line in enumerate(raw_lines):
-        if any(kw in line.lower() for kw in error_keywords):
-            raw_error_idxs.append(idx)
-            
-    # 2. 擴展到整組指令區塊
-    # 如果從 parser 拿到了 fail_items 則優先使用精確範圍
-    if fail_items:
-        for it in fail_items:
-            s, e = it.get('start_idx'), it.get('end_idx')
-            if s is not None and e is not None:
-                for i in range(s, e + 1):
-                    fail_indices.add(i)
-    else:
-        # 自行偵測語境下的區塊
-        for err_idx in raw_error_idxs:
-            # 往上找指令開始 (>)
-            block_start = err_idx
-            for i in range(err_idx, max(0, err_idx - 50), -1):
-                if '>' in raw_lines[i] or '@STEP' in raw_lines[i]:
-                    block_start = i
-                    break
-            # 往下找直到結束或下一指令
-            block_end = err_idx
-            for i in range(err_idx, min(len(raw_lines), err_idx + 30)):
-                if 'All Test Aborted' in raw_lines[i] or 'executes fail' in raw_lines[i] or 'root@' in raw_lines[i]:
-                    block_end = i
-                    break
-                elif i > err_idx and ('>' in raw_lines[i] or '@STEP' in raw_lines[i]):
-                    block_end = i - 1
-                    break
-                block_end = i
-            
-            for i in range(block_start, block_end + 1):
-                fail_indices.add(i)
+    # 優先級偵測錯誤點：DOESN'T MATCH > FAIL/ERROR (從最下面往上找，才是真實報錯位置)
+    error_line_idx = None
+    dm_pattern = re.compile(r"doesn't match", re.IGNORECASE)
+    fe_pattern = re.compile(r"fail|error", re.IGNORECASE)
 
-    # --- 步驟 B: 寫入 Excel ---
-    for i, raw in enumerate(raw_lines, start=start_row):
-        src_idx = i - start_row
-        line = str(raw)
-        
-        # 標題及標註內容
-        found_anno = None
-        for anno in annotations:
-            if anno.get('line_idx') == src_idx:
-                found_anno = anno
+    # 1. 先找 DOESN'T MATCH (Bottom-up)
+    for i in range(len(raw_lines)-1, -1, -1):
+        if dm_pattern.search(raw_lines[i]):
+            error_line_idx = i
+            break
+    
+    # 2. 如果沒找到，找 FAIL/ERROR (Bottom-up)
+    if error_line_idx is None:
+        for i in range(len(raw_lines)-1, -1, -1):
+            if fe_pattern.search(raw_lines[i]):
+                error_line_idx = i
                 break
+    
+    # 3. 擷取錯誤區塊文字 (用於置頂顯示預覽)
+    error_block_preview = []
+    if error_line_idx is not None:
+        b_start = error_line_idx
+        for j in range(error_line_idx, max(-1, error_line_idx - 20), -1):
+            if '>' in raw_lines[j] or 'Do @STEP' in raw_lines[j]:
+                b_start = j
+                break
+        b_end = error_line_idx
+        for j in range(error_line_idx, min(len(raw_lines), error_line_idx + 10)):
+            b_end = j
+            if j > error_line_idx and ('>' in raw_lines[j] or 'Do @STEP' in raw_lines[j]):
+                b_end = j - 1
+                break
+            if 'Test Completed' in raw_lines[j] or 'executes fail' in raw_lines[j]:
+                break
+        error_block_preview = raw_lines[b_start : b_end + 1]
+
+    # --- 步驟 A: 預先計算置頂區塊高度 ---
+    curr_h_row = start_row # 通常是 3 或更高
+    
+    # 佔位：如果有的話，寫入提示與預覽
+    if error_line_idx is not None:
+        # A2 在 excel_writer 中已經被 [回到 Summary] 佔用了？ 
+        # 不，excel_writer 呼叫時 start_row=3。
+        # A1: [Back to Summary]
+        # A2: 空
+        # A3: Header Info start
+        # 所以 start_row 會由 insert_header_info 回傳。
+        pass
+
+    # --- 步驟 B: 寫入預覽區塊 ---
+    preview_rows_count = 0
+    if error_line_idx is not None:
+        # [ 直接前往錯誤點 ]
+        jump_cell = ws.cell(row=curr_h_row, column=1, value="[ 發現錯誤點 ] (點擊跳轉至 Log 正確位置)")
+        jump_cell.font = Font(name='Calibri', size=11, bold=True, color="FF0000", underline="single")
+        # 暫時用佔位符列號，稍後計算 actual_log_start 後再修正 hyperlink
+        p_row_jump = curr_h_row
+        curr_h_row += 1
         
-        # 樣式決策
-        bg_color = None
-        font_color = color_map['black']
+        if error_block_preview:
+            pink_fill = PatternFill('solid', fgColor='FFFFE1E1')
+            for line_p in error_block_preview:
+                cp = ws.cell(row=curr_h_row, column=1, value="  >> " + sanitize_cell_text(line_p))
+                cp.font = Font(name='Consolas', size=10, color='FFC00000', bold=True)
+                cp.fill = pink_fill
+                curr_h_row += 1
+            curr_h_row += 1 # 留空行
+    
+    actual_log_start = curr_h_row
+    
+    # --- 步驟 C: 更新 Hyperlink ---
+    if error_line_idx is not None:
+        error_excel_row = actual_log_start + error_line_idx
+        ws.cell(row=p_row_jump, column=1).value = f"[ 直接前往錯誤點 (Row {error_excel_row}) ]"
+        ws.cell(row=p_row_jump, column=1).hyperlink = f"#'{ws.title}'!A{error_excel_row}"
+
+    # --- 步驟 D: 寫入正式 Log ---
+    current_bg_color = None
+    step_bg_1 = 'FFE8F4FD' 
+    step_bg_2 = 'FFF0E8FF' 
+
+    for i, raw in enumerate(raw_lines):
+        row_idx = actual_log_start + i
+        line = str(raw)
+        anno = anno_lookup.get(i, {})
+        
+        if anno.get('show_separator'):
+            title = anno.get('separator_title', 'PHASE')
+            sep_cell = ws.cell(row=row_idx, column=1, value=f" --   [ {title} ]")
+            sep_cell.font = Font(name='Consolas', size=12, bold=True, color='FFFFFF')
+            sep_cell.fill = PatternFill('solid', fgColor='FF2E7D32') 
+            sep_cell.alignment = Alignment(horizontal='center')
+            continue 
+
+        cell = ws.cell(row=row_idx, column=1)
+        cell.value = sanitize_cell_text(line)
+        
+        txt_color_name = anno.get('color', 'black')
+        txt_color = color_map.get(txt_color_name, color_map['black'])
+        bg_hex = anno.get('background', 'white')
         is_bold = False
         
-        # 1. 區塊紅字邏輯 (使用者要求：整區塊變紅)
-        is_in_fail_block = src_idx in fail_indices
-        if is_in_fail_block:
-            font_color = 'FFFF0000' # 紅色
+        if bg_hex == '#FFCCCC' or txt_color_name == 'red':
+            txt_color = color_map['red']
+            bg_hex = 'FFFFCCCC'
             is_bold = True
-            
-            # 如果這行本身就是錯誤點，給點背景色
-            if any(kw in line.lower() for kw in error_keywords):
-                bg_color = 'FFFFFF00' # 正黃色加強
-                if not error_line_found:
-                    first_error_row = i
-                    error_line_found = True
         
-        # 2. 標籤覆蓋
-        if found_anno:
-            # 只有在不是失敗區塊的情況下才由標籤決定顏色，或是保留標籤顏色
-            if not is_in_fail_block:
-                c_name = found_anno.get('color')
-                if c_name in color_map: font_color = color_map[c_name]
-            
-            target_bg = found_anno.get('background')
-            if target_bg and target_bg.startswith('#'):
-                bg_color = 'FF' + target_bg[1:]
-        
-        # 3. 寫入儲存格
-        clean_line = sanitize_cell_text(line)
-        cell = ws.cell(row=i, column=1)
-        cell.value = clean_line # 暫時取消 Rich Text，避免 Excel XML 損毀
-        
-        # 套用儲存格樣式
-        cell.font = Font(name=font.name, size=font.size, color=font_color, bold=is_bold)
-        if bg_color:
-            cell.fill = PatternFill('solid', fgColor=bg_color)
-            
-    if first_error_row:
-        # 內頁跳轉：使用簡單 A{row} 形式，減少跨頁公式錯誤
-        ws.cell(row=1, column=1).value = f"Jump to Error (A{first_error_row})"
-        ws.cell(row=1, column=1).hyperlink = f"A{first_error_row}" # 本頁跳轉不需要 #'Title'!
-        ws.cell(row=1, column=1).font = Font(color="0000FF", underline="single")
+        if bg_hex == 'white' or bg_hex is None:
+            if 'Do @STEP' in line:
+                current_bg_color = step_bg_1 if current_bg_color != step_bg_1 else step_bg_2
+            if current_bg_color:
+                cell.fill = PatternFill('solid', fgColor=current_bg_color)
+        else:
+            if bg_hex.startswith('#'):
+                cell.fill = PatternFill('solid', fgColor='FF' + bg_hex[1:])
+                
+        cell.font = Font(name='Consolas', size=10, color=txt_color, bold=is_bold)
+
+    return actual_log_start + len(raw_lines)
 
 def insert_header_info(ws, header_info, start_row=4):
     """插入置頂 Header 資訊"""
     if not header_info:
-        return
+        return start_row
         
     lines = header_info.split('\n')
     header_font = Font(name='Consolas', size=14, bold=True, color='000000')

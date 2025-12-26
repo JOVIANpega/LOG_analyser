@@ -6,20 +6,26 @@ Excel工具函數模組
 import re
 import os
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+from datetime import datetime
 
 def sanitize_cell_text(value: object) -> str:
     """
     清理欲寫入儲存格的文字：
-    - 轉為字串
-    - 移除非法控制字元 (openpyxl 限制)
-    - 去除 ANSI/ESC 序列
-    - 截斷過長文字 (3 萬字元)
+    - 轉為字串並處理 Excel 公式偵測問題 (避免 = 開頭導致損毀)
+    - 移除非法控制字元
+    - 截斷過長文字
     """
     if value is None:
         return ""
     
     text = str(value)
     
+    # --- 關鍵修正：防止 Excel 將 Log 誤認為公式 ---
+    # 如果內容以 '=' 開頭，Excel 會嘗試當作公式解析，這在 Log 中極易導致檔案損毀。
+    # 加入前綴單引號 (') 是 Excel 官方推薦的轉義純文字方法。
+    if text.startswith('='):
+        text = "'" + text
+
     # 移除 ANSI/ESC 序列
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     text = ansi_escape.sub('', text)
@@ -91,10 +97,11 @@ def sanitize_sheet_title(title: str) -> str:
     
     # 限制長度
     if len(title) > 31:
-        title = title[:28] + "..."
+        title = title[:30]
     
-    # 確保不以點號開頭或結尾
-    title = title.strip(". ")
+    # 截斷後確保不以點號或底線結尾，並移除點號 (避免 Excel 解析超連結出錯)
+    title = title.replace(".", "_")
+    title = title.strip("_ ")
     
     return title.strip() if title.strip() else "Sheet"
 

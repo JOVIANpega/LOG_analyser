@@ -15,7 +15,10 @@ class LogParser:
         self.resp_pattern = re.compile(r'(?:\([A-Za-z0-9_ ]+\)|\[[A-Za-z0-9_ ]+\])?\s*<\s*(.+)')
         self.retry_pattern = re.compile(r'Retry:\s*(\d+)')
         self.root_pattern = re.compile(r'root@.*:/root\$')
-        self.fail_keywords = ['FAIL', 'FAILED', 'ERROR', 'failed', 'error', 'NACK', 'timeout']
+        self.fail_keywords = [
+            'FAIL', 'FAILED', 'ERROR', 'failed', 'error', 'NACK', 'timeout', 
+            "doesn't match", "does not match", "Status:False"
+        ]
         self.phase_pattern = re.compile(r'Execute (Phase \d+ Test)', re.IGNORECASE)
 
     def parse_log_file(self, file_path):

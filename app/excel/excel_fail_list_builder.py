@@ -54,41 +54,57 @@ class FailListBuilder:
         error_counts = {}
         
         for entry in logs:
-            fail_items = entry.get('fail_items', [])
-            if not fail_items:
+            # --- 核心改進：每份 Log 僅在 FAIL_LIST 記錄一個「最主要」的錯誤 ---
+            # 優先使用 parser 判定出的 last_fail (內含優先級邏輯)
+            primary_fail = entry.get('last_fail')
+            
+            # 如果沒有判定出 Last Fail，則從 fail_items 中抓取最後一項
+            if not primary_fail and entry.get('fail_items'):
+                primary_fail = entry['fail_items'][-1]
+            
+            if not primary_fail:
                 continue
                 
             fname = entry.get('file_name', entry.get('filename', ''))
             isn = extract_isn_from_filename(fname)
             station = extract_station_from_filename(fname)
             suggestion = "請參閱 PEGA SOP"
+
+            # 提取 Item 名稱
+            step_name = primary_fail.get('step_name', '')
+            result_val = primary_fail.get('result', '')
+            fail_item_str = f"{step_name}"
+            if result_val and result_val not in step_name:
+                 fail_item_str += f" {result_val}"
             
-            for item in fail_items:
-                step_name = item.get('step_name', '')
-                result = item.get('result', '')
-                fail_item_str = f"{step_name}"
-                if result and result not in step_name:
-                     fail_item_str += f" {result}"
-                
-                # 清理 Item 名稱：移除冗餘的 FAIL/is Fail
-                fail_item_str = re.sub(r'\s+\b(is\s+)?FAIL\b.*$', '', fail_item_str, flags=re.IGNORECASE).strip()
-                fail_item_str = fail_item_str.strip() or "Unknown Item"
-                
-                reason = item.get('error', '')
-                if not reason or reason == 'FAIL':
-                    reason = item.get('response', '')
-                
-                # 統計
-                error_counts[fail_item_str] = error_counts.get(fail_item_str, 0) + 1
-                
-                pending_rows.append({
-                    'isn': isn,
-                    'station': station,
-                    'item': fail_item_str,
-                    'reason': reason,
-                    'suggestion': suggestion,
-                    'norm_key': fail_item_str
-                })
+            # 清理 Item 名稱
+            fail_item_str = re.sub(r'\s+\b(is\s+)?FAIL\b.*$', '', fail_item_str, flags=re.IGNORECASE).strip()
+            fail_item_str = fail_item_str.strip() or "Unknown Item"
+            
+            # 從該失敗項目的 Log 中尋找最真實的 Reason (優先搜尋 DOESN'T MATCH)
+            reason = ""
+            full_log = primary_fail.get('full_log', [])
+            for log_line in reversed(full_log):
+                if "doesn't match" in log_line.lower():
+                    reason = log_line.strip()
+                    break
+            
+            if not reason:
+                reason = primary_fail.get('error', '')
+            if not reason or reason == 'FAIL':
+                reason = primary_fail.get('response', '')
+            
+            # 統計
+            error_counts[fail_item_str] = error_counts.get(fail_item_str, 0) + 1
+            
+            pending_rows.append({
+                'isn': isn,
+                'station': station,
+                'item': fail_item_str,
+                'reason': reason,
+                'suggestion': suggestion,
+                'norm_key': fail_item_str
+            })
         
         # 2. 排序資料 (依內容分類，讓同類型錯誤擺在一起)
         pending_rows.sort(key=lambda x: (x['item'], x['isn']))
@@ -171,11 +187,12 @@ class FailListBuilder:
                 c2.alignment = self.center_align
                 c3.alignment = self.center_align
             
-            # 圖表
-            chart = PieChart()
+            # 圖表美化：選用樣式 7
+            from openpyxl.chart import PieChart3D
+            chart = PieChart3D()
             chart.title = "FAIL Item 佔比統計"
-            chart.style = 10 
-            chart.legend = None # 不顯示圖例 (數列1, 數列2...)
+            chart.style = 7   # 依照要求改為樣式 7
+            chart.legend = None # 確保隱藏圖例 (Series XX)
             
             max_r = summary_start_row + len(error_counts) - 1
             data = Reference(ws, min_col=2, min_row=summary_start_row, max_row=max_r)
@@ -184,30 +201,29 @@ class FailListBuilder:
             chart.add_data(data, titles_from_data=False)
             chart.set_categories(cats)
             
-            # 設定 Data Labels 格式
+            # 設定 Data Labels 格式 (顯示項目, 數量, 百分比)
             chart.dataLabels = DataLabelList()
             chart.dataLabels.showPercent = True
             chart.dataLabels.showCatName = True
-            chart.dataLabels.showSerName = False 
+            chart.dataLabels.showVal = True 
+            chart.dataLabels.showSerName = False # 確保不顯示數列名稱
+            chart.dataLabels.separator = ", "
             
-            # 設定字體大小 (14pt)
+            # 設定字體強制為 Calibri 14pt 加粗
             try:
-                from openpyxl.drawing.text import CharacterProperties, Paragraph, ParagraphProperties, RichTextProperties
-                
-                # 字體大小設定 (1400 = 14pt)，並加粗
-                cp = CharacterProperties(sz=1400, b=True)
+                from openpyxl.drawing.text import CharacterProperties, Paragraph, ParagraphProperties, RichTextProperties, Font as DrawingFont
+                cp = CharacterProperties(sz=1400, b=True, latin=DrawingFont(typeface='Calibri'))
                 chart.dataLabels.txPr = RichTextProperties(p=[Paragraph(pPr=ParagraphProperties(defRPr=cp), endParaRPr=cp)])
-                
             except Exception as e:
                 print(f"[DEBUG] 設定圖表字體失敗: {e}")
             
-            # 設定高度與寬度
+            # 調整圖表大小
             chart.height = 13
-            chart.width = 18
+            chart.width = 20
             
-            # 放置在表格下方 (數據結束行 + 6，即空5行)
-            # 表格佔用 Col 1-3，圖表放在 Col A 會比較整齊
             chart_row = max_r + 6
             ws.add_chart(chart, f"A{chart_row}")
         except Exception as e:
             print(f"[WARNING] 圓餅圖生成失敗: {e}")
+            import traceback
+            traceback.print_exc()

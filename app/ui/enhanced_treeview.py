@@ -434,10 +434,10 @@ class EnhancedTreeview:
         clean_name = phase_name.strip()
         values = [clean_name] + [""] * (columns_count - 1)
         
-        # 設定標籤和顏色 - 依要求移除亮綠色背景，改為黑色加粗
+        # 設定標籤和顏色 - 移除粗體，改回正常
         self.tree.tag_configure('phase_header', 
                              foreground='black', 
-                             font=('Arial', self.font_size, 'bold'))
+                             font=('Arial', self.font_size, 'normal'))
         
         item_id = self.tree.insert('', 'end', values=tuple(values), tags=('phase_header',))
         return item_id
