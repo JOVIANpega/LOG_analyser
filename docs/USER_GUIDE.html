@@ -210,7 +210,9 @@
         <li><a href="#section5">五、匯出 Excel</a></li>
         <li><a href="#section6">六、常見問題</a></li>
         <li><a href="#section7">七、新功能說明</a></li>
-        <li><a href="#section9">八、V2.0.0 重大更新</a></li>
+        <li><a href="#section8">八、V1.9.0 回顧</a></li>
+        <li><a href="#section9">九、V2.0.0 重大更新</a></li>
+        <li><a href="#section10">十、V2.1.0 視覺簡化與體驗升級</a></li>
       </ul>
     </div>
 
@@ -219,15 +221,18 @@
     <div class="section" id="section1">
       <h2>一、左側按鈕區</h2>
       <ul>
-        <li><strong>📁 選擇檔案 (Log/壓縮檔)</strong>：挑一個或多個 <code>.log</code> 或壓縮檔進行分析。支援一次載入多份 Log。</li>
-        <li><strong>📂 選擇資料夾 (自動識別)</strong>：一次分析資料夾內所有檔案。</li>
+        <li><strong>📂 選擇 LOG 來源 (檔案/資料夾)</strong>：整合型智能按鈕。點擊後可選擇：
+          <ul>
+            <li>📄 <strong>選擇檔案</strong>：挑選單個或多個 <code>.log</code>、壓縮檔 (zip/7z/rar)。</li>
+            <li>📁 <strong>選擇資料夾</strong>：批次分析資料夾內所有檔案。</li>
+          </ul>
+        </li>
+        <li><strong>📊 CSV檔案整理</strong>：選擇目錄自動搜尋 CSV 檔案並整理。</li>
         <li><strong>🗑️ 清除結果</strong>：清空所有顯示結果與暫存狀態。</li>
         <li><strong>🔍 搜尋功能</strong>：輸入關鍵字後可跨標籤頁搜尋，找到的文字會以黃底高亮顯示。</li>
-        <li><strong>⚡ 執行中動畫</strong>：當分析檔案開始時，左側 Owl Logo 與標題「PEGA LOG ANALYZER」會呈現顯眼的<strong>綠/黃</strong>色彩閃爍，代表正在運算中。
-        </li>
         <li><strong>📖 查看操作說明(HTML)</strong>：點擊即可開啟本頁面進行快速查閱。</li>
       </ul>
-      <p class="tip">移除原有的狀態指示燈，改以標題閃爍作為主要的處理中視覺回饋。</p>
+      <p class="tip">移除原有的多個繁雜按鈕，整合為單一入口，操作更直覺。</p>
     </div>
 
     <div class="section" id="section2">
@@ -244,49 +249,40 @@
       <ul>
         <li>畫面上下分割：</li>
         <ul>
-          <li><strong>上方表格</strong>：欄位為 <strong>Step Name / 指令 / 錯誤回應 / Retry次數 / 錯誤原因</strong>。</li>
-          <li><strong>下方區域</strong>：顯示詳細錯誤內容，含紅色標示的 <em>is Fail</em> 文字。</li>
+          <li><strong>上方表格</strong>：顯示失敗的測項。</li>
+          <li><strong>下方區域</strong>：顯示詳細錯誤內容。採用 <strong>Bottom-up</strong> 智能分析，只顯示最關鍵的錯誤原因（如 <em>doesn't match</em>）。
+          </li>
         </ul>
-        <li>點選上方任一列，會即時更新下方詳細內容。</li>
-        <li>打開檔案時會自動選取第一筆 FAIL 方便查看。</li>
+        <li><strong>色彩標示</strong>：主要錯誤會以紅色文字搭配粉紅背景顯示，與 Excel 報表完全一致。</li>
       </ul>
     </div>
 
     <div class="section" id="section4">
       <h2>四、📄 原始LOG 標籤頁</h2>
       <ul>
-        <li>顯示完整原始 LOG 文字，採用<strong>高效率線性顯式</strong>。</li>
-        <li><strong>自動聚焦</strong>：切換到此標籤頁時，程式會自動尋找第一個錯誤行（如 FAIL 或 Exception）並捲動到該位置。</li>
-        <li><strong>滑鼠懸停高亮</strong>：滑鼠滑過的行會即時加亮（優化後的局部更新技術，即使萬行 Log 也不卡頓）。</li>
-        <li><strong>醒目標示</strong>：FAIL/ERROR 區域會以淺紅色背景標註，方便一眼看出故障範圍。</li>
+        <li><strong>錯誤區塊置頂預覽 (New)</strong>：打開原始 LOG 時，系統會自動將錯誤發生的指令區塊（從下指令到錯誤結束）直接複製顯示在最頂端，無需捲動即可看到原因。</li>
+        <li><strong>視覺簡化</strong>：移除斑馬紋背景，採用更清晰的白底。</li>
+        <li><strong>自動聚焦</strong>：自動捲動到第一個錯誤行。</li>
+        <li><strong>滑鼠懸停高亮</strong>：滑鼠滑過的行會即時加亮。</li>
       </ul>
-      <p class="tip">考慮到穩定性，新版本已移除舊有的摺疊功能，改以色彩標註與快速對焦替代。</p>
+      <p class="tip">新版本移除舊有的摺疊與斑馬紋功能，改以色彩標註與置頂預覽替代，提升可讀性。</p>
     </div>
 
     <div class="section" id="section5">
       <h2>五、匯出 Excel（僅「選擇資料夾」時自動執行）</h2>
       <ul>
         <li>輸出路徑：所選資料夾內的 <code>LOG集總整理/</code>。</li>
-        <li><strong>PASS匯總.xlsx</strong>：
-          <ul>
-            <li>Summary 工作表：
-              <ul>
-                <li>精簡化欄位：<strong>檔名 / 腳本檔案 / SFIS / 測試總時間</strong>。</li>
-                <li>自動美化：針對長路徑自動調整欄寬。檔名欄支援超連結點擊跳轉，並具備懸停預覽內容功能。</li>
-              </ul>
-            </li>
-            <li>各 LOG 工作表：第 1 行檔名（綠底白字），第 2 行 PASS 項目清單，第 3 行起貼上原始 LOG。</li>
-          </ul>
-        </li>
+        <li><strong>PASS匯總.xlsx</strong>： Summary 工作表與詳細 LOG。</li>
         <li><strong>FAIL匯總.xlsx</strong>：
           <ul>
-            <li><strong>FAIL_LIST 工作表 (優化)</strong> ⭐：
+            <li><strong>FAIL_LIST 工作表</strong>：
               <ul>
-                <li>依 <strong>FAIL Item</strong> 自動記數與排名。系統會自動移除項目名稱中冗餘的 "FAIL" 字眼，使報表更易讀。</li>
-                <li>提供錯誤排名統計表格與橫條圖 (Bar Chart)，快速定位高頻 Fail 項目。</li>
+                <li>列出所有失敗項目與原因。</li>
+                <li><strong>ISN 超連結 (New)</strong>：點擊 ISN 序號，可直接跳轉到該 LOG 工作表中錯誤發生的確切行數。</li>
+                <li><span style="color: grey; text-decoration: line-through;">圓餅圖</span> (已移除以簡化報表)。</li>
               </ul>
             </li>
-            <li>Summary 工作表：提供所有檔案的 FAIL 原因總覽。</li>
+            <li>風格統一：所有錯誤行與區塊均使用紅色文字與粉紅背景，與 GUI 保持一致。</li>
           </ul>
         </li>
       </ul>
@@ -488,6 +484,29 @@
         <li><strong>區塊級高亮</strong>：若一個指令步區塊發生錯誤，整段文字將以**紅色加粗**顯示。</li>
         <li><strong>精確錯誤背景</strong>：發生錯誤的那一行會額外增加**黃色背景**，幫助您精確鎖定失敗點。</li>
         <li><strong>富文本支援</strong>：一般行內的錯誤關鍵字（如 fail, nack）會單獨以紅色高亮顯示。</li>
+      </ul>
+    </div>
+
+    <div class="section" id="section10">
+      <h2>十、V2.1.0 視覺簡化與體驗升級 ⭐ (2025-12-26)</h2>
+
+      <h3>🎨 視覺降噪 (Visual Simplification)</h3>
+      <ul>
+        <li><strong>移除斑馬紋</strong>：全面移除 GUI 與 Excel 中的藍紫相間斑馬紋，回歸乾淨白底，減少視覺疲勞。</li>
+        <li><strong>精確錯誤高亮</strong>：
+          <ul>
+            <li><strong>Doesn't match 區塊</strong>：從下指令到錯誤結束的整段文字，統一使用<strong>粉紅背景 + 紅色粗體</strong>標示。</li>
+            <li><strong>單行錯誤</strong>：FAIL/ERROR/NACK 等關鍵字行單獨紅底高亮。</li>
+          </ul>
+        </li>
+      </ul>
+
+      <h3>🚀 操作體驗升級</h3>
+      <ul>
+        <li><strong>錯誤置頂預覽</strong>：在 GUI「原始 LOG」分頁，錯誤發生的過程直接「置頂顯示」，一眼看到原因。</li>
+        <li><strong>单一智能按鈕</strong>：左側按鈕整併為「📂 選擇 LOG 來源」，支援所有類型檔案與資料夾。</li>
+        <li><strong>GUI/Excel 邏輯同步</strong>：確保 GUI 看到的錯誤原因與 Excel 報表完全一致（嚴格遵循 Bottom-up 優先級）。</li>
+        <li><strong>Excel 超連結優化</strong>：FAIL_LIST 的 ISN 序號現在是超連結，點擊直接跳轉到錯誤行。</li>
       </ul>
     </div>
 
