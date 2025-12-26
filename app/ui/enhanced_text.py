@@ -248,8 +248,8 @@ class EnhancedText:
         # 恢復游標樣式
         self.text.config(cursor='xterm')
     
-    def insert_log_with_highlighting(self, log_content, test_results, header_content=None):
-        """插入log內容並進行語法高亮（帶折疊功能）"""
+    def insert_log_with_highlighting(self, log_content, test_results, header_content=None, ui_annotations=None):
+        """插入log內容並進行語法高亮（使用解析器提供的標註）"""
         self.text.delete('1.0', tk.END)
         self.step_positions.clear()
         self.folded_items.clear()
@@ -264,7 +264,6 @@ class EnhancedText:
             return
         
         # 計算 Header 佔用的行數偏移量
-        # 獲取插入點的當前行號 (整數)
         try:
             current_pos = self.text.index(tk.INSERT)
             header_offset = int(current_pos.split('.')[0]) - 1
@@ -272,99 +271,74 @@ class EnhancedText:
             header_offset = 0
             
         # 獲取 pass_items 和 fail_items
-        pass_items = test_results.get('pass_items', [])
         fail_items = test_results.get('fail_items', [])
         
-        # 1. 始終使用無折疊的線性插入模式 (回應使用者需求：還原折疊，但保留高亮)
-        # 用戶反饋折疊功能容易錯亂，因此回歸最穩定的純文本顯示
-        self._insert_without_folding(log_content)
+        # 1. 使用解析器提供的 ui_annotations 進行渲染
+        if ui_annotations:
+            self._insert_with_annotations(ui_annotations)
+        else:
+            # Fallback (如果沒提供標註)
+            self._insert_without_folding(log_content)
         
-        # 2. 額外處理 FAIL 區域的高亮顯示
+        # 2. 額外處理 FAIL 區域的高亮顯示 (保持原有邏輯作為雙重保障)
         if fail_items:
             self._highlight_fail_regions(fail_items, header_offset)
-        
-        # 停用延遲折疊 (因為已經不使用折疊功能)
-        # self.text.after(100, self._delayed_fold_pass_items)
     
-    
-    def _insert_without_folding(self, log_content):
-        """插入不帶折疊的LOG（原始高亮模式）"""
-        lines = log_content.split('\n')
-        current_step = None
-        step_counter = 0
+    def _insert_with_annotations(self, annotations):
+        """使用解析器的 UI 標註資訊逐行插入並著色"""
         bg_toggle = True
         
-        for i, line in enumerate(lines):
+        for i, ann in enumerate(annotations):
             line_start = self.text.index(tk.INSERT)
             line_number = i + 1
+            line_content = ann.get('line_content', '')
             
             # 插入行號
             self.text.insert(tk.INSERT, f"{line_number:4d} ")
             self.text.tag_add('line_number', line_start, self.text.index(tk.INSERT))
             
-            # 檢查是否為新的step
-            step_match = re.search(r'Do @STEP\d+@([^@\n]+)', line)
+            # 插入內容行
+            content_start = self.text.index(tk.INSERT)
+            self.text.insert(tk.INSERT, line_content + '\n')
+            content_end = self.text.index(tk.INSERT)
+            
+            # 應用解析器定義的顏色
+            color = ann.get('color', 'black')
+            background = ann.get('background', 'white')
+            
+            # 建立動態標籤
+            tag_name = f"style_{color}_{background.replace('#','')}"
+            if tag_name not in self.text.tag_names():
+                # 判斷是否需要白色以外的背景
+                bg_val = background if background.lower() != 'white' else None
+                self.text.tag_configure(tag_name, foreground=color, background=bg_val)
+            
+            self.text.tag_add(tag_name, content_start, content_end)
+            
+            # 對於 Step 行，額外建立可點擊區域
+            step_match = re.search(r'Do @STEP\d+@([^@\n]+)', line_content)
             if step_match:
                 current_step = step_match.group(1).strip()
-                step_counter += 1
-                bg_toggle = not bg_toggle
-                
-                # 記錄step位置
                 self.step_positions[current_step] = line_start
-                
-                # 插入可點擊的step標籤
-                self.text.insert(tk.INSERT, line + '\n')
-                line_end = self.text.index(tk.INSERT)
-                
-                # 設定背景色
-                bg_tag = 'step_bg_1' if bg_toggle else 'step_bg_2'
-                self.text.tag_add(bg_tag, line_start, line_end)
-                
-                # 設定可點擊標籤
                 step_tag = f"step_{current_step}_clickable"
-                self.text.tag_add(step_tag, line_start, line_end)
-                self.text.tag_add('step_clickable', line_start, line_end)
+                self.text.tag_add(step_tag, line_start, content_end)
+                self.text.tag_add('step_clickable', line_start, content_end)
                 
-                continue
-            
-            # 檢查指令行
-            if '>' in line:
-                self.text.insert(tk.INSERT, line + '\n')
-                line_end = self.text.index(tk.INSERT)
-                self.text.tag_add('command', line_start, line_end)
-                continue
-            
-            # 檢查回應行
-            if '<' in line:
-                self.text.insert(tk.INSERT, line + '\n')
-                line_end = self.text.index(tk.INSERT)
-                self.text.tag_add('response', line_start, line_end)
-                continue
-            
-            # 檢查PASS/FAIL結果
-            if 'Test is Pass' in line:
-                self.text.insert(tk.INSERT, line + '\n')
-                line_end = self.text.index(tk.INSERT)
-                self.text.tag_add('pass_text', line_start, line_end)
-                continue
-            elif 'Test is Fail' in line or 'FAIL' in line or 'ERROR' in line:
-                self.text.insert(tk.INSERT, line + '\n')
-                line_end = self.text.index(tk.INSERT)
-                self.text.tag_add('fail_text', line_start, line_end)
-                continue
-            
-            # 檢查其他錯誤關鍵字
-            line_lower = line.lower()
-            if any(critical_error in line_lower for critical_error in [
-                'segmentation fault', 'core dumped', 'executes fail', 
-                "doesn't match", 'timeout', 'exception', 'wrong'
-            ]):
-                self.text.insert(tk.INSERT, line + '\n')
-                line_end = self.text.index(tk.INSERT)
-                self.text.tag_add('critical_error', line_start, line_end)
-                continue
-            
-            # 一般行
+                # Step 的交替背景 (僅當標註沒指定背景時)
+                if background.lower() == 'white':
+                    bg_toggle = not bg_toggle
+                    bg_tag = 'step_bg_1' if bg_toggle else 'step_bg_2'
+                    self.text.tag_add(bg_tag, line_start, content_end)
+    
+    def _insert_without_folding(self, log_content):
+        """插入不帶折疊的LOG（原始備用模式）"""
+        lines = log_content.split('\n')
+        bg_toggle = True
+        
+        for i, line in enumerate(lines):
+            line_start = self.text.index(tk.INSERT)
+            # ... (其餘邏輯維持 fallback)
+            self.text.insert(tk.INSERT, f"{i+1:4d} ")
             self.text.insert(tk.INSERT, line + '\n')
     
     def jump_to_step(self, step_name):

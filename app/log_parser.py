@@ -387,17 +387,21 @@ class LogParser:
                 # 檢查是否為PASS結束行
                 if self._is_step_end_line(line, current_step.get('step_number', '')):
                     current_step['end_idx'] = idx
-                    current_step['is_pass'] = True
-                    current_step['result'] = 'PASS'
+                    # 重要：只有在之前該步驟內沒發現過任何 ERROR/FAIL 關鍵字時，才設為 PASS
+                    if current_step.get('result') != 'FAIL':
+                        current_step['is_pass'] = True
+                        current_step['result'] = 'PASS'
                     self._finalize_step(current_step, pass_items, fail_items, no_command_steps)
                     current_step = None
                     continue
                 
-                # 檢查是否為FAIL行
-                if any(keyword in line.upper() for keyword in ['FAIL', 'FAILED', 'ERROR']):
-                    current_step['is_pass'] = False
-                    current_step['result'] = 'FAIL'
-                    current_step['error'] = line.strip()
+                # 檢查是否為FAIL行 (使用全域定義的關鍵字，統一用大寫比對)
+                if any(k.upper() in line.upper() for k in self.fail_keywords):
+                    # 避免重複標記，保留第一個錯誤資訊，且一旦標記為 FAIL 就不再被後續的 Pass 覆蓋
+                    if current_step.get('result') != 'FAIL':
+                        current_step['is_pass'] = False
+                        current_step['result'] = 'FAIL'
+                        current_step['error'] = line.strip()
                 
                 # 檢查指令行
                 cmd_match = self.cmd_pattern.search(line)
@@ -413,10 +417,13 @@ class LogParser:
         # 處理最後一個測項
         if current_step:
             current_step['end_idx'] = len(raw_lines) - 1
-            # 如果沒有明確的PASS/FAIL標記，根據是否有錯誤判斷
+            # 如果沒有明確的PASS結束標記，且文件結束了
+            # 這通常表示中斷(Aborted)或超時(Timeout)，應視為 FAIL
             if current_step['is_pass'] is None:
-                current_step['is_pass'] = not bool(current_step['error'])
-                current_step['result'] = 'PASS' if current_step['is_pass'] else 'FAIL'
+                current_step['is_pass'] = False
+                current_step['result'] = 'FAIL'
+                if not current_step.get('error'):
+                    current_step['error'] = "Step not completed (Log abruptly ended)"
             self._finalize_step(current_step, pass_items, fail_items, no_command_steps)
         
         # 處理"未找到指令"的集合
@@ -791,19 +798,42 @@ class LogParser:
             # PASS/FAIL 標註
             elif 'PASS' in line.upper():
                 annotation['color'] = 'green'
-            elif any(keyword in line.upper() for keyword in ['FAIL', 'ERROR']):
+            elif any(keyword in line.upper() for keyword in ['FAIL', 'ERROR', "DOESN'T MATCH"]):
                 annotation['color'] = 'red'
+                annotation['background'] = '#FFCCCC' # 粉紅色背景
             
-            # 指令/回應標註
-            elif self.cmd_pattern.search(line):
-                annotation['color'] = 'blue'
-            elif self.resp_pattern.search(line):
-                annotation['color'] = 'purple'
+            # Criteria 檢查 (極簡偵測模式：專注於數值 (下限, 上限) 結構)
+            # 格式：= [Value] ([Min], [Max])
+            criteria_match = re.search(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)', line)
+            if criteria_match:
+                val_str = criteria_match.group(1).strip()
+                min_str = criteria_match.group(2).strip()
+                max_str = criteria_match.group(3).strip()
+                
+                try:
+                    # 嘗試數值判定
+                    val = float(val_str)
+                    low = float(min_str)
+                    hi = float(max_str)
+                    if low <= val <= hi:
+                        annotation['color'] = 'green'        # PASS: 綠色標註
+                    else:
+                        annotation['color'] = 'red'
+                        annotation['background'] = '#FFCCCC' # FAIL: 紅字粉紅底
+                except ValueError:
+                    # 如果不是數字 (如 ISN)，則用字串比對
+                    if min_str == max_str and val_str == min_str:
+                        annotation['color'] = 'green'
+                    else:
+                        annotation['color'] = 'red'
+                        annotation['background'] = '#FFCCCC'
             
-            # 特殊高亮區塊 (doesn't match 最後一個區塊)
-            if highlight_start <= idx <= highlight_end:
-                annotation['background'] = '#FFFF00' # 黃色背景
-                annotation['color'] = 'red'          # 紅色文字
+            # 指令/回應標註 (如果尚未被 Criteria 覆蓋顏色且為黑色)
+            if annotation['color'] == 'black':
+                if self.cmd_pattern.search(line):
+                    annotation['color'] = 'blue'
+                elif self.resp_pattern.search(line):
+                    annotation['color'] = 'purple'
             
             annotations.append(annotation)
         

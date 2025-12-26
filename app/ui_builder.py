@@ -273,12 +273,20 @@ class UIBuilderMixin:
         # 先獲取目前的標籤列表（用於判斷是否已存在）
         visible_tabs = self.notebook.tabs()
         
-        # 單一檔案模式：pass/fail 都顯示 (由使用者要求)
+        # 單一檔案模式：有資料才顯示 (使用者點名：PASS LOG 不顯示 FAIL 標籤)
         if not is_multiple:
-            if str(self.tab_pass) not in visible_tabs:
-                self.notebook.insert(0, self.tab_pass, text="✅ PASS測項")
-            if str(self.tab_fail) not in visible_tabs:
-                self.notebook.insert(1, self.tab_fail, text="❌ FAIL測項")
+            if pass_count > 0:
+                if str(self.tab_pass) not in visible_tabs:
+                    self.notebook.insert(0, self.tab_pass, text="✅ PASS測項")
+            else:
+                self.notebook.hide(self.tab_pass)
+                
+            if fail_count > 0:
+                if str(self.tab_fail) not in visible_tabs:
+                    pos = 1 if str(self.tab_pass) in self.notebook.tabs() else 0
+                    self.notebook.insert(pos, self.tab_fail, text="❌ FAIL測項")
+            else:
+                self.notebook.hide(self.tab_fail)
             return
 
         # 多檔案模式：有資料才顯示

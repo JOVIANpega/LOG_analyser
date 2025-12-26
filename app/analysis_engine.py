@@ -218,11 +218,12 @@ class AnalysisEngineMixin:
             # This is heavy. Assume insert_log_with_highlighting handles it or it blocks for a bit.
             # We can't easily chunk text widget insertion without changing EnhancedText.
             # But the yield before this gives a breath.
+            # 現在傳入 ui_annotations 以便進行精確的行高亮（包含 Criteria 的綠色/紅粉色）
             self.log_text_enhanced.insert_log_with_highlighting(log_content, {
                 'fail_line_idx': fail_line_idx,
                 'pass_items': pass_items,
                 'fail_items': fail_items
-            }, header_content=header_info)
+            }, header_content=header_info, ui_annotations=result.get('ui_annotations'))
             
             if fail_line_idx is not None and fail_line_idx < len(raw_lines):
                 self.log_text_enhanced.highlight_error_block(fail_line_idx + 1, fail_line_idx + 1)
