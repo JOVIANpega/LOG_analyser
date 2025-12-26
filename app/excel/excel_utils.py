@@ -79,19 +79,22 @@ def extract_station_from_filename(filename: str) -> str:
 def sanitize_sheet_title(title: str) -> str:
     """
     移除Excel工作表名稱不允許的字元並修剪長度。
-    禁用字元: : \\ / ? * [ ]，且長度<=31，不可為空。
+    禁用字元: : \\ / ? * [ ] '，且長度<=31，不可為空。
     """
     if not title:
         return "Sheet"
     
-    # 移除禁用字元
-    forbidden_chars = [':', '\\', '/', '?', '*', '[', ']']
+    # 移除禁用字元 (包含單引號，避免連結出錯)
+    forbidden_chars = [':', '\\', '/', '?', '*', '[', ']', "'"]
     for char in forbidden_chars:
         title = title.replace(char, '_')
     
     # 限制長度
     if len(title) > 31:
         title = title[:28] + "..."
+    
+    # 確保不以點號開頭或結尾
+    title = title.strip(". ")
     
     return title.strip() if title.strip() else "Sheet"
 

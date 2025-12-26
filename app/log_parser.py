@@ -16,6 +16,7 @@ class LogParser:
         self.retry_pattern = re.compile(r'Retry:\s*(\d+)')
         self.root_pattern = re.compile(r'root@.*:/root\$')
         self.fail_keywords = ['FAIL', 'FAILED', 'ERROR', 'failed', 'error', 'NACK', 'timeout']
+        self.phase_pattern = re.compile(r'Execute (Phase \d+ Test)', re.IGNORECASE)
 
     def parse_log_file(self, file_path):
         """
@@ -75,9 +76,16 @@ class LogParser:
         run_pattern = re.compile(r'Run ([A-Z0-9]+-\d+):(.*?)Mode:', re.IGNORECASE)
         
         start_idx = 0
+        current_phase = "Unknown Phase"
         
         # 尋找所有測試項目的結束行
         for idx, line in enumerate(raw_lines):
+            # 偵測 Phase
+            p_match = self.phase_pattern.search(line)
+            if p_match:
+                raw_phase_title = p_match.group(1).strip()
+                current_phase = self._get_enriched_phase_name(raw_lines, idx, raw_phase_title)
+
             match = end_pattern.search(line)
             if match:
                 # 找到一個測試項目的結束
@@ -95,16 +103,13 @@ class LogParser:
                     if run_pattern.search(l):
                         run_indices.append(i)
                         
-                # 只有當有多個 Run 行，且第一個 Run 不是在最後一個步驟的範圍內（這比較難判斷）
-                # 簡單策略：如果有 >1 個 Run 行，就拆分
-                # 但要注意：最後一個 Run 行必須對應當前的結束行（通常）
-                
                 if len(run_indices) > 1:
                     # 進行拆分處理
                     self._process_split_blocks(
                         block_lines, block_start, run_indices, 
                         end_step_number, end_step_name,
-                        pass_items, no_command_steps
+                        pass_items, no_command_steps, 
+                        current_phase
                     )
                 else:
                     # 只有一個或沒有 Run 行，作為單一項目處理
@@ -113,6 +118,7 @@ class LogParser:
                     step_info['end_idx'] = block_end
                     step_info['raw_idx'] = block_start
                     step_info['full_log'] = block_lines
+                    step_info['phase'] = current_phase
                     
                     self._finalize_pass_step(step_info, pass_items, no_command_steps)
                 
@@ -139,7 +145,7 @@ class LogParser:
             'log_type': 'PASS'
         }
     
-    def _process_split_blocks(self, block_lines, global_start_idx, run_indices, end_step_number, end_step_name, pass_items, no_command_steps):
+    def _process_split_blocks(self, block_lines, global_start_idx, run_indices, end_step_number, end_step_name, pass_items, no_command_steps, current_phase):
         """拆分包含多個步驟的區塊"""
         run_pattern = re.compile(r'Run ([A-Z0-9]+-\d+):(.*?)Mode:', re.IGNORECASE)
         
@@ -177,6 +183,7 @@ class LogParser:
             
             # 構建 Step Info
             step_info = self._analyze_block_content(sub_lines, step_number, step_name)
+            step_info['phase'] = current_phase
             
             # 計算全局索引
             abs_start = global_start_idx + current_run_idx
@@ -343,8 +350,15 @@ class LogParser:
         fail_items = []
         no_command_steps = []
         current_step = None
+        current_phase = "Unknown Phase"
         
         for idx, line in enumerate(raw_lines):
+            # 偵測 Phase
+            p_match = self.phase_pattern.search(line)
+            if p_match:
+                raw_phase_title = p_match.group(1).strip()
+                current_phase = self._get_enriched_phase_name(raw_lines, idx, raw_phase_title)
+
             # 找到 Do @STEPxxx@ 行 - 測項開始
             step_match = self.step_pattern.search(line)
             if step_match:
@@ -377,7 +391,8 @@ class LogParser:
                     'start_idx': idx,
                     'end_idx': None,
                     'step_number': step_number,
-                    'is_pass': None  # 待確定
+                    'is_pass': None,  # 待確定
+                    'phase': current_phase
                 }
                 continue
             
@@ -750,6 +765,30 @@ class LogParser:
         
         return "Unknown Step"
     
+    def _get_enriched_phase_name(self, raw_lines, phase_idx, phase_title):
+        """
+        向後搜尋最近的一個 Step 名稱，並將其附加到 Phase 標題上。
+        """
+        # 向下搜尋最多 10 行
+        for i in range(phase_idx + 1, min(phase_idx + 11, len(raw_lines))):
+            line = raw_lines[i]
+            # 偵測 Do @STEP 或 Run 
+            do_match = re.search(r'Do @STEP\d+@([^@\n]+)', line)
+            run_match = re.search(r'Run [A-Z0-9\-]+:([^@\n\t]+)', line)
+            
+            step_name = None
+            if do_match:
+                # 排除掉 Test is Pass 結尾行
+                if 'Test is Pass' not in line:
+                    step_name = do_match.group(1).strip()
+            elif run_match:
+                step_name = run_match.group(1).strip()
+            
+            if step_name:
+                return f"{phase_title} ={step_name}"
+        
+        return phase_title
+
     def _generate_ui_annotations(self, raw_lines, is_pass_log):
         """產生UI標註資訊"""
         annotations = []
@@ -778,6 +817,8 @@ class LogParser:
                     highlight_end = i
                     break
 
+        last_separator_idx = -30
+        
         for idx, line in enumerate(raw_lines):
             annotation = {
                 'line_idx': idx,
@@ -785,10 +826,25 @@ class LogParser:
                 'color': 'black',
                 'background': 'white',
                 'is_clickable': False,
-                'hover_color': None
+                'hover_color': None,
+                'show_separator': False,
+                'separator_title': None
             }
             
-            # Step 區塊標註
+            # --- PHASE 大章節偵測 ---
+            # 範例: "Execute Phase 18 Test." -> "PHASE 18 TEST = GET EMMC_ID"
+            phase_match = re.search(r'Execute (Phase \d+ Test)', line, re.IGNORECASE)
+            
+            if phase_match:
+                raw_phase_title = phase_match.group(1).strip()
+                # 簡單冷卻機制，避免重複畫線
+                if (idx - last_separator_idx > 10):
+                    enriched_title = self._get_enriched_phase_name(raw_lines, idx, raw_phase_title)
+                    annotation['show_separator'] = True
+                    annotation['separator_title'] = enriched_title.upper()
+                    last_separator_idx = idx
+            
+            # Step 區塊標註 (維持原本的 Step 點擊與底色功能，但不畫大綠條)
             if self.step_pattern.search(line):
                 annotation['color'] = 'green' if is_pass_log else 'blue'
                 annotation['background'] = '#E8F4FD' if idx % 2 == 0 else '#F0E8FF'
@@ -803,7 +859,6 @@ class LogParser:
                 annotation['background'] = '#FFCCCC' # 粉紅色背景
             
             # Criteria 檢查 (極簡偵測模式：專注於數值 (下限, 上限) 結構)
-            # 格式：= [Value] ([Min], [Max])
             criteria_match = re.search(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)', line)
             if criteria_match:
                 val_str = criteria_match.group(1).strip()
@@ -811,24 +866,20 @@ class LogParser:
                 max_str = criteria_match.group(3).strip()
                 
                 try:
-                    # 嘗試數值判定
-                    val = float(val_str)
-                    low = float(min_str)
-                    hi = float(max_str)
+                    val = float(val_str); low = float(min_str); hi = float(max_str)
                     if low <= val <= hi:
-                        annotation['color'] = 'green'        # PASS: 綠色標註
+                        annotation['color'] = 'green'
                     else:
                         annotation['color'] = 'red'
-                        annotation['background'] = '#FFCCCC' # FAIL: 紅字粉紅底
+                        annotation['background'] = '#FFCCCC'
                 except ValueError:
-                    # 如果不是數字 (如 ISN)，則用字串比對
                     if min_str == max_str and val_str == min_str:
                         annotation['color'] = 'green'
                     else:
                         annotation['color'] = 'red'
                         annotation['background'] = '#FFCCCC'
             
-            # 指令/回應標註 (如果尚未被 Criteria 覆蓋顏色且為黑色)
+            # 指令/回應標註
             if annotation['color'] == 'black':
                 if self.cmd_pattern.search(line):
                     annotation['color'] = 'blue'

@@ -288,10 +288,35 @@ class EnhancedText:
         """使用解析器的 UI 標註資訊逐行插入並著色"""
         bg_toggle = True
         
+        # 預先定義樣式 (亮綠色、白字、大字、加粗)
+        if 'step_separator_style' not in self.text.tag_names():
+            self.text.tag_configure('step_separator_style', 
+                                 background='#2E7D32', foreground='white', 
+                                 font=('Consolas', 12, 'bold'))
+
         for i, ann in enumerate(annotations):
+            line_content = ann.get('line_content', '')
+            
+            # --- 智慧型分隔線插入 (遵循解析器的標註) ---
+            if ann.get('show_separator'):
+                # 標題文字樣式
+                title = ann.get('separator_title', 'TEST PHASE')
+                # 依要求：不使用綠色底，改回黑色文字
+                separator_text = f" [ {title[:80]} ]\n"
+                
+                tag_name = 'step_separator_style'
+                # 改為黑色文字，移除綠色底
+                self.text.tag_configure(tag_name, foreground='black', font=('Courier New', 12, 'bold'), justify='center')
+                
+                sep_start = self.text.index(tk.INSERT)
+                self.text.insert(tk.INSERT, " --  " + separator_text, tag_name)
+                
+                # 記錄跳轉位置 (跳轉到分隔線)
+                self.step_positions[title] = sep_start
+            
+            # --- 插入正常的 Log 行 ---
             line_start = self.text.index(tk.INSERT)
             line_number = i + 1
-            line_content = ann.get('line_content', '')
             
             # 插入行號
             self.text.insert(tk.INSERT, f"{line_number:4d} ")
@@ -302,33 +327,30 @@ class EnhancedText:
             self.text.insert(tk.INSERT, line_content + '\n')
             content_end = self.text.index(tk.INSERT)
             
-            # 應用解析器定義的顏色
+            # 應用顏色標註
             color = ann.get('color', 'black')
             background = ann.get('background', 'white')
-            
-            # 建立動態標籤
             tag_name = f"style_{color}_{background.replace('#','')}"
             if tag_name not in self.text.tag_names():
-                # 判斷是否需要白色以外的背景
                 bg_val = background if background.lower() != 'white' else None
                 self.text.tag_configure(tag_name, foreground=color, background=bg_val)
-            
             self.text.tag_add(tag_name, content_start, content_end)
             
-            # 對於 Step 行，額外建立可點擊區域
-            step_match = re.search(r'Do @STEP\d+@([^@\n]+)', line_content)
+            # 判斷是否為可點擊步驟 (來自原有的 step 標註邏輯)
+            step_match = self.step_re.search(line_content) if hasattr(self, 'step_re') else re.search(r'Do @STEP\d+@([^@\n]+)', line_content)
             if step_match:
-                current_step = step_match.group(1).strip()
-                self.step_positions[current_step] = line_start
-                step_tag = f"step_{current_step}_clickable"
+                step_name = step_match.group(1).strip()
+                step_tag = f"step_{step_name}_clickable"
                 self.text.tag_add(step_tag, line_start, content_end)
                 self.text.tag_add('step_clickable', line_start, content_end)
                 
-                # Step 的交替背景 (僅當標註沒指定背景時)
                 if background.lower() == 'white':
                     bg_toggle = not bg_toggle
                     bg_tag = 'step_bg_1' if bg_toggle else 'step_bg_2'
                     self.text.tag_add(bg_tag, line_start, content_end)
+        
+        # 確保分隔線永遠在最上層
+        self.text.tag_raise('step_separator_style')
     
     def _insert_without_folding(self, log_content):
         """插入不帶折疊的LOG（原始備用模式）"""

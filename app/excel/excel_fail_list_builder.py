@@ -193,10 +193,13 @@ class FailListBuilder:
             # 設定字體大小 (14pt)
             try:
                 from openpyxl.drawing.text import CharacterProperties, Paragraph, ParagraphProperties, RichTextProperties
-                cp = CharacterProperties(sz=1400)  # 14pt
+                
+                # 字體大小設定 (1400 = 14pt)，並加粗
+                cp = CharacterProperties(sz=1400, b=True)
                 chart.dataLabels.txPr = RichTextProperties(p=[Paragraph(pPr=ParagraphProperties(defRPr=cp), endParaRPr=cp)])
-            except:
-                pass
+                
+            except Exception as e:
+                print(f"[DEBUG] 設定圖表字體失敗: {e}")
             
             # 設定高度與寬度
             chart.height = 13

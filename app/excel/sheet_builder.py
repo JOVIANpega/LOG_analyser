@@ -136,24 +136,17 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         # 3. 寫入儲存格
         clean_line = sanitize_cell_text(line)
         cell = ws.cell(row=i, column=1)
+        cell.value = clean_line # 暫時取消 Rich Text，避免 Excel XML 損毀
         
-        # --- 思考：特殊文字顯示紅色 (Rich Text) ---
-        # 如果整行已經是紅色了，Rich Text 就沒意義。
-        # 但如果整行是黑色，我們想讓 keyword 變紅：
-        if not is_in_fail_block and any(kw in line.lower() for kw in error_keywords):
-            # 針對 PASS log 中零星出現的關鍵字，只讓字變紅
-            cell.value = _get_rich_text_for_line(clean_line, error_keywords, font)
-        else:
-            cell.value = clean_line
-
         # 套用儲存格樣式
         cell.font = Font(name=font.name, size=font.size, color=font_color, bold=is_bold)
         if bg_color:
             cell.fill = PatternFill('solid', fgColor=bg_color)
             
     if first_error_row:
+        # 內頁跳轉：使用簡單 A{row} 形式，減少跨頁公式錯誤
         ws.cell(row=1, column=1).value = f"Jump to Error (A{first_error_row})"
-        ws.cell(row=1, column=1).hyperlink = f"#'{ws.title}'!A{first_error_row}"
+        ws.cell(row=1, column=1).hyperlink = f"A{first_error_row}" # 本頁跳轉不需要 #'Title'!
         ws.cell(row=1, column=1).font = Font(color="0000FF", underline="single")
 
 def insert_header_info(ws, header_info, start_row=4):

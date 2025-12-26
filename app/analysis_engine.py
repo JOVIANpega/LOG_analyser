@@ -175,26 +175,19 @@ class AnalysisEngineMixin:
         self._update_progress(f"準備顯示結果...")
         yield
 
-        # Step 2: PASS Items
-        self._update_progress(f"更新 PASS 列表 ({len(pass_items)} 筆)...")
+        # Step 2: PASS Items (現在只顯示大章節清單)
+        self._update_progress(f"更新 PASS 章節清單...")
         if hasattr(self, 'pass_tree_enhanced'):
-            # Clear existing items if needed? Assuming tree is cleared before analysis or we append.
-            # Usually we clear old results before analysis start. But let's assume cleanliness is handled elsewhere.
-            # Batch insertion: Insert 100 items at a time
-            batch_size = 100
-            for i in range(0, len(pass_items), batch_size):
-                batch = pass_items[i:i+batch_size]
-                for idx, item in enumerate(batch, 1 + i):
-                    full_response = item.get('full_response', '')
-                    has_retry = item.get('has_retry_but_pass', False)
-                    self.pass_tree_enhanced.insert_pass_item(
-                        (item['step_name'], item['command'], item['response'], item['result']),
-                        step_number=idx,
-                        full_response=full_response,
-                        has_retry=has_retry
-                    )
-                if len(pass_items) > 500: # Only yield inside loop if many items
-                     yield 
+            current_phase = None
+            
+            # 使用 set 或 dict 確保每個 Phase 只出現一次，保持順序
+            seen_phases = []
+            for item in pass_items:
+                phase_name = item.get('phase', 'Unknown Phase')
+                if phase_name not in seen_phases:
+                    seen_phases.append(phase_name)
+                    # 直接插入 Phase 大標題
+                    self.pass_tree_enhanced.insert_phase_header(phase_name)
         yield
 
         # Step 3: FAIL Items

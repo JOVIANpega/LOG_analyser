@@ -68,22 +68,28 @@ class ExcelWriter:
         import openpyxl
         wb = openpyxl.Workbook()
         
-        # 1. 建立 Summary (使用者要求回復)
+        # 0. 先行確定所有工作表名稱，避免 Summary 連結失效
+        for entry in logs:
+            isn = extract_isn_from_filename(entry.get('file_name', ''))
+            sheet_name = unique_sheet_name(wb, isn or "FAIL_Detail")
+            entry['sheet_name'] = sheet_name
+            # 在 wb 中預佔位置（建立空分頁）
+            wb.create_sheet(sheet_name)
+        
+        # 1. 建立 Summary (此時 'sheet_name' 已固定)
         sws = self.summary_builder.create_summary_sheet(wb, logs, title="Summary")
         try:
-            sws.sheet_properties.tabColor = '0000FF' # 藍色標籤
+            sws.sheet_properties.tabColor = '0000FF'
         except:
             pass
         
         # 2. 建立 FAIL_LIST
         self.fail_builder.build_fail_list_sheet(wb, logs)
         
-        # 2. 建立每個檔案的詳細頁面
+        # 3. 填寫詳細內容
         for entry in logs:
-            isn = extract_isn_from_filename(entry.get('file_name', ''))
-            sheet_name = unique_sheet_name(wb, isn or "FAIL_Detail")
-            entry['sheet_name'] = sheet_name
-            ws = wb.create_sheet(sheet_name)
+            sheet_name = entry['sheet_name']
+            ws = wb[sheet_name]
             self._write_detailed_log(ws, entry)
         
         if "Sheet" in wb.sheetnames:
@@ -95,19 +101,24 @@ class ExcelWriter:
         import openpyxl
         wb = openpyxl.Workbook()
         
-        # 1. 建立 Summary
-        sws = self.summary_builder.create_summary_sheet(wb, logs, title="Summary")
-        try:
-            sws.sheet_properties.tabColor = '0000FF' # 藍色標籤
-        except:
-            pass
-        
-        # 2. 建立每個檔案的頁面
+        # 0. 先行確定所有工作表名稱
         for entry in logs:
             isn = extract_isn_from_filename(entry.get('file_name', ''))
             sheet_name = unique_sheet_name(wb, isn or "PASS_Detail")
             entry['sheet_name'] = sheet_name
-            ws = wb.create_sheet(sheet_name)
+            wb.create_sheet(sheet_name)
+            
+        # 1. 建立 Summary
+        sws = self.summary_builder.create_summary_sheet(wb, logs, title="Summary")
+        try:
+            sws.sheet_properties.tabColor = '0000FF'
+        except:
+            pass
+        
+        # 2. 填寫詳細內容
+        for entry in logs:
+            sheet_name = entry['sheet_name']
+            ws = wb[sheet_name]
             self._write_detailed_log(ws, entry)
 
         if "Sheet" in wb.sheetnames:
@@ -116,19 +127,17 @@ class ExcelWriter:
         return safe_save_workbook(wb, output_path)
 
     def _write_detailed_log(self, ws, entry):
-        """寫入詳細的 LOG 內容與標註 (維持 Premium 外觀)"""
-        # 1. 回到 Summary 連結
-        ws.cell(row=1, column=2, value="[回到 Summary]").hyperlink = f"#'Summary'!A1"
-        ws.cell(row=1, column=2).font = Font(color="0000FF", underline="single")
+        """寫入詳細的 LOG 內容與標註 (維持穩定性，移除高風險內部連結)"""
+        # 依照使用者要求，優先確保檔案開啟穩定度，移除可能導致 XML 損毀的跳轉連結
         
-        # 2. 置頂資訊
+        # 1. 置頂資訊 (取代原本的 Jump 連結)
         header_info = entry.get('header_info', '')
-        curr_row = insert_header_info(ws, header_info, start_row=4)
+        curr_row = insert_header_info(ws, header_info, start_row=1)
         
-        # 3. 原始 LOG
+        # 2. 原始 LOG
         raw_lines = entry.get('raw_lines', [])
         annotations = entry.get('ui_annotations', [])
-        fail_items = entry.get('fail_items', []) # 獲取失敗項目以識別區塊
+        fail_items = entry.get('fail_items', []) 
         content_font = Font(name='Calibri', size=11)
         
         write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=fail_items)

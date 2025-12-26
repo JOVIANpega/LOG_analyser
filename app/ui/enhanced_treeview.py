@@ -427,6 +427,21 @@ class EnhancedTreeview:
             # 使用預設位置
             popup_window.geometry(f"{window_width}x{window_height}+{mouse_x}+{mouse_y}")
     
+    def insert_phase_header(self, phase_name):
+        """插入 Phase 大章節分隔行 (高能見度)"""
+        columns_count = len(self.tree['columns'])
+        # 僅在第一欄顯示章節名稱，其餘留空
+        clean_name = phase_name.strip()
+        values = [clean_name] + [""] * (columns_count - 1)
+        
+        # 設定標籤和顏色 - 依要求移除亮綠色背景，改為黑色加粗
+        self.tree.tag_configure('phase_header', 
+                             foreground='black', 
+                             font=('Arial', self.font_size, 'bold'))
+        
+        item_id = self.tree.insert('', 'end', values=tuple(values), tags=('phase_header',))
+        return item_id
+
     def _hide_hover_popup(self):
         if self._hover_popup and self._hover_popup.winfo_exists():
             try:
@@ -436,8 +451,8 @@ class EnhancedTreeview:
         self._hover_popup = None
         self._hover_row = None
 
-    def insert_pass_item(self, values, step_number, full_response="", has_retry=False):
-        """插入PASS項目"""
+    def insert_pass_item(self, values, step_number, full_response="", has_retry=False, parent=""):
+        """插入PASS項目 (可指定父層節點)"""
         # 在Step Name前加上編號
         enhanced_values = list(values)
         step_name = f"{step_number}. {enhanced_values[0]}"
@@ -449,7 +464,8 @@ class EnhancedTreeview:
         enhanced_values[0] = step_name
         enhanced_values[2] = enhanced_values[2] + " [+點擊展開]"
         
-        item_id = self.tree.insert('', 'end', values=enhanced_values)
+        # 插入到指定的父節點下
+        item_id = self.tree.insert(parent, 'end', values=enhanced_values)
         
         # 設定標籤和顏色 - PASS項目文字全部為黑色，包括RETRY
         command_value = str(enhanced_values[1]) if len(enhanced_values) > 1 else ""
