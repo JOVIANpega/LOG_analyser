@@ -124,7 +124,6 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
                 
                 # 建立超連結跳轉到下方對應位置
                 cp.hyperlink = f"#'{ws.title}'!A{target_excel_row}"
-                cp.tooltip = f"點擊跳轉到第 {target_log_idx + 1} 行"
                 curr_h_row += 1
         
         # 3. 底部跳轉按鈕 (整塊 Box 的結尾)
