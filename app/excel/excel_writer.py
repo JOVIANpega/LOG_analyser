@@ -85,6 +85,7 @@ class ExcelWriter:
         
         # 3. 填寫詳細內容並記錄錯誤行位置
         for entry in logs:
+            entry['log_type'] = 'FAIL'  # ⚠️ 確保標註為 FAIL 以觸發預覽框
             sheet_name = entry['sheet_name']
             ws = wb[sheet_name]
             error_row = self._write_detailed_log(ws, entry)
@@ -120,6 +121,7 @@ class ExcelWriter:
         
         # 2. 填寫詳細內容
         for entry in logs:
+            entry['log_type'] = 'PASS'  # ⚠️ 標註為 PASS
             sheet_name = entry['sheet_name']
             ws = wb[sheet_name]
             self._write_detailed_log(ws, entry)

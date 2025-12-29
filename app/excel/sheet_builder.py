@@ -28,22 +28,32 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
     error_block_preview = []
     
     if log_type == 'FAIL':
-        # 優先級偵測錯誤點：DOESN'T MATCH > is Fail > FAIL > ERROR (從最下面往上找)
+        # 優先級偵測錯誤點 (從最下面往上找)
         dm_pattern = re.compile(r"doesn't match", re.IGNORECASE)
         is_fail_pattern = re.compile(r"is Fail", re.IGNORECASE)
+        abort_pattern = re.compile(r"All Test Aborted", re.IGNORECASE)
+        status_pattern = re.compile(r"Status:False", re.IGNORECASE)
         fail_pattern = re.compile(r"FAIL", re.IGNORECASE)
         error_pattern = re.compile(r"ERROR", re.IGNORECASE)
     
-        # 1. 最高優先級：DOESN'T MATCH (Bottom-up)
+        # 1. 最高優先級：DOESN'T MATCH
         for i in range(len(raw_lines)-1, -1, -1):
             if dm_pattern.search(raw_lines[i]):
                 error_line_idx = i
                 break
         
-        # 2. 次優先級：is Fail
+        # 2. 次優先級：is Fail / All Test Aborted
         if error_line_idx is None:
             for i in range(len(raw_lines)-1, -1, -1):
-                if is_fail_pattern.search(raw_lines[i]):
+                cur_line = raw_lines[i]
+                if is_fail_pattern.search(cur_line) or abort_pattern.search(cur_line):
+                    error_line_idx = i
+                    break
+        
+        # 3. 第三優先級：Status:False
+        if error_line_idx is None:
+            for i in range(len(raw_lines)-1, -1, -1):
+                if status_pattern.search(raw_lines[i]):
                     error_line_idx = i
                     break
         
@@ -89,13 +99,9 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
 
     # --- 步驟 B: 僅對 FAIL 日誌寫入預覽區塊 (Premium Box) ---
     if error_line_idx is not None and log_type == 'FAIL':
-        # 繪製 Premium 錯誤預覽框
-        pink_fill = PatternFill('solid', fgColor='FFFFE1E1')
-        red_font = Font(name='Consolas', size=11, color='FFC00000', bold=True)
+        # 1. 標題行
         title_font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FFFFFF')
         title_fill = PatternFill('solid', fgColor='FFFF0000') # 純紅標題
-        
-        # 1. 標題行
         title_cell = ws.cell(row=curr_h_row, column=1, value="  [ 發現錯誤點 (預覽) ]  ")
         title_cell.font = title_font
         title_cell.fill = title_fill
@@ -103,16 +109,13 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         curr_h_row += 1
         
         # 2. 錯誤內容 (每行皆可點擊跳轉)
+        # 使用剛才擷取預覽塊時的 b_start 作為索引基底
+        pink_fill = PatternFill('solid', fgColor='FFFFE1E1')
+        red_font = Font(name='Consolas', size=11, color='FFC00000', bold=True)
+        
         if error_block_preview:
-            # 取得 error_block 在 raw_lines 中的起始 index
-            b_start_idx = error_line_idx
-            for j in range(error_line_idx, max(-1, error_line_idx - 20), -1):
-                if '>' in raw_lines[j] or 'Do @STEP' in raw_lines[j]:
-                    b_start_idx = j
-                    break
-            
             for i, line_p in enumerate(error_block_preview):
-                target_log_idx = b_start_idx + i
+                target_log_idx = b_start + i
                 target_excel_row = actual_log_start + target_log_idx
                 
                 cp = ws.cell(row=curr_h_row, column=1, value="  >> " + sanitize_cell_text(line_p))
@@ -124,13 +127,13 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
                 cp.tooltip = f"點擊跳轉到第 {target_log_idx + 1} 行"
                 curr_h_row += 1
         
-        # 3. 跳轉按鈕行
-        error_excel_row = actual_log_start + error_line_idx
-        jump_cell = ws.cell(row=curr_h_row, column=1, value=f" [ 🚀 直接跳轉至錯誤行 Row {error_excel_row} ] ")
+        # 3. 底部跳轉按鈕 (整塊 Box 的結尾)
+        target_err_row = actual_log_start + error_line_idx
+        jump_cell = ws.cell(row=curr_h_row, column=1, value=f" [ 🚀 直接跳轉至錯誤行 Row {target_err_row} ] ")
         jump_cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color="FF0000BB", underline="single")
         jump_cell.fill = pink_fill
         jump_cell.alignment = Alignment(horizontal='center')
-        jump_cell.hyperlink = f"#'{ws.title}'!A{error_excel_row}"
+        jump_cell.hyperlink = f"#'{ws.title}'!A{target_err_row}"
         
         curr_h_row += 2 # 留空行
 
