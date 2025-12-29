@@ -90,14 +90,23 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
 
     # --- 步驟 A: 預先計算預覽區塊高度以利超連結定位 ---
     preview_box_height = 0
+    
+    # FAIL 日誌：錯誤預覽框
     if error_line_idx is not None and log_type == 'FAIL':
-        # 標題行(1) + 內容行(len) + 跳轉按鈕(1) + 間隔行(1)
         preview_box_height = 1 + len(error_block_preview) + 1 + 1
+    
+    # PASS 日誌：測試項目預覽框
+    pass_items_preview = []
+    if log_type == 'PASS' and fail_items:
+        # fail_items 在 PASS 日誌中實際包含的是 pass_items
+        pass_items_preview = fail_items[:15]  # 最多顯示前15個測試項目
+        if pass_items_preview:
+            preview_box_height = 1 + len(pass_items_preview) + 1
     
     actual_log_start = start_row + preview_box_height
     curr_h_row = start_row
 
-    # --- 步驟 B: 僅對 FAIL 日誌寫入預覽區塊 (Premium Box) ---
+    # --- 步驟 B1: FAIL 日誌寫入錯誤預覽區塊 ---
     if error_line_idx is not None and log_type == 'FAIL':
         # 1. 標題行
         title_font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FFFFFF')
@@ -135,6 +144,37 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         jump_cell.hyperlink = f"#'{ws.title}'!A{target_err_row}"
         
         curr_h_row += 2 # 留空行
+    
+    # --- 步驟 B2: PASS 日誌寫入測試項目預覽區塊 ---
+    if log_type == 'PASS' and pass_items_preview:
+        # 1. 標題行 (藍底白字)
+        title_font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FFFFFF')
+        title_fill = PatternFill('solid', fgColor='FF4472C4')  # 藍色標題
+        title_cell = ws.cell(row=curr_h_row, column=1, value="  [ 比對項目細節 ]  ")
+        title_cell.font = title_font
+        title_cell.fill = title_fill
+        title_cell.alignment = Alignment(horizontal='center', vertical='center')
+        curr_h_row += 1
+        
+        # 2. 測試項目內容 (淺藍背景)
+        light_blue_fill = PatternFill('solid', fgColor='FFE1F0FF')
+        blue_font = Font(name='Consolas', size=11, color='FF000080', bold=True)
+        
+        for item in pass_items_preview:
+            step_name = item.get('step_name', 'Unknown Step')
+            result = item.get('result', '')
+            
+            # 格式化顯示文字
+            display_text = f"  ✓ {step_name}"
+            if result and result not in step_name:
+                display_text += f" = {result}"
+            
+            cp = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(display_text))
+            cp.font = blue_font
+            cp.fill = light_blue_fill
+            curr_h_row += 1
+        
+        curr_h_row += 1  # 留空行
 
     # --- 步驟 D: 寫入正式 Log ---
     for i, raw in enumerate(raw_lines):

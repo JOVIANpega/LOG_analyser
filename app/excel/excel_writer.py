@@ -135,12 +135,16 @@ class ExcelWriter:
     def _write_detailed_log(self, ws, entry):
         """寫入詳細的 LOG 內容與標註 (同步 GUI 外觀並補回超連結)"""
         
-        # 1. 置頂 [回到 Summary] 連結 - Font 16, 深藍底白字
+        # 1. 置頂 [回到 Summary/FAIL_LIST] 連結 - Font 16, 深藍底白字
         link_font = Font(name='Calibri', size=16, bold=True, color="FFFFFF", underline="single")
         deep_blue_fill = PatternFill('solid', fgColor='000080')
         
-        c_top = ws.cell(row=1, column=1, value="[回到 FAIL_LIST]")
-        c_top.hyperlink = f"#'FAIL_LIST'!A1"
+        # 根據日誌類型決定返回目標
+        log_type = entry.get('log_type', 'UNKNOWN')
+        back_target = 'FAIL_LIST' if log_type == 'FAIL' else 'Summary'
+        
+        c_top = ws.cell(row=1, column=1, value=f"[回到 {back_target}]")
+        c_top.hyperlink = f"#'{back_target}'!A1"
         c_top.font = link_font
         c_top.fill = deep_blue_fill
         c_top.alignment = Alignment(horizontal='center')
@@ -163,10 +167,10 @@ class ExcelWriter:
         # ⚠️ 接收返回的錯誤行位置信息
         last_row, error_excel_row = write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=fail_items, log_type=log_type)
         
-        # 4. 置底 [回到 Summary] 連結 - Font 16, 深藍底白字
+        # 4. 置底 [回到 Summary/FAIL_LIST] 連結 - Font 16, 深藍底白字
         bottom_row = last_row + 2
-        c_bot = ws.cell(row=bottom_row, column=1, value="[回到 FAIL_LIST]")
-        c_bot.hyperlink = f"#'FAIL_LIST'!A1"
+        c_bot = ws.cell(row=bottom_row, column=1, value=f"[回到 {back_target}]")
+        c_bot.hyperlink = f"#'{back_target}'!A1"
         c_bot.font = link_font
         c_bot.fill = deep_blue_fill
         c_bot.alignment = Alignment(horizontal='center')
