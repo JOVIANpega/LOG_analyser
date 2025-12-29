@@ -170,9 +170,13 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         # 應用字體
         cell.font = Font(name='Consolas', size=10, color=txt_color, bold=is_bold)
 
+    error_excel_row = None
+    if log_type == 'FAIL' and error_line_idx is not None:
+        error_excel_row = actual_log_start + error_line_idx
+
     # 返回最後一行和錯誤行位置 (供 FAIL_LIST 超鏈接使用)
     last_row = actual_log_start + len(raw_lines)
-    return (last_row, error_excel_row if log_type == 'FAIL' else None)
+    return (last_row, error_excel_row)
 
 def insert_header_info(ws, header_info, start_row=4):
     """插入置頂 Header 資訊"""
