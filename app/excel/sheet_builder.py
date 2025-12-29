@@ -159,30 +159,42 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         # 2. 測試項目內容 (淺藍背景)
         light_blue_fill = PatternFill('solid', fgColor='FFE1F0FF')
         blue_font = Font(name='Consolas', size=11, color='FF000080', bold=True)
+        detail_font = Font(name='Consolas', size=10, color='FF000080')
         
         for item in pass_items_preview:
             step_name = item.get('step_name', 'Unknown Step')
             result = item.get('result', '')
-            response = item.get('response', '')
-            error = item.get('error', '')
             
-            # 格式化顯示文字 - 優先顯示詳細的比對資訊
-            display_text = f"  ✓ {step_name}"
-            
-            # 如果有 response 且包含比對資訊（例如 "1000 (1000,)"）
-            if response and '(' in response:
-                display_text += f" = {response}"
-            elif result and result not in step_name:
+            # 顯示主要的 Phase 標題
+            display_text = f"  ■ {step_name}"
+            if result and result not in step_name and '=' not in result:
                 display_text += f" = {result}"
-            
-            # 如果有額外的錯誤或回應資訊
-            if error and error != 'PASS' and error not in display_text:
-                display_text += f" [{error}]"
             
             cp = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(display_text))
             cp.font = blue_font
             cp.fill = light_blue_fill
             curr_h_row += 1
+            
+            # 提取並顯示詳細的比對資料（從 full_log 中）
+            full_log = item.get('full_log', [])
+            comparison_lines = []
+            
+            for log_line in full_log:
+                line_str = str(log_line).strip()
+                # 尋找包含 '=' 和 '(' 的比對行（例如 "LAN_SPEED = 1000 (1000,)"）
+                if '=' in line_str and '(' in line_str and ')' in line_str:
+                    # 移除前面的符號和空白
+                    clean_line = line_str.lstrip('└├│ \t')
+                    if clean_line and not clean_line.startswith('>'):
+                        comparison_lines.append(clean_line)
+            
+            # 顯示比對細節（縮排顯示）
+            for comp_line in comparison_lines[:5]:  # 最多顯示5個比對項
+                detail_text = f"    └ {comp_line}"
+                cd = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(detail_text))
+                cd.font = detail_font
+                cd.fill = light_blue_fill
+                curr_h_row += 1
         
         curr_h_row += 1  # 留空行
 
