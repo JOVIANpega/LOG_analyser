@@ -24,6 +24,11 @@ class EnhancedText:
         # 綁定滑鼠移動事件 (用於行高亮)
         self.text.bind('<Motion>', self._on_mouse_move)
         self.text.bind('<Leave>', self._on_mouse_leave)
+        
+        # 🟢 新增：綁定鍵盤/點擊事件 (確保反黃效果跟隨鍵盤選擇)
+        self.text.bind('<KeyRelease>', self._on_cursor_move)
+        self.text.bind('<ButtonRelease-1>', self._on_cursor_move)
+        
         self.last_highlighted_line = None
     
     def setup_scrollbars(self):
@@ -52,7 +57,14 @@ class EnhancedText:
     def append(self, text, tag=None):
         """追加文字內容並自動捲動"""
         try:
+            insert_pos = self.text.index(tk.END + "-1c")
             self.text.insert(tk.END, str(text) + "\n", tag)
+            
+            # 🟢 鍵盤導航增強：如果是在追加測項章節，額外加上 header_style 標籤
+            if '@STEP' in str(text):
+                end_pos = self.text.index(tk.END + "-1c")
+                self.text.tag_add('header_style', insert_pos, end_pos)
+
             self.text.see(tk.END)
         except Exception as e:
             print(f"Append text failed: {e}")
@@ -390,16 +402,18 @@ class EnhancedText:
             # 著色 (套用到整行，包含行號背景，讓視覺更一致)
             self.text.tag_add(style_tag, line_start, content_end)
             
-            # 4. 可點擊元件處理
-            if ann.get('is_clickable'):
-                # 提取測項名稱用於點擊跳轉
+            # 4. 章節與跳轉點標記 (用於鍵盤上下鍵切換章節)
+            if '@STEP' in line_content:
+                # 著色為標題樣式
+                self.text.tag_add('header_style', line_start, content_end)
+                
+                # 提取測項名稱用於內部跳轉索引
                 step_match = re.search(r'Do @STEP\d+@([^@\n]+)', line_content)
                 if step_match:
                     step_name = step_match.group(1).strip()
                     click_tag = f"step_jump_{step_name}"
                     self.text.tag_add(click_tag, content_start, content_end)
                     self.text.tag_add('step_clickable', content_start, content_end)
-                    # 也可以將此行加入跳轉索引
                     if step_name not in self.step_positions:
                         self.step_positions[step_name] = line_start
 
@@ -571,4 +585,29 @@ class EnhancedText:
         if self.last_highlighted_line:
             self.text.tag_remove('current_line_highlight', f"{self.last_highlighted_line}.0", f"{self.last_highlighted_line}.end+1c")
         self.last_highlighted_line = None
+
+    def _on_cursor_move(self, event=None):
+        """處理鍵盤/點擊後的游標移動，高亮當前行 (反黃跟隨)"""
+        try:
+            # 1. 獲取當前游標所在的行號
+            index = self.text.index(tk.INSERT)
+            current_line = index.split('.')[0]
+            
+            # 2. 如果行號沒變，不重複處理
+            if current_line == self.last_highlighted_line:
+                return
+                
+            # 3. 移除舊的高亮
+            if self.last_highlighted_line:
+                self.text.tag_remove('current_line_highlight', f"{self.last_highlighted_line}.0", f"{self.last_highlighted_line}.end+1c")
+                
+            # 4. 添加新高亮
+            line_start = f"{current_line}.0"
+            line_end = f"{current_line}.end+1c"
+            self.text.tag_add('current_line_highlight', line_start, line_end)
+            self.text.tag_raise('current_line_highlight')
+            
+            self.last_highlighted_line = current_line
+        except Exception:
+            pass
     

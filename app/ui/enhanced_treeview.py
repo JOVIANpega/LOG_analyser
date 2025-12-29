@@ -181,23 +181,37 @@ class EnhancedTreeview:
                 print("沒有找到詳細內容")
     
     def _on_selection_change(self, event):
-        """處理選擇改變事件 (考慮使用者設定是否顯示彈窗)"""
-        # 檢查設定是否允許顯示懸停預覽
-        show_preview = False
-        if self.settings:
-            show_preview = self.settings.get('show_hover_preview', False)
-            
+        """處理選擇改變事件 (讓反黃效果跟隨鍵盤選擇)"""
         selected_items = self.tree.selection()
         if not selected_items:
             self._hide_hover_popup()
             return
+            
+        current_item = selected_items[0]
         
-        # 只有在設定開啟時才自動顯示彈窗
+        # 🟢 視覺連動：讓鍵盤選中的項目也套用 hover (反黃) 效果
+        if current_item != self.current_hover_item:
+            # 清除舊的
+            if self.current_hover_item:
+                try:
+                    old_tags = list(self.tree.item(self.current_hover_item, 'tags'))
+                    if 'hover' in old_tags: old_tags.remove('hover')
+                    self.tree.item(self.current_hover_item, tags=tuple(old_tags))
+                except: pass
+            
+            # 套用新的
+            self.current_hover_item = current_item
+            try:
+                tags = list(self.tree.item(current_item, 'tags'))
+                if 'hover' not in tags: tags.append('hover')
+                self.tree.item(current_item, tags=tuple(tags))
+            except: pass
+
+        # 檢查設定是否顯示懸停彈窗
+        show_preview = self.settings.get('show_hover_preview', False) if self.settings else False
         if show_preview:
-            current_item = selected_items[0]
-            if current_item != self._hover_row:
-                if self.full_content_storage.get(current_item):
-                    self._maybe_show_hover_popup_for_keyboard(current_item)
+            if self.full_content_storage.get(current_item):
+                self._maybe_show_hover_popup_for_keyboard(current_item)
         else:
             self._hide_hover_popup()
     
@@ -640,6 +654,49 @@ class EnhancedTreeview:
             self.tree.delete(item)
         self.full_content_storage.clear()  # 清空存儲字典
         self.all_items_data.clear()  # 清空所有測試項資料
+
+    def add_navigation_buttons(self):
+        """在 Treeview 左側添加導覽按鈕列 (Top, PgUp, PgDn, Bottom)"""
+        parent = self.tree.master
+        nav_frame = ttk.Frame(parent)
+        nav_frame.pack(side=tk.LEFT, fill=tk.Y, padx=2)
+        
+        ttk.Button(nav_frame, text="▲", width=3, command=self.page_up).pack(pady=2)
+        ttk.Button(nav_frame, text="TOP", width=4, command=self.scroll_to_top).pack(pady=2)
+        ttk.Button(nav_frame, text="END", width=4, command=self.scroll_to_bottom).pack(pady=2)
+        ttk.Button(nav_frame, text="▼", width=3, command=self.page_down).pack(pady=2)
+
+    def scroll_to_top(self):
+        """滾動到最頂端"""
+        children = self.tree.get_children()
+        if children:
+            self.tree.see(children[0])
+            self.tree.selection_set(children[0])
+            self.tree.focus(children[0])
+
+    def scroll_to_bottom(self):
+        """滾動到最後一個可見節點"""
+        children = self.tree.get_children()
+        if not children: return
+        
+        last_item = children[-1]
+        # 遞迴找到最後一個子節點
+        while True:
+            sub_children = self.tree.get_children(last_item)
+            if not sub_children: break
+            last_item = sub_children[-1]
+            
+        self.tree.see(last_item)
+        self.tree.selection_set(last_item)
+        self.tree.focus(last_item)
+
+    def page_up(self):
+        """向上翻頁 (移動選擇器)"""
+        self.tree.event_generate('<Prior>')
+
+    def page_down(self):
+        """向下翻頁 (移動選擇器)"""
+        self.tree.event_generate('<Next>')
     
     def _show_detail_dialog(self, content, current_item_id=None):
         """顯示詳細內容對話框（測項指令內容）"""

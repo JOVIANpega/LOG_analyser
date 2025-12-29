@@ -91,8 +91,122 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
             
             # 強制重新綁定 Motion 事件 (add='+' 確保不衝突)
             self.fail_tree_enhanced.tree.bind('<Motion>', self._on_fail_tree_motion_direct, add='+')
-            # 點擊選擇也同步更新 (點擊是最高優先權，立即開發)
+            # 點擊/鍵盤選擇也同步更新 (立即顯示)
             self.fail_tree_enhanced.tree.bind('<<TreeviewSelect>>', self._on_fail_item_select_instant, add='+')
+            
+            # ⌨️ 鍵盤增強：當焦點在 Treeview 時，Ctrl+上下鍵/Page可以滾動下方 Detail
+            self.fail_tree_enhanced.tree.bind('<Control-Up>', lambda e: self.fail_error_text.yview_scroll(-1, "units"))
+            self.fail_tree_enhanced.tree.bind('<Control-Down>', lambda e: self.fail_error_text.yview_scroll(1, "units"))
+            self.fail_tree_enhanced.tree.bind('<Control-Prior>', lambda e: self.fail_error_text.yview_scroll(-1, "pages"))
+            self.fail_tree_enhanced.tree.bind('<Control-Next>', lambda e: self.fail_error_text.yview_scroll(1, "pages"))
+
+        # 🔄 標籤切換時自動聚焦，確保鍵盤立即可以使用
+        if hasattr(self, 'notebook'):
+            self.notebook.bind('<<NotebookTabChanged>>', self._on_tab_changed)
+
+        # 📄 原始 LOG 鍵盤增強：上下鍵改為「翻頁」模式 (User Requested: 一次翻轉一個頁面)
+        if hasattr(self, 'log_text_enhanced'):
+            # 將上下鍵綁定為翻頁
+            self.log_text_enhanced.text.bind('<Down>', lambda e: self.log_text_enhanced.text.yview_scroll(1, "pages") or "break")
+            self.log_text_enhanced.text.bind('<Up>', lambda e: self.log_text_enhanced.text.yview_scroll(-1, "pages") or "break")
+            
+            # 將章節跳轉移動到 Alt + PageUp/Down
+            self.log_text_enhanced.text.bind('<Alt-Prior>', lambda e: self._jump_to_text_mark(self.log_text_enhanced.text, 'header_style', 'prev'))
+            self.log_text_enhanced.text.bind('<Alt-Next>', lambda e: self._jump_to_text_mark(self.log_text_enhanced.text, 'header_style', 'next'))
+            
+        # ❌ FAIL 詳情鍵盤增強
+        if hasattr(self, 'fail_error_text'):
+            # 上下鍵翻頁
+            self.fail_error_text.bind('<Down>', lambda e: self.fail_error_text.yview_scroll(1, "pages") or "break")
+            self.fail_error_text.bind('<Up>', lambda e: self.fail_error_text.yview_scroll(-1, "pages") or "break")
+            
+            # 章節跳轉也移動到 Alt + PageUp/Down
+            self.fail_error_text.bind('<Alt-Prior>', lambda e: self._jump_to_text_mark(self.fail_error_text, 'fail_text', 'prev'))
+            self.fail_error_text.bind('<Alt-Next>', lambda e: self._jump_to_text_mark(self.fail_error_text, 'fail_text', 'next'))
+
+    def _jump_to_text_mark(self, widget, tag, direction):
+        """輔助函式：在指定的 Text Widget 中依據標籤跳轉 (支援 Content Switching)"""
+        try:
+            current_pos = widget.index(tk.INSERT)
+            ranges = widget.tag_ranges(tag)
+            if not ranges: return None
+            
+            # 取得所有區段的起始位置
+            positions = [widget.index(ranges[i]) for i in range(0, len(ranges), 2)]
+            
+            target_pos = None
+            if direction == 'next':
+                for p in positions:
+                    if widget.compare(p, '>', current_pos):
+                        target_pos = p
+                        break
+                if not target_pos and positions: target_pos = positions[0] # 回到第一個
+            else:
+                for p in reversed(positions):
+                    if widget.compare(p, '<', current_pos):
+                        target_pos = p
+                        break
+                if not target_pos and positions: target_pos = positions[-1] # 回到最後一個
+            
+            if target_pos:
+                widget.see(target_pos)
+                widget.mark_set(tk.INSERT, target_pos)
+                # 📢 觸發反黃高亮跟隨 (如果有該方法)
+                if hasattr(self, 'log_text_enhanced'):
+                    # 嘗試從物件實例中調用高亮更新
+                    for attr in ['log_text_enhanced', 'fail_error_text']:
+                        obj = getattr(self, attr, None)
+                        if obj and hasattr(obj, 'text') and obj.text == widget:
+                             obj._on_cursor_move()
+                             break
+        except: pass
+        return "break" # 攔截預設的 1 line 移動
+
+    # 🚀 全域快捷導航實作 (由左側面板按鈕調用)
+    def _global_scroll_top(self):
+        """全域置頂：根據目前標籤頁進行置頂"""
+        tab_text = self._get_current_tab_text()
+        if "FAIL" in tab_text: self.fail_tree_enhanced.scroll_to_top()
+        elif "PASS" in tab_text: self.pass_tree_enhanced.scroll_to_top()
+        elif "原始" in tab_text: self.log_text_enhanced.text.see("1.0")
+
+    def _global_scroll_bottom(self):
+        """全域置底：根據目前標籤頁進行置底"""
+        tab_text = self._get_current_tab_text()
+        if "FAIL" in tab_text: self.fail_tree_enhanced.scroll_to_bottom()
+        elif "PASS" in tab_text: self.pass_tree_enhanced.scroll_to_bottom()
+        elif "原始" in tab_text: self.log_text_enhanced.text.see(tk.END)
+
+    def _global_scroll_pgup(self):
+        """全域上一頁：標準翻頁行為 (例如：51-100 -> 0-50)"""
+        tab_text = self._get_current_tab_text()
+        if "FAIL" in tab_text: self.fail_tree_enhanced.page_up()
+        elif "PASS" in tab_text: self.pass_tree_enhanced.page_up()
+        elif "原始" in tab_text: self.log_text_enhanced.text.yview_scroll(-1, "pages")
+
+    def _global_scroll_pgdn(self):
+        """全域下一頁：標準翻頁行為 (例如：0-50 -> 51-100)"""
+        tab_text = self._get_current_tab_text()
+        if "FAIL" in tab_text: self.fail_tree_enhanced.page_down()
+        elif "PASS" in tab_text: self.pass_tree_enhanced.page_down()
+        elif "原始" in tab_text: self.log_text_enhanced.text.yview_scroll(1, "pages")
+
+    def _get_current_tab_text(self):
+        try:
+            return self.notebook.tab(self.notebook.select(), "text")
+        except: return ""
+
+    def _on_tab_changed(self, event):
+        """當切換分頁時，自動聚焦到該頁面的主要列表中"""
+        selected_tab = self.notebook.select()
+        tab_text = self.notebook.tab(selected_tab, "text")
+        
+        if "FAIL" in tab_text and hasattr(self, 'fail_tree_enhanced'):
+            self.fail_tree_enhanced.tree.focus_set()
+        elif "PASS" in tab_text and hasattr(self, 'pass_tree_enhanced'):
+            self.pass_tree_enhanced.tree.focus_set()
+        elif "原始" in tab_text and hasattr(self, 'log_text_enhanced'):
+            self.log_text_enhanced.text.focus_set()
 
     def _on_fail_tree_motion_direct(self, event):
         """懸停處理：實作快速延遲預覽 (200ms)，確保流暢且不閃爍"""
@@ -167,6 +281,10 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         # 3. 更新 Treeview 
         if hasattr(self, 'result_tree'):
             self.font_scaler.apply_to_treeview(self.result_tree.tree)
+            
+        # 4. 更新下拉選單字體 (左側面板)
+        if hasattr(self, 'selection_menu'):
+            self.selection_menu.configure(font=('Arial', self.ui_font_size))
 
     def _cleanup_temp_files_async(self):
         """非同步清理暫存檔案"""

@@ -87,10 +87,12 @@ def build_left_panel(parent, app):
     app.font_scaler.register(btn_smart)
     _create_tooltip(btn_smart, "點擊選擇 LOG 來源\n支援單個/多個檔案、壓縮檔或整個資料夾", app=app)
     
-    # 創建下拉選單
-    selection_menu = tk.Menu(btn_smart, tearoff=0)
+    # 創建下拉選單 (設定字體以連動 UI 大小)
+    ui_font_size = app.settings.get('ui_font_size', 10)
+    selection_menu = tk.Menu(btn_smart, tearoff=0, font=('Arial', ui_font_size))
     selection_menu.add_command(label="📄 選擇檔案 (Log/壓縮檔)...", command=app._select_files_unified)
     selection_menu.add_command(label="📁 選擇資料夾 (批次處理)...", command=app._select_folder_unified)
+    app.selection_menu = selection_menu
     
     # 綁定點擊事件顯示選單
     def show_smart_menu(event):
@@ -127,7 +129,7 @@ def build_left_panel(parent, app):
     search_label.pack(anchor='w')
     app.font_scaler.register(search_label)
     
-    app.search_var = tk.StringVar()
+    app.search_var = tk.StringVar(value="doesn't")
     app.search_entry = ttk.Entry(search_frame, textvariable=app.search_var, font=('Arial', 10))
     app.search_entry.pack(fill=tk.X, pady=5)
     app.search_entry.bind('<KeyRelease>', app._on_search_change)
@@ -168,12 +170,45 @@ def build_left_panel(parent, app):
     app.font_scaler.register(help_btn)
     _create_tooltip(help_btn, "開啟操作說明文件\n查看詳細使用指南", app=app)
     
-    # 不需要額外的 bold 和 hover 處理
-    pass
+    # 🚀 跨分頁快捷導覽按鈕區 (User Requested: 放在 HTML 按鈕下方)
+    nav_labelframe = ttk.LabelFrame(parent, text=" ⚡ 快捷導覽 (隨當前標籤切換) ", padding=(10, 10))
+    nav_labelframe.pack(fill=tk.X, padx=10, pady=5)
     
+    nav_btn_frame = ttk.Frame(nav_labelframe)
+    nav_btn_frame.pack(fill=tk.X)
+    
+    # 使用網格佈局 2x2
+    # TOP
+    btn_top = ttk.Button(nav_btn_frame, text="🔝 TOP (置頂)", 
+                        command=app._global_scroll_top, style='info.TButton')
+    btn_top.grid(row=0, column=0, sticky='nsew', padx=2, pady=2)
+    app.font_scaler.register(btn_top)
+    
+    # PAGE UP
+    btn_pgup = ttk.Button(nav_btn_frame, text="▲ 上一頁", 
+                         command=app._global_scroll_pgup, style='secondary.TButton')
+    btn_pgup.grid(row=0, column=1, sticky='nsew', padx=2, pady=2)
+    app.font_scaler.register(btn_pgup)
+    
+    # PAGE DOWN
+    btn_pgdn = ttk.Button(nav_btn_frame, text="▼ 下一頁", 
+                         command=app._global_scroll_pgdn, style='secondary.TButton')
+    btn_pgdn.grid(row=1, column=1, sticky='nsew', padx=2, pady=2)
+    app.font_scaler.register(btn_pgdn)
+    
+    # END
+    btn_end = ttk.Button(nav_btn_frame, text="🔚 END (最後)", 
+                        command=app._global_scroll_bottom, style='info.TButton')
+    btn_end.grid(row=1, column=0, sticky='nsew', padx=2, pady=2)
+    app.font_scaler.register(btn_end)
+    
+    nav_btn_frame.columnconfigure(0, weight=1)
+    nav_btn_frame.columnconfigure(1, weight=1)
+    _create_tooltip(nav_labelframe, "快速捲動目前的內容\n💡 鍵盤快捷鍵：\n• 方向鍵 [↑/↓]：直接翻頁 (Page Up/Down)\n• [Alt + PageUp/Dn]：切換測項章節 (@STEP)", app=app)
+
     # 顯示選擇的檔案
-    app.file_info_label = ttk.Label(file_frame, text="未選擇檔案", 
-                                    wraplength=200, style='secondary.TLabel')
-    app.file_info_label.pack(pady=(5, 0))
-    app.font_scaler.register(app.file_info_label)
+    app.file_info_label_left = ttk.Label(file_frame, text="未選擇檔案", 
+                                        wraplength=200, style='secondary.TLabel')
+    app.file_info_label_left.pack(pady=(5, 0))
+    app.font_scaler.register(app.file_info_label_left)
     

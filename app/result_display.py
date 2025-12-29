@@ -442,9 +442,12 @@ class ResultDisplayMixin:
                 line_display = f"{i+1:4d} | {line}\n"
                 
                 if i == primary_error_idx:
-                    self.fail_error_text.insert(tk.END, " ▶ " + line_display, 'primary_error')
-                elif '>' in line or 'Do @STEP' in line:
-                    self.fail_error_text.insert(tk.END, "   " + line_display, 'command_line')
+                    self.fail_error_text.insert(tk.END, " ▶ " + line_display, ('primary_error', 'fail_text'))
+                elif '>' in line or '@STEP' in line:
+                    # 如果是測項章節，也標記為可跳轉點
+                    tags = ['command_line']
+                    if '@STEP' in line: tags.append('fail_text')
+                    self.fail_error_text.insert(tk.END, "   " + line_display, tuple(tags))
                 else:
                     self.fail_error_text.insert(tk.END, "   " + line_display, 'context_line')
         else:

@@ -301,6 +301,29 @@ else:
 | 2025-12-26 | 创建初始规则文档 | Antigravity AI | 全局规则定义 |
 | 2025-12-26 | 统一 bottom-up 优先级逻辑 | Antigravity AI | GUI + Excel 错误提取 |
 | 2025-12-26 | 添加 FAIL_LIST ISN 超链接 | Antigravity AI | Excel FAIL_LIST |
+| 2025-12-29 | 新增全域導覽按鈕與鍵盤翻頁規則 (v2.1) | Antigravity AI | GUI 導覽控制 |
+
+---
+
+## ⌨️ 導覽與鍵盤操作規則 (v2.1)
+
+為確保大數據日誌處理的極速體驗，導覽行為必須符合以下規範：
+
+### 1. 全域導覽按鈕 (Global Navigation)
+*   **按鈕位置**: 整合於左側面板 (Navigation Area)。
+*   **行為邏輯**: 
+    1. 偵測目前焦點所在的 Tab (FAIL, PASS, Raw Log)。
+    2. 調用該分頁對應的 `EnhancedText` 或 `EnhancedTreeview` 捲動方法。
+    3. 必須包含: **Top**, **Page Up**, **Page Down**, **End**。
+
+### 2. 鍵盤快捷鍵標準
+*   **翻頁 (Paging)**: 方向鍵 `↑` / `↓` 必須映射至 `page_up` / `page_down` (一次捲動一整個視窗)。
+*   **章節跳轉 (Chapter Jump)**: `Alt + PageUp` / `Alt + PageDown` 必須在含有 `@STEP` 的行之間跳轉。
+*   **頂/末端跳轉**: `Ctrl + Home` / `Ctrl + End` (標準行為)。
+
+### 3. 視覺一致性
+*   **黃色高亮跟隨**: 在 `EnhancedText` 中，當游標透過鍵盤或滑鼠移動時，`current_line_highlight` (背景色 #FFF2CC) 必須即時更新至該行。
+*   **Treeview 選取同步**: 鍵盤上下移動選取項時，必須觸發 `hover` 標籤與細節預覽跟隨。
 
 ---
 

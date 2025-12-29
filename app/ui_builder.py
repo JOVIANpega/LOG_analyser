@@ -183,7 +183,7 @@ class UIBuilderMixin:
         pass_columns = ("比對項目細節", "判定結果")
         self.pass_tree_enhanced = EnhancedTreeview(self.tab_pass, pass_columns, settings=self.settings)
         self.pass_tree_enhanced.pack_with_scrollbars(fill=tk.BOTH, expand=1)
-        self.pass_tree_enhanced.auto_fit_columns() # 確保欄寬足夠
+        self.pass_tree_enhanced.auto_fit_columns()
     
     def _build_enhanced_fail_tab(self):
         """建立FAIL標籤頁 - 分割成上下兩個視窗"""
@@ -194,7 +194,6 @@ class UIBuilderMixin:
         self.fail_paned = ttk.Panedwindow(self.tab_fail, orient=tk.VERTICAL)
         self.fail_paned.pack(fill=tk.BOTH, expand=1)
         
-        # 上半部 - FAIL測項列表
         self.fail_upper_frame = ttk.Frame(self.fail_paned)
         fail_columns = ("測項名稱", "FAIL原因")
         self.fail_tree_enhanced = EnhancedTreeview(self.fail_upper_frame, fail_columns, settings=self.settings)

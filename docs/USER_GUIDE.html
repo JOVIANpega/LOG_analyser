@@ -116,7 +116,7 @@
 <body>
 
   <div class="header">
-    <h1>PEGA Log Analyzer V2.0.0</h1>
+    <h1>PEGA Log Analyzer V2.1.0</h1>
     <p>專業測試 Log 快速分析工具 - 操作說明手冊</p>
   </div>
 
@@ -128,12 +128,12 @@
         支援單一 <code>.log</code>、多選檔案、<code>.zip</code>、<code>.7z</code> 壓縮檔及整個資料夾。
       </div>
       <div class="feature-item">
-        <strong>📊 嚴格數據提取</strong>
-        自動捕捉 <code>xxx = OOO (OOO)</code> 規律的比對數據，過濾無關雜訊。
+        <strong>⚡ 增強型導覽</strong>
+        全分頁支援左側「快捷導覽」按鈕與鍵盤翻頁，大數據日誌閱讀更流暢。
       </div>
       <div class="feature-item">
         <strong>🔍 錯誤精準定位</strong>
-        FAIL 項目自動關聯原始 Log 位置，並提供關鍵區塊預覽。
+        FAIL 項目自動關聯原始 Log 位置，滑鼠懸停即可即時預覽錯誤詳情。
       </div>
       <div class="feature-item">
         <strong>📈 Excel 報表生成</strong>
@@ -143,15 +143,26 @@
   </div>
 
   <div class="section">
+    <h2>⌨️ 鍵盤快捷鍵與導覽 (最高效率)</h2>
+    <ul>
+      <li><strong>方向鍵 [↑ / ↓]</strong>：<span class="highlight">快速翻頁 (Page Up/Down)</span>。適合大範圍快速掃描內容。</li>
+      <li><strong>[Alt + PageUp / PageDown]</strong>：<span class="highlight">下一章節 (@STEP)</span>。直接在不同測試步驟間瞬間跳轉。</li>
+      <li><strong>[Ctrl + Home / End]</strong>：跳轉至整份日誌的最頂端或最末端。</li>
+      <li><strong>[Ctrl + F]</strong>：開啟快速搜尋對話框。</li>
+      <li><strong>[Ctrl + 滾輪]</strong>：即時調整 UI 字體與內容顯示大小。</li>
+    </ul>
+  </div>
+
+  <div class="section">
     <h2>📖 如何使用（三步驟）</h2>
     <div class="step" data-number="1">
       <strong>選擇檔案</strong>：使用左側面板的「選擇檔案」、「選擇資料夾」或「選擇壓縮檔」。您可以一次選取多個檔案進行批次分析。
     </div>
     <div class="step" data-number="2">
-      <strong>查看結果</strong>：
+      <strong>查看與導覽</strong>：
       <ul>
-        <li><strong>✅ PASS測項</strong>：查看成功的測試步驟及其精確的比對數值。</li>
-        <li><strong>❌ FAIL測項</strong>：查看失敗的錯誤回應、FAIL原因及重試次數。點選項目可直接在原始 Log 中跳轉到錯誤位置。</li>
+        <li><strong>✅ PASS測項</strong>：查看成功的測試步驟。利用左側「快捷導覽」按鈕快速翻轉長列表。</li>
+        <li><strong>❌ FAIL測項</strong>：點選項目可直接在原始 Log 中跳轉。使用鍵盤上下鍵進行翻頁閱讀詳情。</li>
         <li><strong>📄 原始LOG</strong>：即時查看完整的日誌內容，支援關鍵字高亮快搜。</li>
       </ul>
     </div>
@@ -163,14 +174,14 @@
   <div class="section">
     <h2>⚙️ 進階操作技巧</h2>
     <ul>
+      <li><strong>懸停預覽</strong>：在 FAIL 列表上移動滑鼠，下方視窗會即時連動顯示錯誤區塊，無需頻繁點擊。</li>
       <li><strong>高亮關鍵字</strong>：在原始 LOG 頁面使用搜尋功能後，點選「+高亮」可將該字串存入設定，往後打開任何 LOG 都會自動標色。</li>
-      <li><strong>縮放字體</strong>：使用滑鼠滾輪或設定頁面調整文字大小，適應不同的顯示器解析度。</li>
-      <li><strong>過濾雜訊</strong>：系統已內建自動過濾 Ping、ICMP 等系統雜訊，讓您專注於測試參數。</li>
+      <li><strong>側邊欄搜尋統計</strong>：搜尋框上方會顯示「目前頁面/總共項目」的匹配數量，幫助您精確掌握錯誤點。</li>
     </ul>
   </div>
 
   <div class="footer">
-    © 2025 PEGA Advanced Agentic Coding. All rights reserved.
+    © 2025 PEGA Advanced Agentic Coding. Version 2.1.0
   </div>
 
 </body>
