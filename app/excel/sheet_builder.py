@@ -163,11 +163,21 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         for item in pass_items_preview:
             step_name = item.get('step_name', 'Unknown Step')
             result = item.get('result', '')
+            response = item.get('response', '')
+            error = item.get('error', '')
             
-            # 格式化顯示文字
+            # 格式化顯示文字 - 優先顯示詳細的比對資訊
             display_text = f"  ✓ {step_name}"
-            if result and result not in step_name:
+            
+            # 如果有 response 且包含比對資訊（例如 "1000 (1000,)"）
+            if response and '(' in response:
+                display_text += f" = {response}"
+            elif result and result not in step_name:
                 display_text += f" = {result}"
+            
+            # 如果有額外的錯誤或回應資訊
+            if error and error != 'PASS' and error not in display_text:
+                display_text += f" [{error}]"
             
             cp = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(display_text))
             cp.font = blue_font
