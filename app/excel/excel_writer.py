@@ -159,13 +159,19 @@ class ExcelWriter:
         # 3. 原始 LOG (帶有 Premium 背景顏色與文字顏色)
         raw_lines = entry.get('raw_lines', [])
         annotations = entry.get('ui_annotations', [])
-        fail_items = entry.get('fail_items', []) 
         log_type = entry.get('log_type', 'UNKNOWN')  # ⚠️ 關鍵：取得日誌類型
+        
+        # 根據日誌類型取得對應的項目列表
+        if log_type == 'PASS':
+            items_to_display = entry.get('pass_items', [])
+        else:
+            items_to_display = entry.get('fail_items', [])
+        
         content_font = Font(name='Consolas', size=11)
         
-        # ⚠️ 傳入 log_type，確保 PASS 日誌不會生成錯誤預覽框
+        # ⚠️ 傳入 log_type 和對應的項目列表
         # ⚠️ 接收返回的錯誤行位置信息
-        last_row, error_excel_row = write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=fail_items, log_type=log_type)
+        last_row, error_excel_row = write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=items_to_display, log_type=log_type)
         
         # 4. 置底 [回到 Summary/FAIL_LIST] 連結 - Font 16, 深藍底白字
         bottom_row = last_row + 2
