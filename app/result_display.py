@@ -219,81 +219,54 @@ class ResultDisplayMixin:
             print(f"自動顯示FAIL錯誤原因失敗: {e}")
     
     def _display_fail_reason_for_item(self, item_id):
-        """為指定項目顯示FAIL錯誤原因"""
+        """為指定項目顯示FAIL錯誤原因 (支援點擊與懸停)"""
+        if not item_id: return
+        
         try:
+            # 1. 檢查是否為 Phase Header (📘 Phase...)
+            tags = self.fail_tree_enhanced.tree.item(item_id, 'tags')
+            if 'phase_header' in tags:
+                return # 章節標題不更新內容
+                
             values = self.fail_tree_enhanced.tree.item(item_id, 'values')
-            
             if values:
-                # 從存儲中獲取完整內容
+                # 2. 獲取完整 LOG 內容
                 full_content = self.fail_tree_enhanced.full_content_storage.get(item_id, '')
+                if not full_content:
+                    # 備原方案：如果 storage 沒抓到，嘗試從 data 列表找
+                    for data in self.fail_tree_enhanced.all_items_data:
+                        if data['item_id'] == item_id:
+                            full_content = data.get('full_response', '')
+                            break
                 
-                # 提取主要的FAIL原因作為大字體標題
+                # 3. 提取錯誤摘要 (大字體標題)
                 main_error = self._extract_main_fail_reason(full_content)
+                if not main_error or main_error == "未知錯誤":
+                    # 如果提取失敗，嘗試用列表中的 FAIL原因 欄位
+                    main_error = values[1] if len(values) > 1 else "未知錯誤"
                 
-                # 顯示大字體紅色文字白底
+                # 4. 更新 UI 標題
                 if hasattr(self, 'fail_error_title'):
                     self.fail_error_title.config(text=main_error, 
-                                                font=('Arial', 20, 'bold'), fg='red', bg='white')
+                                                font=('Arial', 18, 'bold'), 
+                                                foreground='red', background='white')
                 
-                # 提取FAIL原因部分顯示在下方
-                fail_reason_content = self._extract_fail_reason(full_content)
-                
-                # 更新錯誤內容
+                # 5. 更新 UI 文字框 (顯示格式化 LOG)
                 if hasattr(self, 'fail_error_text'):
                     self.fail_error_text.config(state=tk.NORMAL)
-                    self.fail_error_text.delete('1.0', tk.END)
-                    self._insert_formatted_fail_content(fail_reason_content)
-                    self.fail_error_text.config(state=tk.NORMAL)
-            else:
-                if hasattr(self, 'fail_error_title'):
-                    self.fail_error_title.config(text="無詳細錯誤資訊")
-                if hasattr(self, 'fail_error_text'):
-                    self.fail_error_text.config(state=tk.NORMAL)
-                    self.fail_error_text.delete('1.0', tk.END)
-                    self.fail_error_text.insert('1.0', "沒有詳細錯誤內容可顯示")
-                    self.fail_error_text.config(state=tk.NORMAL)
+                    self._insert_formatted_fail_content(full_content)
+                    self.fail_error_text.config(state=tk.DISABLED) # 防止誤刪改
         except Exception as e:
-            print(f"顯示FAIL錯誤原因失敗: {e}")
+            print(f"[ERROR] 顯示FAIL原因失敗: {e}")
     
     def _on_fail_item_select(self, event):
         """處理FAIL項目選擇事件"""
         try:
             selection = self.fail_tree_enhanced.tree.selection()
             if selection:
-                item_id = selection[0]
-                values = self.fail_tree_enhanced.tree.item(item_id, 'values')
-                
-                if values:
-                    # 從存儲中獲取完整內容，優先找到包含 "is Fail" 的行作為標題
-                    full_content = self.fail_tree_enhanced.full_content_storage.get(item_id, '')
-                    
-                    # 優先從完整內容中找到包含 "is Fail" 的行作為大字體標題
-                    main_error = self._extract_main_fail_reason(full_content)
-                    
-                    # 顯示大字體紅色文字白底
-                    if hasattr(self, 'fail_error_title'):
-                        self.fail_error_title.config(text=main_error, 
-                                                    font=('Arial', 20, 'bold'), fg='red', bg='white')
-                    
-                    # 提取FAIL原因部分顯示在下方
-                    fail_reason_content = self._extract_fail_reason(full_content)
-                    
-                    # 更新錯誤內容
-                    if hasattr(self, 'fail_error_text'):
-                        self.fail_error_text.config(state=tk.NORMAL)
-                        self.fail_error_text.delete('1.0', tk.END)
-                        self._insert_formatted_fail_content(fail_reason_content)
-                        self.fail_error_text.config(state=tk.NORMAL)
-                else:
-                    if hasattr(self, 'fail_error_title'):
-                        self.fail_error_title.config(text="無詳細錯誤資訊")
-                    if hasattr(self, 'fail_error_text'):
-                        self.fail_error_text.config(state=tk.NORMAL)
-                        self.fail_error_text.delete('1.0', tk.END)
-                        self.fail_error_text.insert('1.0', "沒有詳細錯誤內容可顯示")
-                        self.fail_error_text.config(state=tk.NORMAL)
+                self._display_fail_reason_for_item(selection[0])
         except Exception as e:
-            print(f"處理FAIL項目選擇失敗: {e}")
+            print(f"[ERROR] FAIL項目點擊失敗: {e}")
     
     def _extract_fail_reason(self, full_content):
         """提取FAIL原因部分，包含更多錯誤關鍵字"""
@@ -413,18 +386,19 @@ class ResultDisplayMixin:
             print(f"切換到LOG標籤頁並聚焦錯誤失敗: {e}")
     
     def _insert_formatted_fail_content(self, content):
-        """插入格式化的FAIL內容，使用 Bottom-up 優先級顯示錯誤（與 Excel 一致）"""
+        """插入格式化的FAIL內容，突顯錯誤行與指令"""
         if not hasattr(self, 'fail_error_text'):
             return
         
-        # 標題
-        self.fail_error_text.insert(tk.END, "═══════════════ 錯誤原因 ═══════════════\n\n", 'error_title')
+        # 清除現有內容
+        self.fail_error_text.config(state=tk.NORMAL)
+        self.fail_error_text.delete('1.0', tk.END)
         
         lines = content.split('\n')
         
-        # === Bottom-up 優先級搜索（與 Excel 完全一致）===
+        # === 尋找主要錯誤行 (與 Excel 邏輯一致) ===
         primary_error_idx = None
-        error_type = None
+        error_type = "UNKNOWN"
         
         # 優先級 1: doesn't match
         for i in range(len(lines)-1, -1, -1):
@@ -441,57 +415,51 @@ class ResultDisplayMixin:
                     error_type = "IS FAIL"
                     break
         
-        # 優先級 3: All Test Aborted
+        # 其他關鍵關鍵字
         if primary_error_idx is None:
-            for i in range(len(lines)-1, -1, -1):
-                if "All Test Aborted" in lines[i].lower():
-                    primary_error_idx = i
-                    error_type = "TEST ABORTED"
-                    break
-        
-        # 優先級 4: 其他關鍵錯誤
-        if primary_error_idx is None:
-            critical_keywords = ['Status:False', 'executes fail', 'FAIL', 'ERROR', 'NACK', 'TIMEOUT']
-            for keyword in critical_keywords:
+            keywords = ['FAIL', 'ERROR', 'NACK', 'TIMEOUT', 'ABORTED']
+            for kw in keywords:
                 for i in range(len(lines)-1, -1, -1):
-                    if keyword.lower() in lines[i].lower():
+                    if kw in lines[i].upper():
                         primary_error_idx = i
-                        error_type = keyword.upper()
+                        error_type = kw
                         break
-                if primary_error_idx is not None:
-                    break
+                if primary_error_idx is not None: break
         
-        if primary_error_idx is None:
-            self.fail_error_text.insert(tk.END, "  未找到明確的錯誤原因\n", 'context_line')
-            return
-        
-        # === 提取錯誤區塊 (顯示指令到錯誤行) ===
-        # 往上找指令起點
-        block_start = primary_error_idx
-        for i in range(primary_error_idx, max(-1, primary_error_idx - 50), -1):
-            if '>' in lines[i] or 'Do @STEP' in lines[i]:
-                block_start = i
-                break
-        
-        # 往下延伸 2 行
-        block_end = min(len(lines), primary_error_idx + 2)
-        
-        # 顯示錯誤類型標籤
-        self.fail_error_text.insert(tk.END, f"🔴 發現錯誤 [{error_type}] (Line {primary_error_idx + 1})\n", 'highlight_title')
-        self.fail_error_text.insert(tk.END, "─" * 50 + "\n", 'separator')
-        
-        # 顯示錯誤區塊
-        for i in range(block_start, block_end):
-            line = lines[i]
-            prefix = "  >>> " if i == primary_error_idx else "      "
+        # --- 寫入內容 ---
+        if primary_error_idx is not None:
+            # 顯示錯誤原因告知
+            self.fail_error_text.insert(tk.END, f" 🔴 偵測到主要錯誤: [{error_type}]\n", 'error_header')
+            self.fail_error_text.insert(tk.END, f" 📍 發生位置: 第 {primary_error_idx + 1} 行\n", 'location_info')
+            self.fail_error_text.insert(tk.END, "━" * 50 + "\n\n", 'separator')
             
-            # 錯誤行使用特殊樣式
-            if i == primary_error_idx:
-                self.fail_error_text.insert(tk.END, prefix + line + '\n', 'primary_error')
-            elif '>' in line or 'Do @STEP' in line:
-                self.fail_error_text.insert(tk.END, prefix + line + '\n', 'command_line')
-            else:
-                self.fail_error_text.insert(tk.END, prefix + line + '\n', 'context_line')
+            # 決定顯示區塊 (往上 15 行，往下 5 行)
+            start = max(0, primary_error_idx - 15)
+            end = min(len(lines), primary_error_idx + 5)
+            
+            for i in range(start, end):
+                line = lines[i]
+                line_display = f"{i+1:4d} | {line}\n"
+                
+                if i == primary_error_idx:
+                    self.fail_error_text.insert(tk.END, " ▶ " + line_display, 'primary_error')
+                elif '>' in line or 'Do @STEP' in line:
+                    self.fail_error_text.insert(tk.END, "   " + line_display, 'command_line')
+                else:
+                    self.fail_error_text.insert(tk.END, "   " + line_display, 'context_line')
+        else:
+            # 如果找不到明確錯誤，顯示全部
+            self.fail_error_text.insert(tk.END, " ℹ️ 未偵測到特定錯誤模式，顯示完整內容:\n\n", 'context_line')
+            for i, line in enumerate(lines):
+                self.fail_error_text.insert(tk.END, f"{i+1:4d} | {line}\n", 'context_line')
+        
+        # 配置標籤樣式
+        self.fail_error_text.tag_configure('error_header', foreground='red', font=('Arial', 14, 'bold'))
+        self.fail_error_text.tag_configure('location_info', foreground='#555555', font=('Arial', 10))
+        self.fail_error_text.tag_configure('separator', foreground='#CCCCCC')
+        self.fail_error_text.tag_configure('primary_error', foreground='#FFFFFF', background='#D0342C', font=('Consolas', 11, 'bold'))
+        self.fail_error_text.tag_configure('command_line', foreground='#007ACC', font=('Consolas', 11, 'bold'))
+        self.fail_error_text.tag_configure('context_line', foreground='#666666', font=('Consolas', 11))
         
         self.fail_error_text.insert(tk.END, "=" * 50 + "\n", 'separator')
         

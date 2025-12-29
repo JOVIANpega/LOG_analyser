@@ -1,7 +1,7 @@
 {
   "ui_font_size": 12,
   "content_font_size": 11,
-  "last_log_path": "C:/Users/pega_user/Desktop/TEMP ASIAOPT/LOG/20251226/1+4cam stitching1 test-LoopRunning-20251226131630-WUCA002-08F0.log",
+  "last_log_path": "C:/Users/pega_user/Desktop/TEMP ASIAOPT/LOG/20251226/1+4cam stitching1 test-LoopRunning-20251226161648-WUCA002-08F0.log",
   "last_folder_path": "C:/Users/pega_user/Desktop/TEMP ASIAOPT/LOG/20251219",
   "window_width": 1902,
   "window_height": 1033,
@@ -12,11 +12,12 @@
   "auto_analyze": true,
   "remember_path": true,
   "version": "V2.05",
-  "last_compressed_path": "C:/Users/pega_user/Desktop/TEMP ASIAOPT/LOG/20251216.7z",
+  "last_compressed_path": "C:/Users/pega_user/Desktop/TEMP ASIAOPT/LOG/MB＿LOG/1+MB FUNCTION-222-20250805162911-ITIF009-06G0.7z",
   "last_compressed_folder": "D:/((Python TOOL/解析LOG2/MINE/蒐集LOG/ZIP LOG",
   "csv_max_display_length": 50,
   "csv_pass_color": "#90EE90",
   "csv_fail_color": "#FFB6C1",
-  "theme": "pulse",
-  "skip_no_test_time": true
+  "theme": "lumen",
+  "skip_no_test_time": true,
+  "show_hover_preview": false
 }

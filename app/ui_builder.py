@@ -196,7 +196,7 @@ class UIBuilderMixin:
         
         # 上半部 - FAIL測項列表
         self.fail_upper_frame = ttk.Frame(self.fail_paned)
-        fail_columns = ("測項名稱", "指令", "錯誤回應", "Retry次數", "FAIL原因")
+        fail_columns = ("測項名稱", "FAIL原因")
         self.fail_tree_enhanced = EnhancedTreeview(self.fail_upper_frame, fail_columns, settings=self.settings)
         self.fail_tree_enhanced.pack_with_scrollbars(fill=tk.BOTH, expand=1)
         self.fail_paned.add(self.fail_upper_frame, weight=3) # 分配權重
@@ -214,8 +214,8 @@ class UIBuilderMixin:
         error_text_frame.pack(fill=tk.BOTH, expand=1, padx=10, pady=5)
         
         self.fail_error_text = tk.Text(error_text_frame, wrap=tk.WORD, 
-                                      bg='#FFF0F0', fg='darkred', font=('Consolas', 12),
-                                      relief=tk.FLAT, padx=8, pady=8)
+                                      bg='white', fg='#333333', font=('Consolas', 12),
+                                      relief=tk.FLAT, padx=10, pady=10)
         self.fail_error_text.grid(row=0, column=0, sticky='nsew')
         
         # 滾動條

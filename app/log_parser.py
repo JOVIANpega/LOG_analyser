@@ -229,40 +229,47 @@ class LogParser:
         }
 
     def _extract_validations(self, lines):
-        """從 Log 行中提取所有 'The validation:' 資訊"""
+        """從 Log 行中「嚴格提取」帶有括號比對標準的比對項目 (xxx = OOO (OOO))"""
         validations = []
-        criteria_pattern = re.compile(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)')
+        # 嚴格正則：必須包含括號內的標準才提取
+        strict_pattern = re.compile(r'([\w\s_-]+)\s*=\s*([^ \(\)]+)\s*\(\s*([^,\)]+)\s*(?:,\s*([^ \)]*)\s*)?\)')
+        
+        noise_keywords = ['icmp_seq', 'ttl=', 'time=', 'bytes from', 'reply from']
         
         for line in lines:
             line_str = str(line).strip()
-            if 'The validation:' in line_str:
-                parts = line_str.split('The validation:', 1)
-                v_content = parts[1].strip() if len(parts) > 1 else line_str
+            
+            # 只有符合 xxx = OOO (OOO) 規律的才列出
+            c_match = strict_pattern.search(line_str)
+            if c_match:
+                if any(kw in line_str.lower() for kw in noise_keywords):
+                    continue
+                
+                # 取得內容 (移除可能的 The validation: 前綴)
+                if 'The validation:' in line_str:
+                    v_content = line_str.split('The validation:', 1)[1].strip()
+                else:
+                    v_content = c_match.group(0).strip()
                 
                 v_status = 'PASS'
-                c_match = criteria_pattern.search(line_str)
-                if c_match:
-                    try:
-                        # 取得實際被檢查的字串 (等號後、左括號前)
-                        val_str = line_str.split('=')[-1].split('(')[0].strip()
-                        v_num = float(c_match.group(1))
-                        l_lim = float(c_match.group(2))
-                        r_lim = float(c_match.group(3))
-                        
-                        # 優先以數值大小判定，若失敗則檢查字串長度 (針對 ISN/SN)
-                        if not (l_lim <= v_num <= r_lim):
-                            if not (l_lim <= len(val_str) <= r_lim):
-                                v_status = 'FAIL'
-                    except:
-                        if 'is FAIL' in line_str or 'status:FAIL' in line_str.lower(): v_status = 'FAIL'
-                else:
+                try:
+                    val_str = c_match.group(2).strip()
+                    l_lim_str = c_match.group(3).strip()
+                    r_lim_str = c_match.group(4).strip() if c_match.group(4) else l_lim_str
+                    
+                    v_num = float(val_str)
+                    l_lim = float(l_lim_str)
+                    r_lim = float(r_lim_str)
+                    
+                    if not (l_lim <= v_num <= r_lim):
+                        if not (l_lim <= len(val_str) <= r_lim):
+                            v_status = 'FAIL'
+                except:
                     if 'is FAIL' in line_str or 'status:FAIL' in line_str.lower():
                         v_status = 'FAIL'
                 
-                validations.append({
-                    'content': v_content,
-                    'status': v_status
-                })
+                validations.append({'content': v_content, 'status': v_status})
+                    
         return validations
         
         return {

@@ -9,6 +9,7 @@ class EnhancedTreeview:
     
     def __init__(self, parent, columns, show='headings', settings=None):
         self.tree = ttk.Treeview(parent, columns=columns, show=show)
+        self.on_hover_callback = None # 懸停回調，供外部連動 (如更新預覽面板)
         
         # 設定欄位標題內容
         for col in columns:
@@ -63,16 +64,15 @@ class EnhancedTreeview:
     
     def setup_hover_effects(self):
         """設定hover效果"""
-        self.tree.bind('<Motion>', self._on_hover)
-        self.tree.bind('<Leave>', self._on_leave)
-        self.tree.bind('<Double-1>', self._on_double_click)
-        self.tree.bind('<Control-c>', self._on_copy)  # 支援Ctrl+C複製
+        # 使用 add='+' 確保不影響其他可能的綁定
+        self.tree.bind('<Motion>', self._on_hover, add='+')
+        self.tree.bind('<Leave>', self._on_leave, add='+')
+        self.tree.bind('<Double-1>', self._on_double_click, add='+')
+        self.tree.bind('<Control-c>', self._on_copy)
         
         # 綁定選擇改變事件
-        self.tree.bind('<<TreeviewSelect>>', self._on_selection_change)
-        
-        # 綁定ENTER鍵事件
-        self.tree.bind('<Return>', self._on_enter_key)
+        self.tree.bind('<<TreeviewSelect>>', self._on_selection_change, add='+')
+        self.tree.bind('<Return>', self._on_enter_key, add='+')
         
         self.current_hover_item = None
     
@@ -91,51 +91,87 @@ class EnhancedTreeview:
         self.v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
         
-        # 從kwargs中提取pack參數，避免衝突
+        # 從kwargs中提取pack參數
         pack_kwargs = {}
         for key, value in kwargs.items():
             if key in ['fill', 'expand', 'side', 'padx', 'pady', 'ipadx', 'ipady', 'anchor']:
                 pack_kwargs[key] = value
         
-        # 設定預設值
-        if 'fill' not in pack_kwargs:
-            pack_kwargs['fill'] = tk.BOTH
-        if 'expand' not in pack_kwargs:
-            pack_kwargs['expand'] = 1
+        if 'fill' not in pack_kwargs: pack_kwargs['fill'] = tk.BOTH
+        if 'expand' not in pack_kwargs: pack_kwargs['expand'] = 1
             
-        # 直接使用pack_kwargs，不傳遞kwargs
         self.tree.pack(**pack_kwargs)
-    
+
     def _on_hover(self, event):
-        """滑鼠懸停效果"""
-        item = self.tree.identify_row(event.y)
-        if item != self.current_hover_item:
+        """滑鼠懸停效果 - 穩定連動版本"""
+        # 1. 識別項目 (雙重確認識別方式)
+        item = self.tree.identify('item', event.x, event.y)
+        if not item:
+            item = self.tree.identify_row(event.y)
+            
+        # 2. 如果滑鼠離開任何項目，重置狀態
+        if not item:
             if self.current_hover_item:
-                # 取消舊的hover標籤
+                try:
+                    tags = list(self.tree.item(self.current_hover_item, 'tags'))
+                    if 'hover' in tags: tags.remove('hover')
+                    self.tree.item(self.current_hover_item, tags=tuple(tags))
+                except: pass
+            self.current_hover_item = None
+            self._hide_hover_popup()
+            return
+
+        # 3. 處理項目變更
+        if item != self.current_hover_item:
+            # 清除前一個項目的視覺效果
+            if self.current_hover_item:
+                try:
+                    old_tags = list(self.tree.item(self.current_hover_item, 'tags'))
+                    if 'hover' in old_tags: old_tags.remove('hover')
+                    self.tree.item(self.current_hover_item, tags=tuple(old_tags))
+                except: pass
+            
+            self.current_hover_item = item
+            
+            try:
+                # 獲取標籤判斷屬性
+                current_tags = list(self.tree.item(item, 'tags'))
+                is_header = 'phase_header' in current_tags
+                
+                # 套用視覺效果 (Hover 背景色)
+                if 'hover' not in current_tags:
+                    current_tags.append('hover')
+                self.tree.item(item, tags=tuple(current_tags))
+                
+                if self.on_hover_callback and not is_header:
+                    if item in self.full_content_storage:
+                        self.on_hover_callback(item)
+            except: pass
+                
+        # 4. 處理獨立懸停彈窗 (依設定)
+        self._maybe_show_hover_popup(event)
+    
+    def _on_leave(self, event):
+        """滑鼠離開 Treeview 區域"""
+        if self.current_hover_item:
+            try:
                 tags = list(self.tree.item(self.current_hover_item, 'tags'))
                 if 'hover' in tags:
                     tags.remove('hover')
                 self.tree.item(self.current_hover_item, tags=tuple(tags))
-            if item:
-                tags = list(self.tree.item(item, 'tags'))
-                if 'hover' not in tags:
-                    tags.append('hover')
-                self.tree.item(item, tags=tuple(tags))
-                self.current_hover_item = item
-        # 額外：顯示懸停浮窗（整列只要有保存內容即可顯示）
-        self._maybe_show_hover_popup(event)
-    
-    def _on_leave(self, event):
-        """滑鼠離開效果"""
-        if self.current_hover_item:
-            self.tree.item(self.current_hover_item, tags=())
+            except: pass
             self.current_hover_item = None
+        
         self._hover_row = None
         self._hide_hover_popup()
     
     def _on_double_click(self, event):
         """雙擊展開詳細內容"""
-        item = self.tree.selection()[0] if self.tree.selection() else None
+        selection = self.tree.selection()
+        if not selection:
+            return
+            
+        item = selection[0]
         if item:
             # 從字典中獲取完整內容
             full_content = self.full_content_storage.get(item)
@@ -145,18 +181,25 @@ class EnhancedTreeview:
                 print("沒有找到詳細內容")
     
     def _on_selection_change(self, event):
-        """處理選擇改變事件，同步彈窗顯示"""
+        """處理選擇改變事件 (考慮使用者設定是否顯示彈窗)"""
+        # 檢查設定是否允許顯示懸停預覽
+        show_preview = False
+        if self.settings:
+            show_preview = self.settings.get('show_hover_preview', False)
+            
         selected_items = self.tree.selection()
         if not selected_items:
-            # 沒有選中項目時隱藏彈窗
             self._hide_hover_popup()
             return
         
-        current_item = selected_items[0]
-        if current_item != self._hover_row:
-            # 如果當前項目有內容，顯示彈窗
-            if self.full_content_storage.get(current_item):
-                self._maybe_show_hover_popup_for_keyboard(current_item)
+        # 只有在設定開啟時才自動顯示彈窗
+        if show_preview:
+            current_item = selected_items[0]
+            if current_item != self._hover_row:
+                if self.full_content_storage.get(current_item):
+                    self._maybe_show_hover_popup_for_keyboard(current_item)
+        else:
+            self._hide_hover_popup()
     
     def _on_enter_key(self, event):
         """ENTER鍵處理，開啟詳細視窗"""
@@ -165,12 +208,9 @@ class EnhancedTreeview:
             return "break"
         
         current_item = selected_items[0]
-        # 從字典中獲取完整內容
         full_content = self.full_content_storage.get(current_item)
         if full_content:
             self._show_detail_dialog(full_content, current_item_id=current_item)
-        else:
-            print("沒有找到詳細內容")
         
         return "break"
 
@@ -182,20 +222,9 @@ class EnhancedTreeview:
             sz = 11
         self.font_size = max(10, min(15, sz))
         
-        # 更新TreeView內容字體大小
+        # 更新樣式
         self.style.configure("Treeview", font=('Arial', self.font_size))
         self.style.configure("Treeview.Heading", font=('Arial', self.font_size, 'bold'))
-        self.style.configure("Pass.Treeview", font=('Arial', self.font_size))
-        self.style.configure("Pass.Treeview.Item", font=('Arial', self.font_size))
-        self.style.configure("Fail.Treeview", font=('Arial', self.font_size))
-        self.style.configure("Fail.Treeview.Item", font=('Arial', self.font_size))
-        
-        # 更新懸停浮窗字體
-        if self._hover_popup and self._hover_popup.winfo_exists():
-            try:
-                self._hover_text.config(font=('Consolas', self.font_size))
-            except Exception:
-                pass
     
     def _on_copy(self, event):
         """處理Ctrl+C複製選中項目"""
@@ -205,16 +234,18 @@ class EnhancedTreeview:
                 item = selected_items[0]
                 values = self.tree.item(item, 'values')
                 if values:
-                    # 複製選中行的所有內容
                     content = '\t'.join(str(v) for v in values)
                     self._copy_to_clipboard(content)
         except Exception as e:
             print(f"複製選中項目失敗: {e}")
     
     def _maybe_show_hover_popup(self, event):
-        """顯示懸停彈窗，支援滑鼠和鍵盤選擇"""
-        # 檢查是否有滑鼠事件
+        """顯示懸停彈窗 (考慮使用者設定)"""
         if not event or not hasattr(event, 'y'):
+            return
+            
+        # 檢查設定是否允許顯示懸停預覽
+        if self.settings and not self.settings.get('show_hover_preview', False):
             return
             
         row = self.tree.identify_row(event.y)
@@ -222,28 +253,24 @@ class EnhancedTreeview:
             self._hover_row = None
             self._hide_hover_popup()
             return
+
         content = self.full_content_storage.get(row)
         if not content:
             if self._hover_row != row:
                 self._hover_row = None
                 self._hide_hover_popup()
             return
-        # 位置計算 - 檢查是否靠近下方
+
+        # 位置計算
         abs_x = self.tree.winfo_rootx() + event.x + 12
         abs_y = self.tree.winfo_rooty() + event.y + 12
-        
-        # 檢查是否靠近螢幕下方，如果是則往上顯示
-        screen_height = self.tree.winfo_screenheight()
-        popup_height = 400
-        if abs_y + popup_height > screen_height - 50:  # 距離底部50像素時往上顯示
-            abs_y = screen_height - popup_height - 50
         
         if self._hover_row == row and self._hover_popup and self._hover_popup.winfo_exists():
             try:
                 self._hover_popup.geometry(f"700x400+{abs_x}+{abs_y}")
-            except Exception:
-                pass
+            except Exception: pass
             return
+            
         self._hover_row = row
         self._show_hover_popup("完整內容", content, abs_x, abs_y)
     
@@ -468,8 +495,8 @@ class EnhancedTreeview:
         # 根據狀態決定整行文字顏色
         tag_name = f"v_color_{status.lower()}"
         if status.upper() == 'PASS':
-            # PASS 測項文字改為黑色，保持介面清爽
-            self.tree.tag_configure(tag_name, foreground='black')
+            # PASS 測項文字改為綠色
+            self.tree.tag_configure(tag_name, foreground='#2E7D32')
         else:
             # FAIL 測項保持紅色高亮
             self.tree.tag_configure(tag_name, foreground='#D32F2F', font=('Arial', self.font_size, 'bold'))
@@ -559,29 +586,32 @@ class EnhancedTreeview:
         self.all_items_data.append(item_data)
         return item_id
     
-    def insert_fail_item(self, values, full_response="", is_main_fail=True):
-        """插入FAIL項目"""
-        # 處理錯誤回應內容並加上圖示
+    def insert_fail_item(self, values, full_response="", is_main_fail=True, parent=""):
+        """插入FAIL項目 (精簡版：僅保留 測項名稱 與 FAIL原因)"""
+        # 索引說明: 0:測項名稱, 1:FAIL原因
         enhanced_values = list(values)
-        icon = "❌ "
-        enhanced_values[0] = f"{icon}{enhanced_values[0]}"
-        enhanced_values[2] = enhanced_values[2] + " [+點擊展開]"
         
+        # 在測項名稱加上圖示
+        if len(enhanced_values) > 0:
+            icon = "❌ "
+            # 避免重複加圖示
+            if not str(enhanced_values[0]).startswith("❌"):
+                enhanced_values[0] = f"{icon}{enhanced_values[0]}"
+            
         # 計算斑馬紋標籤
-        current_rows = len(self.tree.get_children())
+        current_rows = len(self.tree.get_children(parent))
         stripe_tag = 'even' if current_rows % 2 == 0 else 'odd'
         
-        item_id = self.tree.insert('', 'end', values=enhanced_values)
+        item_id = self.tree.insert(parent, 'end', values=enhanced_values)
         
-        command_value = str(enhanced_values[1]) if len(enhanced_values) > 1 else ""
-        error_value = str(enhanced_values[4]) if len(enhanced_values) > 4 else ""
+        # 提取錯誤原因進行顏色判定
+        error_val = str(enhanced_values[1]) if len(enhanced_values) > 1 else ""
         
         is_real_error = False
-        if "未找到指令" not in command_value:
-            if error_value and error_value != "未知錯誤" and error_value != "無錯誤":
-                error_keywords = ['FAIL', 'ERROR', 'NACK', 'TIMEOUT', '失敗', '錯誤', '超時', '異常']
-                if any(keyword in error_value.upper() for keyword in error_keywords):
-                    is_real_error = True
+        if error_val and error_val != "未知錯誤" and error_val != "無錯誤":
+            error_keywords = ['FAIL', 'ERROR', 'NACK', 'TIMEOUT', '失敗', '錯誤', '超時', '異常']
+            if any(keyword in error_val.upper() for keyword in error_keywords):
+                is_real_error = True
         
         if is_real_error:
             self.tree.item(item_id, tags=('fail_main_red', stripe_tag))
@@ -596,10 +626,7 @@ class EnhancedTreeview:
         item_data = {
             'item_id': item_id,
             'step_name': enhanced_values[0],
-            'command': command_value,
-            'response': enhanced_values[2] if len(enhanced_values) > 2 else "",
-            'result': enhanced_values[3] if len(enhanced_values) > 3 else "",
-            'error': error_value,
+            'error': error_val,
             'full_response': full_response,
             'is_main_fail': is_main_fail,
             'type': 'fail'

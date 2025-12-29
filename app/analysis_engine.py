@@ -204,13 +204,28 @@ class AnalysisEngineMixin:
         # Step 3: FAIL Items
         self._update_progress(f"更新 FAIL 列表 ({len(fail_items)} 筆)...")
         if hasattr(self, 'fail_tree_enhanced'):
+            # 追蹤 Phase 是否已存在
+            seen_phases_map = {} # phase_name -> parent_id
+            
             for idx, item in enumerate(fail_items):
+                phase_name = item.get('phase', 'Unknown Phase')
+                
+                # 如果是新的 Phase，建立大標題 (📘 Phase X ...)
+                if phase_name not in seen_phases_map:
+                    p_id = self.fail_tree_enhanced.insert_phase_header(phase_name)
+                    seen_phases_map[phase_name] = p_id
+                
+                parent_id = seen_phases_map[phase_name]
                 is_main_fail = item.get('is_main_fail', False)
                 full_response = item.get('full_response', '')
+                
+                # 插入此測項，Phase 欄位留空 (因為已有 Header)
+                # 新版本只保留: 測項名稱, FAIL原因
                 self.fail_tree_enhanced.insert_fail_item(
-                    (item['step_name'], item['command'], item['response'], item['retry'], item['error']),
+                    (item['step_name'], item['error']),
                     full_response=full_response,
-                    is_main_fail=is_main_fail
+                    is_main_fail=is_main_fail,
+                    parent=parent_id
                 )
         yield
 

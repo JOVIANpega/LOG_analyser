@@ -123,6 +123,15 @@ def build_settings_content(app, parent):
     skip_no_test_time_check._is_settings_checkbutton = True  # 標識為設定核取方塊
     skip_no_test_time_check.pack(anchor=tk.W, pady=3)
     app.font_scaler.register(skip_no_test_time_check)
+
+    # 顯示懸停預覽彈窗
+    app.show_hover_preview_var = tk.BooleanVar(value=app.settings.get('show_hover_preview', False))
+    hover_preview_check = tk.Checkbutton(other_frame, text="顯示懸停預覽彈窗 (預設關閉)", 
+                                        variable=app.show_hover_preview_var, 
+                                        font=('Arial', 11))
+    hover_preview_check._is_settings_checkbutton = True
+    hover_preview_check.pack(anchor=tk.W, pady=3)
+    app.font_scaler.register(hover_preview_check)
     
     # 主題設定區域
     theme_frame = tk.LabelFrame(right_column, text="介面主題", padx=15, pady=15)

@@ -94,15 +94,15 @@ class SummaryBuilder:
         return ws
 
     def _add_time_distribution_chart(self, ws, time_data):
-        """新增測試時間分佈圖 (折線圖/點圖)"""
+        """新增測試時間分佈圖 (點圖/Dot Map)"""
         try:
             from openpyxl.chart import LineChart, Reference, Series
-            from openpyxl.chart.axis import DateAxis
+            from openpyxl.drawing.fill import SolidFillProperties
             
             start_row = ws.max_row + 3
             
-            # 1. 寫入統計匯總表格 (放在 A, B 欄)
-            ws.cell(row=start_row, column=1, value=" 📊 測試時間匯總統計 ").font = Font(name='Arial', size=12, bold=True, color='FFFFFF')
+            # 1. 寫入統計匯總表格
+            ws.cell(row=start_row, column=1, value=" 📊 測試時間分佈統計 ").font = Font(name='Arial', size=12, bold=True, color='FFFFFF')
             ws.cell(row=start_row, column=1).fill = PatternFill('solid', fgColor='2E7D32')
             
             stats_data = [
@@ -110,56 +110,60 @@ class SummaryBuilder:
                 ("平均測試時間", f"{sum(d[1] for d in time_data) / len(time_data):.2f} Sec"),
                 ("最長測試時間", f"{max(d[1] for d in time_data):.2f} Sec"),
                 ("最短測試時間", f"{min(d[1] for d in time_data):.2f} Sec"),
-                ("總累積測試時間", f"{sum(d[1] for d in time_data):.2f} Sec")
             ]
             
             for i, (k, v) in enumerate(stats_data):
-                k_cell = ws.cell(row=start_row + 1 + i, column=1, value=k)
-                v_cell = ws.cell(row=start_row + 1 + i, column=2, value=v)
-                k_cell.font = Font(name='Calibri', size=11, bold=True)
-                v_cell.font = Font(name='Calibri', size=11)
-                k_cell.fill = PatternFill('solid', fgColor='E8F5E9')
+                ws.cell(row=start_row + 1 + i, column=1, value=k).font = Font(bold=True)
+                ws.cell(row=start_row + 1 + i, column=2, value=v)
                 
-            # 2. 寫入原始數據表 (列出數據如 300sec) - 放在統計表下方
+            # 2. 寫入原始數據表 (用於圖表引用)
             data_header_row = start_row + len(stats_data) + 2
-            ws.cell(row=data_header_row, column=1, value="時間分布原始數據 (SEC)").font = Font(name='Arial', size=11, bold=True)
-            ws.cell(row=data_header_row + 1, column=1, value="ID / ISN / SN").font = self.header_font
-            ws.cell(row=data_header_row + 1, column=1).fill = self.fill_blue
-            ws.cell(row=data_header_row + 1, column=2, value="時間 (Sec)").font = self.header_font
-            ws.cell(row=data_header_row + 1, column=2).fill = self.fill_blue
+            ws.cell(row=data_header_row, column=1, value=" ID / ISN ").font = self.header_font
+            ws.cell(row=data_header_row, column=1).fill = self.fill_blue
+            ws.cell(row=data_header_row, column=2, value=" 時間 (Sec) ").font = self.header_font
+            ws.cell(row=data_header_row, column=2).fill = self.fill_blue
             
-            data_start = data_header_row + 2
+            data_start = data_header_row + 1
             for i, (label, val) in enumerate(time_data):
                 ws.cell(row=data_start + i, column=1, value=label)
                 ws.cell(row=data_start + i, column=2, value=val)
             
-            # 3. 建立並配置圖表 - 放置在 E 欄，避免遮擋數據
+            # 3. 建立點圖 (使用 LineChart 但隱藏線條)
             chart = LineChart()
-            chart.title = "測試時間分布趨勢圖"
+            chart.title = "測試時間分佈點圖 (Time Dot Map)"
             chart.style = 13
             chart.y_axis.title = "秒數 (Sec)"
-            chart.x_axis.title = "測試序號"
+            chart.x_axis.title = "測試項"
             
             # 數據引用
-            ref_data = Reference(ws, min_col=2, min_row=data_start - 3, max_row=data_start + len(time_data) - 1)
-            ref_cats = Reference(ws, min_col=1, min_row=data_start, max_row=data_start + len(time_data) - 1)
+            data_ref = Reference(ws, min_col=2, min_row=data_start, max_row=data_start + len(time_data) - 1)
+            cats_ref = Reference(ws, min_col=1, min_row=data_start, max_row=data_start + len(time_data) - 1)
             
-            chart.add_data(ref_data, titles_from_data=True)
-            chart.set_categories(ref_cats)
+            chart.add_data(data_ref)
+            chart.set_categories(cats_ref)
             
-            # 數據標籤與點樣式
-            from openpyxl.chart.label import DataLabels
+            # 配置數據系列：顯示點，隱藏線
             series = chart.series[0]
             series.marker.symbol = "circle"
-            series.marker.size = 5
-            series.dLbls = DataLabels(showVal=True) # 顯示數值
+            series.marker.size = 8
             
-            chart.width = 32
+            # 設定點的顏色為紅色 (使用正確的 SolidFillProperties 結構)
+            from openpyxl.drawing.fill import SolidFillProperties
+            series.marker.graphicalProperties.solidFill = SolidFillProperties(srgbClr="FF0000") 
+            series.marker.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="FF0000")
+            
+            # 重要：移除連線
+            series.graphicalProperties.line.noFill = True
+            
+            # 隱藏圖例 (因為只有一個系列)
+            chart.legend = None
+            
+            chart.width = 30
             chart.height = 15
             ws.add_chart(chart, f"E{start_row}")
             
         except Exception as e:
-            print(f"[WARNING] 時間分佈圖生成失敗: {e}")
+            print(f"[WARNING] 時間點分佈圖生成失敗: {e}")
 
     def _add_time_statistics_table(self, ws, times):
         """(過時) 舊的時間統計表，目前由 _add_time_distribution_chart 取代"""

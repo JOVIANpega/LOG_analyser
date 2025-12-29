@@ -43,9 +43,9 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         
         # Apply window settings
         self.config_manager.load_window_geometry()
-        app_title = self.config_manager.get('app_title', 'PEGA test log Aanlyser')
-        version = self.config_manager.get('version', 'V1.5.6')
-        self.root.title(f"{app_title} {version}")
+        from .version import VERSION
+        app_title = self.config_manager.get('app_title', 'PEGA test log Analyser')
+        self.root.title(f"{app_title} {VERSION}")
         
         # Load font settings
         self.ui_font_size = self.config_manager.get('ui_font_size', 11)
@@ -83,6 +83,68 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         
         # Events
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
+        
+        # 🎯 核心懸停連動：直接綁定 Motion 事件，確保即時預覽 (不依賴回調)
+        if hasattr(self, 'fail_tree_enhanced'):
+            self._fail_hover_after_id = None # 用於延遲觸發的 ID
+            self._last_fail_hover_item = None
+            
+            # 強制重新綁定 Motion 事件 (add='+' 確保不衝突)
+            self.fail_tree_enhanced.tree.bind('<Motion>', self._on_fail_tree_motion_direct, add='+')
+            # 點擊選擇也同步更新 (點擊是最高優先權，立即開發)
+            self.fail_tree_enhanced.tree.bind('<<TreeviewSelect>>', self._on_fail_item_select_instant, add='+')
+
+    def _on_fail_tree_motion_direct(self, event):
+        """懸停處理：實作快速延遲預覽 (200ms)，確保流暢且不閃爍"""
+        try:
+            # 1. 識別目前滑鼠下的項目
+            item = self.fail_tree_enhanced.tree.identify_row(event.y)
+            
+            # 2. 如果滑鼠離開項目，取消待處理計時
+            if not item:
+                if getattr(self, '_fail_hover_after_id', None):
+                    self.root.after_cancel(self._fail_hover_after_id)
+                    self._fail_hover_after_id = None
+                self._last_fail_hover_item = None
+                return
+                
+            # 3. 如果還在同一個項目上，不需要重複計時
+            if item == getattr(self, '_last_fail_hover_item', None):
+                return
+            
+            # 4. 取消之前的計時器
+            if getattr(self, '_fail_hover_after_id', None):
+                self.root.after_cancel(self._fail_hover_after_id)
+            
+            self._last_fail_hover_item = item
+            
+            # 5. 排除 Phase Header (藍色條)
+            tags = self.fail_tree_enhanced.tree.item(item, 'tags')
+            if 'phase_header' in tags:
+                self._fail_hover_after_id = None
+                return 
+            
+            # 6. 設定 200ms 延遲觸發 (比 1 秒快得多，幾乎即時但有防抖)
+            def trigger_preview():
+                self._display_fail_reason_for_item(item)
+                self._fail_hover_after_id = None
+
+            self._fail_hover_after_id = self.root.after(200, trigger_preview)
+            
+        except Exception:
+            pass 
+
+    def _on_fail_item_select_instant(self, event):
+        """點擊選擇時：立即更新，並取消任何待處理的延遲懸停"""
+        if getattr(self, '_fail_hover_after_id', None):
+            self.root.after_cancel(self._fail_hover_after_id)
+            self._fail_hover_after_id = None
+        
+        selection = self.fail_tree_enhanced.tree.selection()
+        if selection:
+            item_id = selection[0]
+            self._last_fail_hover_item = item_id # 防止懸停重複觸發
+            self._display_fail_reason_for_item(item_id)
 
     def _apply_font_size(self):
         """應用字體設定並更新介面"""
@@ -137,6 +199,8 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
                  self.config_manager.set('remember_path', self.remember_path_var.get())
             if hasattr(self, 'skip_no_test_time_var'):
                  self.config_manager.set('skip_no_test_time', self.skip_no_test_time_var.get())
+            if hasattr(self, 'show_hover_preview_var'):
+                 self.config_manager.set('show_hover_preview', self.show_hover_preview_var.get())
                  
             self.config_manager.save()
             print("設定已保存")
