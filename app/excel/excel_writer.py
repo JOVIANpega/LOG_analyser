@@ -76,12 +76,8 @@ class ExcelWriter:
             # 在 wb 中預佔位置（建立空分頁）
             wb.create_sheet(sheet_name)
         
-        # 1. 建立 Summary (此時 'sheet_name' 已固定)
-        sws = self.summary_builder.create_summary_sheet(wb, logs, title="Summary")
-        try:
-            sws.sheet_properties.tabColor = '0000FF'
-        except:
-            pass
+        # 1. 直接建立統一的 FAIL_LIST (包含 Summary 資訊)
+        # 我們將它的建立延後到填寫詳細內容之後，以便取得正確的 error_excel_row
         
         # 2. 建立 FAIL_LIST (在填寫詳細內容之前，先計算錯誤行位置)
         # 註：我們需要先填寫詳細內容，才能得到精確的 error_excel_row
@@ -140,8 +136,8 @@ class ExcelWriter:
         link_font = Font(name='Calibri', size=16, bold=True, color="FFFFFF", underline="single")
         deep_blue_fill = PatternFill('solid', fgColor='000080')
         
-        c_top = ws.cell(row=1, column=1, value="[回到 Summary]")
-        c_top.hyperlink = f"#'Summary'!A1"
+        c_top = ws.cell(row=1, column=1, value="[回到 FAIL_LIST]")
+        c_top.hyperlink = f"#'FAIL_LIST'!A1"
         c_top.font = link_font
         c_top.fill = deep_blue_fill
         c_top.alignment = Alignment(horizontal='center')
@@ -163,8 +159,8 @@ class ExcelWriter:
         
         # 4. 置底 [回到 Summary] 連結 - Font 16, 深藍底白字
         bottom_row = last_row + 2
-        c_bot = ws.cell(row=bottom_row, column=1, value="[回到 Summary]")
-        c_bot.hyperlink = f"#'Summary'!A1"
+        c_bot = ws.cell(row=bottom_row, column=1, value="[回到 FAIL_LIST]")
+        c_bot.hyperlink = f"#'FAIL_LIST'!A1"
         c_bot.font = link_font
         c_bot.fill = deep_blue_fill
         c_bot.alignment = Alignment(horizontal='center')
