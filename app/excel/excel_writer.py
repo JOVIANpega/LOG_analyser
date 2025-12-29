@@ -15,7 +15,8 @@ from .excel_utils import (
     auto_fit_columns, 
     unique_sheet_name,
     extract_isn_from_filename,
-    extract_system_info
+    extract_system_info,
+    generate_header_info_text
 )
 from .excel_fail_list_builder import FailListBuilder
 from .excel_summary_builder import SummaryBuilder
@@ -144,8 +145,11 @@ class ExcelWriter:
         c_top.fill = deep_blue_fill
         c_top.alignment = Alignment(horizontal='center')
         
-        # 2. 置頂資訊
+        # 2. 置頂資訊 (如果沒有預設資訊，則現場生成)
         header_info = entry.get('header_info', '')
+        if not header_info:
+            header_info = generate_header_info_text(entry)
+            
         curr_row = insert_header_info(ws, header_info, start_row=3)
         
         # 3. 原始 LOG (帶有 Premium 背景顏色與文字顏色)

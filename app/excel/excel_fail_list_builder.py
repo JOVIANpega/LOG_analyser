@@ -12,6 +12,7 @@ from .excel_utils import (
     sanitize_cell_text, 
     extract_isn_from_filename, 
     extract_station_from_filename,
+    generate_header_info_text,
     auto_fit_columns
 )
 
@@ -88,9 +89,11 @@ class FailListBuilder:
             if not reason: reason = primary_fail.get('error', '')
             if not reason or reason == 'FAIL': reason = primary_fail.get('response', '')
             
+            # 合併資訊
+            merged_info = generate_header_info_text(entry)
+            
             pending_rows.append({
-                'isn': isn,
-                'station': station,
+                'merged_info': merged_info,
                 'item': fail_item_str,
                 'reason': reason,
                 'suggestion': suggestion,
@@ -100,31 +103,32 @@ class FailListBuilder:
             })
         
         # 排序並寫入細節
-        pending_rows.sort(key=lambda x: (x['item'], x['isn']))
+        pending_rows.sort(key=lambda x: (x['item']))
         
         data_start_row = start_row + 1
         for i, row_data in enumerate(pending_rows):
             curr_row = data_start_row + i
             count = error_counts.get(row_data['norm_key'], 0)
             
-            row_vals = [row_data['isn'], row_data['station'], row_data['item'], row_data['reason'], row_data['suggestion'], count]
+            row_vals = [row_data['merged_info'], row_data['item'], row_data['reason'], row_data['suggestion'], count]
             for col_idx, val in enumerate(row_vals, 1):
                 cell = ws.cell(row=curr_row, column=col_idx, value=sanitize_cell_text(val))
                 cell.font = self.content_font
                 
-                if col_idx == 1 and row_data.get('sheet_name'):
+                if col_idx == 1:
+                    cell.alignment = self.top_left_align
+                    # 在首行添加超鏈接
                     cell.hyperlink = f"#'{row_data['sheet_name']}'!A{row_data.get('error_row', 1)}"
-                    cell.font = Font(name='Calibri', size=11, color='0563C1', underline='single', bold=True)
+                    cell.font = Font(name='Calibri', size=11, color='0563C1', underline='single')
+                elif col_idx in (2, 5): 
                     cell.alignment = self.center_align
-                elif col_idx in (1, 2, 3, 6): 
-                    cell.alignment = self.center_align
-                elif col_idx == 4:
+                elif col_idx == 3:
                     cell.alignment = self.top_left_align
                 else: 
                     cell.alignment = Alignment(wrap_text=True, vertical='center', horizontal='left')
 
         # 自動調整欄寬
-        auto_fit_columns(ws, {1: 25, 2: 30, 3: 45, 4: 65, 5: 20, 6: 12})
+        auto_fit_columns(ws, {1: 60, 2: 45, 3: 65, 4: 25, 5: 12})
         return ws
 
     def _calculate_counts(self, logs):

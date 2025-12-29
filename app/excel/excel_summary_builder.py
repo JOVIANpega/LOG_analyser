@@ -9,6 +9,7 @@ from .excel_utils import (
     extract_isn_from_filename,
     extract_station_from_filename,
     format_filename_with_timestamp,
+    generate_header_info_text,
     auto_fit_columns
 )
 
@@ -40,35 +41,22 @@ class SummaryBuilder:
         
         for row, entry in enumerate(logs, 2):
             fname = entry.get('file_name', entry.get('filename', ''))
-            isn = extract_isn_from_filename(fname)
-            station = extract_station_from_filename(fname)
-            
-            # 合併資訊 (由使用者要求的格式)
-            system = entry.get('system_info', {})
-            info = [
-                f"File: {fname}",
-                f"ISN: {isn}",
-                f"Station: {station}"
-            ]
-            if system.get('Script'): info.append(f"Script: {system['Script']}")
-            if system.get('SFIS'): info.append(f"SFIS: {system['SFIS']}")
-            
-            test_secs = None
-            test_time_str = "Unknown"
-            if 'raw_lines' in entry:
-                from .excel_utils import extract_total_secs
-                test_secs, _ = extract_total_secs(entry['raw_lines'])
-                if test_secs: 
-                    test_time_str = f"{test_secs:.2f} Sec"
-                    # 只取檔名中段部分作為圖表標籤，避免過長
-                    label = isn if isn else fname[:15]
-                    time_data.append((label, test_secs))
-            info.append(f"Time: {test_time_str}")
+            # 合併資訊
+            info_str = generate_header_info_text(entry)
             
             # 寫入第一欄 (合併資訊)
-            cell_info = ws.cell(row=row, column=1, value="\n".join(info))
+            cell_info = ws.cell(row=row, column=1, value=info_str)
             cell_info.alignment = self.left_top_align
             cell_info.font = self.content_font
+            
+            # 收集數據用於圖表
+            fname = entry.get('file_name', entry.get('filename', ''))
+            isn = extract_isn_from_filename(fname)
+            from .excel_utils import extract_total_secs
+            test_secs, _ = extract_total_secs(entry.get('raw_lines', []))
+            if test_secs:
+                label = isn if isn else fname[:15]
+                time_data.append((label, test_secs))
             
             # 寫入狀態
             status = "PASS" if not entry.get('fail_items') else "FAIL"

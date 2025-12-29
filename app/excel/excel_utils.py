@@ -171,6 +171,31 @@ def auto_fit_columns(ws, min_widths: dict | None = None):
             
         ws.column_dimensions[column_letter].width = adjusted_width
 
+def generate_header_info_text(entry: dict) -> str:
+    """生成統一的置頂資訊/合併資訊字串"""
+    fname = entry.get('file_name', entry.get('filename', ''))
+    isn = extract_isn_from_filename(fname)
+    station = extract_station_from_filename(fname)
+    system = entry.get('system_info', {})
+    
+    info = [
+        f"File: {fname}",
+        f"ISN: {isn}",
+        f"Station: {station}"
+    ]
+    if system.get('Script'): info.append(f"Script: {system['Script']}")
+    if system.get('SFIS'): info.append(f"SFIS: {system['SFIS']}")
+    
+    # 時間提取
+    from .excel_utils import extract_total_secs
+    test_secs, _ = extract_total_secs(entry.get('raw_lines', []))
+    if test_secs:
+        info.append(f"Time: {test_secs:.2f} Sec")
+    else:
+        info.append("Time: Unknown")
+        
+    return "\n".join(info)
+
 def extract_system_info(raw_lines: list) -> dict:
     """從 raw_lines 擷取系統資訊"""
     system_info = {}
