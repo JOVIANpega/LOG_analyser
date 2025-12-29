@@ -9,7 +9,7 @@ from tkinter import ttk
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 
-def _create_tooltip(widget, text):
+def _create_tooltip(widget, text, app=None):
     """創建 tooltip 功能"""
     def on_enter(event):
         # 確保沒有重複的 tooltip
@@ -20,9 +20,15 @@ def _create_tooltip(widget, text):
         tooltip.wm_overrideredirect(True)
         tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
         
+        # 根據設定調整字體大小
+        font_size = 9
+        if app and app.settings:
+            font_size = app.settings.get('ui_font_size', 10) - 1 # 稍微比主 UI 小一點點
+            if font_size < 9: font_size = 9
+            
         label = tk.Label(tooltip, text=text, background="lightyellow", 
-                        relief="solid", borderwidth=1, font=("Arial", 9),
-                        justify="left", wraplength=200)
+                        relief="solid", borderwidth=1, font=("Microsoft JhengHei", font_size),
+                        justify="left", wraplength=300)
         label.pack()
         
         widget.tooltip = tooltip
@@ -74,11 +80,12 @@ def build_left_panel(parent, app):
     file_frame.pack(fill=tk.X, padx=10, pady=5)
     
     # 智能選擇按鈕 (整合單檔/多檔/資料夾)
-    btn_smart = tk.Button(file_frame, text="📂 選擇 LOG 來源 (檔案/資料夾) ▼", 
-                          bg='#673AB7', fg='white', font=('Arial', 10, 'bold'))
+    btn_smart = tk.Button(file_frame, text=" 📂 選擇 LOG 來源 (檔案/資料夾) ▼", 
+                          bg='#673AB7', fg='white', font=('Arial', 10, 'bold'),
+                          anchor='w', padx=15)
     btn_smart.pack(fill=tk.X, pady=5, ipady=5)
     app.font_scaler.register(btn_smart)
-    _create_tooltip(btn_smart, "點擊選擇 LOG 來源\n支援單個/多個檔案、壓縮檔或整個資料夾")
+    _create_tooltip(btn_smart, "點擊選擇 LOG 來源\n支援單個/多個檔案、壓縮檔或整個資料夾", app=app)
     
     # 創建下拉選單
     selection_menu = tk.Menu(btn_smart, tearoff=0)
@@ -91,30 +98,30 @@ def build_left_panel(parent, app):
         
     btn_smart.bind("<Button-1>", show_smart_menu)
     
-    # 壓縮檔處理按鈕 - 已移除，功能整合至上述按鈕
-
-    
     # CSV檔案整理按鈕
-    btn_csv = tk.Button(file_frame, text="📊 CSV檔案整理", 
-                       command=app.start_csv_processing, bg='#FF9800', fg='white')
-    btn_csv.pack(fill=tk.X, pady=2)
+    btn_csv = tk.Button(file_frame, text=" 📊 CSV 檔案整理", 
+                       command=app.start_csv_processing, bg='#FF9800', fg='white',
+                       font=('Arial', 10, 'bold'), anchor='w', padx=15)
+    btn_csv.pack(fill=tk.X, pady=2, ipady=3)
     app.font_scaler.register(btn_csv)
-    _create_tooltip(btn_csv, "選擇目錄自動搜尋CSV檔案並整理\n自動調整欄寬，PASS/FAIL顏色標記")
+    _create_tooltip(btn_csv, "選擇目錄自動搜尋 CSV 檔案並整理\n自動調整欄寬，PASS/FAIL 顏色標記", app=app)
     
     # 清除結果按鈕
-    btn_clear = tk.Button(file_frame, text="🗑️ 清除結果", 
-                         command=app._clear_enhanced_results, bg='#F44336', fg='white')
-    btn_clear.pack(fill=tk.X, pady=2)
+    btn_clear = tk.Button(file_frame, text=" 🗑️ 清除結果", 
+                         command=app._clear_enhanced_results, bg='#F44336', fg='white',
+                         font=('Arial', 10, 'bold'), anchor='w', padx=15)
+    btn_clear.pack(fill=tk.X, pady=2, ipady=3)
     app.font_scaler.register(btn_clear)
-    # 添加 tooltip
-    _create_tooltip(btn_clear, "清除所有分析結果\n重置介面到初始狀態")
-    
-    # 不需要額外的 bold 和 hover 處理，因為 ttkbootstrap 已經處理好了
-    pass
+    _create_tooltip(btn_clear, "清除所有分析結果\n重置介面到初始狀態", app=app)
     
     # 搜尋功能區域
     search_frame = ttk.LabelFrame(parent, text=" 🔍 搜尋功能 ", padding=(10, 10))
     search_frame.pack(fill=tk.X, padx=10, pady=5)
+    
+    # 搜尋結果計數標籤 (提前到輸入框上方，增加醒目度)
+    app.search_count_label = ttk.Label(search_frame, text="準備搜尋...", font=('Arial', 10, 'bold'))
+    app.search_count_label.pack(anchor='w', pady=(0, 5))
+    app.font_scaler.register(app.search_count_label)
     
     search_label = ttk.Label(search_frame, text="搜尋關鍵字:", font=('Arial', 10))
     search_label.pack(anchor='w')
@@ -126,7 +133,7 @@ def build_left_panel(parent, app):
     app.search_entry.bind('<KeyRelease>', app._on_search_change)
     app.search_entry.bind('<Return>', app._on_search_enter)
     app.font_scaler.register(app.search_entry)
-    _create_tooltip(app.search_entry, "輸入要搜尋的關鍵字\n按 Enter 開始搜尋")
+    _create_tooltip(app.search_entry, "輸入要搜尋的關鍵字\n按 Enter 開始搜尋", app=app)
     
     search_btn_frame = ttk.Frame(search_frame)
     search_btn_frame.pack(fill=tk.X, pady=2)
@@ -136,30 +143,30 @@ def build_left_panel(parent, app):
     search_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0,2))
     app.font_scaler.register(search_btn)
     # 添加 tooltip
-    _create_tooltip(search_btn, "搜尋下一個匹配項目\n在當前標籤頁中向下搜尋")
+    _create_tooltip(search_btn, "搜尋下一個匹配項目\n在當前標籤頁中向下搜尋", app=app)
     
     prev_btn = ttk.Button(search_btn_frame, text="上一個", command=app._search_prev, 
                          style='success.Outline.TButton')
     prev_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
     app.font_scaler.register(prev_btn)
-    _create_tooltip(prev_btn, "搜尋上一個匹配項目\n在當前標籤頁中向上搜尋")
+    _create_tooltip(prev_btn, "搜尋上一個匹配項目\n在當前標籤頁中向上搜尋", app=app)
     
     clear_search_btn = ttk.Button(search_btn_frame, text="清除", command=app._clear_search, 
                                  style='warning.Outline.TButton')
     clear_search_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2,0))
     app.font_scaler.register(clear_search_btn)
-    _create_tooltip(clear_search_btn, "清除搜尋結果\n移除所有高亮標記")
+    _create_tooltip(clear_search_btn, "清除搜尋結果\n移除所有高亮標記", app=app)
     
-    # 搜尋結果計數標籤
-    app.search_count_label = ttk.Label(search_frame, text="", font=('Arial', 9))
-    app.search_count_label.pack(pady=(5, 0))
-    app.font_scaler.register(app.search_count_label)
+    # 不需要額外的 bold 和 hover 處理
+    pass
     
-    # 說明文件按鈕（HTML操作說明）
-    help_btn = ttk.Button(parent, text="📖 查看操作說明(HTML)", command=app._open_html_help, style='secondary.TButton')
-    help_btn.pack(fill=tk.X, padx=10, pady=(8, 8))
+    # 說明文件按鈕 (改用 tk.Button 以確保左對齊)
+    help_btn = tk.Button(parent, text=" 📖 查看操作說明 (HTML)", 
+                        command=app._open_html_help, bg='#607D8B', fg='white',
+                        font=('Arial', 10, 'bold'), anchor='w', padx=15)
+    help_btn.pack(fill=tk.X, padx=10, pady=(8, 8), ipady=5)
     app.font_scaler.register(help_btn)
-    _create_tooltip(help_btn, "開啟操作說明文件\n查看詳細使用指南")
+    _create_tooltip(help_btn, "開啟操作說明文件\n查看詳細使用指南", app=app)
     
     # 不需要額外的 bold 和 hover 處理
     pass

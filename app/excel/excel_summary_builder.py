@@ -34,6 +34,10 @@ class SummaryBuilder:
             cell.fill = self.fill_blue
             cell.alignment = self.center_align
             
+        # 變更連結文字：從 "查看 {sheet_name}" 改為 "查看LOG {sheet_name}"
+        # 並收集所有時間與檔名用於最後的圖表顯示
+        time_data = [] # List of (filename, seconds)
+        
         for row, entry in enumerate(logs, 2):
             fname = entry.get('file_name', entry.get('filename', ''))
             isn = extract_isn_from_filename(fname)
@@ -49,12 +53,17 @@ class SummaryBuilder:
             if system.get('Script'): info.append(f"Script: {system['Script']}")
             if system.get('SFIS'): info.append(f"SFIS: {system['SFIS']}")
             
-            test_time = "Unknown"
+            test_secs = None
+            test_time_str = "Unknown"
             if 'raw_lines' in entry:
                 from .excel_utils import extract_total_secs
-                secs, _ = extract_total_secs(entry['raw_lines'])
-                if secs: test_time = f"{secs:.2f} Sec"
-            info.append(f"Time: {test_time}")
+                test_secs, _ = extract_total_secs(entry['raw_lines'])
+                if test_secs: 
+                    test_time_str = f"{test_secs:.2f} Sec"
+                    # 只取檔名中段部分作為圖表標籤，避免過長
+                    label = isn if isn else fname[:15]
+                    time_data.append((label, test_secs))
+            info.append(f"Time: {test_time_str}")
             
             # 寫入第一欄 (合併資訊)
             cell_info = ws.cell(row=row, column=1, value="\n".join(info))
@@ -71,10 +80,88 @@ class SummaryBuilder:
             # 工作表格式化名稱
             sheet_name = entry.get('sheet_name', isn or fname[:25])
             
-            # 連結
-            cell_link = ws.cell(row=row, column=4, value=f"查看 {sheet_name}")
+            # 連結 (變更文字)
+            cell_link = ws.cell(row=row, column=4, value=f"查看LOG {sheet_name}")
             cell_link.hyperlink = f"#'{sheet_name}'!A1"
             cell_link.font = Font(color="0000FF", underline="single")
             
         auto_fit_columns(ws, {1: 60, 2: 10, 3: 15, 4: 25})
+        
+        # 新增測試時間分佈圖 (取代原本的總數統計)
+        if time_data:
+            self._add_time_distribution_chart(ws, time_data)
+            
         return ws
+
+    def _add_time_distribution_chart(self, ws, time_data):
+        """新增測試時間分佈圖 (折線圖/點圖)"""
+        try:
+            from openpyxl.chart import LineChart, Reference, Series
+            from openpyxl.chart.axis import DateAxis
+            
+            start_row = ws.max_row + 3
+            
+            # 1. 寫入統計匯總表格 (放在 A, B 欄)
+            ws.cell(row=start_row, column=1, value=" 📊 測試時間匯總統計 ").font = Font(name='Arial', size=12, bold=True, color='FFFFFF')
+            ws.cell(row=start_row, column=1).fill = PatternFill('solid', fgColor='2E7D32')
+            
+            stats_data = [
+                ("總分析數量", f"{len(time_data)} 筆"),
+                ("平均測試時間", f"{sum(d[1] for d in time_data) / len(time_data):.2f} Sec"),
+                ("最長測試時間", f"{max(d[1] for d in time_data):.2f} Sec"),
+                ("最短測試時間", f"{min(d[1] for d in time_data):.2f} Sec"),
+                ("總累積測試時間", f"{sum(d[1] for d in time_data):.2f} Sec")
+            ]
+            
+            for i, (k, v) in enumerate(stats_data):
+                k_cell = ws.cell(row=start_row + 1 + i, column=1, value=k)
+                v_cell = ws.cell(row=start_row + 1 + i, column=2, value=v)
+                k_cell.font = Font(name='Calibri', size=11, bold=True)
+                v_cell.font = Font(name='Calibri', size=11)
+                k_cell.fill = PatternFill('solid', fgColor='E8F5E9')
+                
+            # 2. 寫入原始數據表 (列出數據如 300sec) - 放在統計表下方
+            data_header_row = start_row + len(stats_data) + 2
+            ws.cell(row=data_header_row, column=1, value="時間分布原始數據 (SEC)").font = Font(name='Arial', size=11, bold=True)
+            ws.cell(row=data_header_row + 1, column=1, value="ID / ISN / SN").font = self.header_font
+            ws.cell(row=data_header_row + 1, column=1).fill = self.fill_blue
+            ws.cell(row=data_header_row + 1, column=2, value="時間 (Sec)").font = self.header_font
+            ws.cell(row=data_header_row + 1, column=2).fill = self.fill_blue
+            
+            data_start = data_header_row + 2
+            for i, (label, val) in enumerate(time_data):
+                ws.cell(row=data_start + i, column=1, value=label)
+                ws.cell(row=data_start + i, column=2, value=val)
+            
+            # 3. 建立並配置圖表 - 放置在 E 欄，避免遮擋數據
+            chart = LineChart()
+            chart.title = "測試時間分布趨勢圖"
+            chart.style = 13
+            chart.y_axis.title = "秒數 (Sec)"
+            chart.x_axis.title = "測試序號"
+            
+            # 數據引用
+            ref_data = Reference(ws, min_col=2, min_row=data_start - 3, max_row=data_start + len(time_data) - 1)
+            ref_cats = Reference(ws, min_col=1, min_row=data_start, max_row=data_start + len(time_data) - 1)
+            
+            chart.add_data(ref_data, titles_from_data=True)
+            chart.set_categories(ref_cats)
+            
+            # 數據標籤與點樣式
+            from openpyxl.chart.label import DataLabels
+            series = chart.series[0]
+            series.marker.symbol = "circle"
+            series.marker.size = 5
+            series.dLbls = DataLabels(showVal=True) # 顯示數值
+            
+            chart.width = 32
+            chart.height = 15
+            ws.add_chart(chart, f"E{start_row}")
+            
+        except Exception as e:
+            print(f"[WARNING] 時間分佈圖生成失敗: {e}")
+
+    def _add_time_statistics_table(self, ws, times):
+        """(過時) 舊的時間統計表，目前由 _add_time_distribution_chart 取代"""
+        pass
+

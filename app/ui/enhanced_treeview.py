@@ -9,6 +9,11 @@ class EnhancedTreeview:
     
     def __init__(self, parent, columns, show='headings', settings=None):
         self.tree = ttk.Treeview(parent, columns=columns, show=show)
+        
+        # 設定欄位標題內容
+        for col in columns:
+            self.tree.heading(col, text=col)
+            
         self.full_content_storage = {}  # 用字典存儲完整內容
         self.all_items_data = []  # 存儲所有測試項的資料
         self.font_size = 11
@@ -39,18 +44,22 @@ class EnhancedTreeview:
 
         self.style = ttk.Style()
         
+        # 設定更大的行高 (重要：這需要設定在 'Treeview' Style 中)
+        self.style.configure("Treeview", font=('Arial', self.font_size), rowheight=30)
+        self.style.configure("Treeview.Heading", font=('Arial', self.font_size, 'bold'))
+        
+        # 定義斑馬紋與章節標頭樣式
+        self.tree.tag_configure('odd', background='#FFFFFF')         # 白色
+        self.tree.tag_configure('even', background='#F5F5F5')        # 極淺灰
+        
         # PASS項目樣式
-        self.style.configure("Pass.Treeview", foreground=pass_color, font=('Arial', self.font_size))
+        self.style.configure("Pass.Treeview", foreground='black', font=('Arial', self.font_size))
         
         # FAIL項目樣式
-        self.style.configure("Fail.Treeview", foreground=fail_color, font=('Arial', self.font_size))
+        self.style.configure("Fail.Treeview", foreground='red', font=('Arial', self.font_size))
         
         # Hover效果樣式
         self.style.configure("Hover.Treeview.Item", background=hover_color)
-        
-        # 一般TreeView樣式
-        self.style.configure("Treeview", font=('Arial', self.font_size))
-        self.style.configure("Treeview.Heading", font=('Arial', self.font_size, 'bold'))
     
     def setup_hover_effects(self):
         """設定hover效果"""
@@ -432,15 +441,65 @@ class EnhancedTreeview:
         columns_count = len(self.tree['columns'])
         # 僅在第一欄顯示章節名稱，其餘留空
         clean_name = phase_name.strip()
-        values = [clean_name] + [""] * (columns_count - 1)
+        values = [f" 📘 {clean_name}"] + [""] * (columns_count - 1)
         
-        # 設定標籤和顏色 - 移除粗體，改回正常
+        # 設定標籤和顏色 - 使用深藍背景與白色粗體文字
         self.tree.tag_configure('phase_header', 
-                             foreground='black', 
-                             font=('Arial', self.font_size, 'normal'))
+                             foreground='white', 
+                             background='#1565C0', # 深藍背景
+                             font=('Arial', self.font_size, 'bold'))
         
         item_id = self.tree.insert('', 'end', values=tuple(values), tags=('phase_header',))
+        # 為了美觀，預設展開 Phase
+        self.tree.item(item_id, open=True)
         return item_id
+    def insert_validation_item(self, parent_id, content, status):
+        """在測項下方插入比對項目資訊 (精簡版)"""
+        # 取得目前子節點數量來決定斑馬紋
+        stripe_tag = 'even' if len(self.tree.get_children(parent_id)) % 2 == 0 else 'odd'
+        
+        # 清理字串
+        clean_content = str(content).strip()
+        display_text = f"  ∟ {clean_content}"
+        
+        # 插入子節點 (第一欄放內容，第二欄放狀態)
+        v_id = self.tree.insert(parent_id, 'end', values=(display_text, status), tags=(stripe_tag,))
+        
+        # 根據狀態決定整行文字顏色
+        tag_name = f"v_color_{status.lower()}"
+        if status.upper() == 'PASS':
+            # PASS 測項文字改為黑色，保持介面清爽
+            self.tree.tag_configure(tag_name, foreground='black')
+        else:
+            # FAIL 測項保持紅色高亮
+            self.tree.tag_configure(tag_name, foreground='#D32F2F', font=('Arial', self.font_size, 'bold'))
+            
+        # 應用顏色標籤
+        current_tags = self.tree.item(v_id, 'tags')
+        self.tree.item(v_id, tags=current_tags + (tag_name,))
+        
+        return v_id
+
+    def set_column_widths(self, widths_dict):
+        """手動設定欄位寬度 {column_index_or_name: width}"""
+        for col, width in widths_dict.items():
+            try:
+                self.tree.column(col, width=width, minwidth=width)
+            except:
+                pass
+
+    def auto_fit_columns(self):
+        """嘗試根據內容自動調整欄寬 (精簡版)"""
+        columns = self.tree['columns']
+        if len(columns) == 2:
+            # 針對精簡後的 PASS 標籤頁
+            self.tree.column(columns[0], width=910)
+            self.tree.column(columns[1], width=110, anchor='center')
+        else:
+            # 針對一般的 FAIL 或其他標籤頁
+            for col in columns:
+                self.tree.column(col, width=200)
+            self.tree.column(columns[0], width=450)
 
     def _hide_hover_popup(self):
         if self._hover_popup and self._hover_popup.winfo_exists():
@@ -453,42 +512,40 @@ class EnhancedTreeview:
 
     def insert_pass_item(self, values, step_number, full_response="", has_retry=False, parent=""):
         """插入PASS項目 (可指定父層節點)"""
-        # 在Step Name前加上編號
+        # 在Step Name前加上編號與圖示
         enhanced_values = list(values)
-        step_name = f"{step_number}. {enhanced_values[0]}"
+        icon = "✅ "
+        step_name = f"{icon}{step_number}. {enhanced_values[0]}"
         
-        # 只有當真正有RETRY時才添加標記，但用黑色文字
         if has_retry:
             step_name += " [RETRY但PASS]"
         
         enhanced_values[0] = step_name
         enhanced_values[2] = enhanced_values[2] + " [+點擊展開]"
         
+        # 計算斑馬紋標籤
+        current_rows = len(self.tree.get_children(parent))
+        stripe_tag = 'even' if current_rows % 2 == 0 else 'odd'
+        
         # 插入到指定的父節點下
         item_id = self.tree.insert(parent, 'end', values=enhanced_values)
         
-        # 設定標籤和顏色 - PASS項目文字全部為黑色，包括RETRY
+        # 設定標籤和顏色
         command_value = str(enhanced_values[1]) if len(enhanced_values) > 1 else ""
         
-        # 檢查是否有"未找到指令"，如果有則確保顯示為黑色
         if "未找到指令" in command_value:
-            # "未找到指令"的情況顯示為黑色
-            self.tree.item(item_id, tags=('pass_normal',))
+            self.tree.item(item_id, tags=('pass_normal', stripe_tag))
             self.tree.tag_configure('pass_normal', foreground='black')
         elif has_retry:
-            # RETRY項目也顯示為黑色（不再是紅色）
-            self.tree.item(item_id, tags=('pass_retry',))
+            self.tree.item(item_id, tags=('pass_retry', stripe_tag))
             self.tree.tag_configure('pass_retry', foreground='black')
         else:
-            # 正常PASS項目顯示為黑色
-            self.tree.item(item_id, tags=('pass',))
+            self.tree.item(item_id, tags=('pass', stripe_tag))
             self.tree.tag_configure('pass', foreground='black')
         
-        # 儲存完整回應內容到字典中
         if full_response:
             self.full_content_storage[item_id] = full_response
         
-        # 存儲測試項資料到 all_items_data 中
         item_data = {
             'item_id': item_id,
             'step_name': step_name,
@@ -500,47 +557,42 @@ class EnhancedTreeview:
             'type': 'pass'
         }
         self.all_items_data.append(item_data)
-        
         return item_id
     
     def insert_fail_item(self, values, full_response="", is_main_fail=True):
         """插入FAIL項目"""
-        # 處理錯誤回應內容
+        # 處理錯誤回應內容並加上圖示
         enhanced_values = list(values)
+        icon = "❌ "
+        enhanced_values[0] = f"{icon}{enhanced_values[0]}"
         enhanced_values[2] = enhanced_values[2] + " [+點擊展開]"
+        
+        # 計算斑馬紋標籤
+        current_rows = len(self.tree.get_children())
+        stripe_tag = 'even' if current_rows % 2 == 0 else 'odd'
         
         item_id = self.tree.insert('', 'end', values=enhanced_values)
         
-        # 設定標籤和顏色 - 預設全部為黑色，只有真正的錯誤才顯示紅色
         command_value = str(enhanced_values[1]) if len(enhanced_values) > 1 else ""
         error_value = str(enhanced_values[4]) if len(enhanced_values) > 4 else ""
         
-        # 檢查是否為真正的錯誤（有具體錯誤訊息且不是"未找到指令"）
         is_real_error = False
-        
-        # 排除"未找到指令"的情況
         if "未找到指令" not in command_value:
-            # 檢查是否有具體的錯誤訊息
             if error_value and error_value != "未知錯誤" and error_value != "無錯誤":
-                # 檢查是否包含錯誤關鍵字
                 error_keywords = ['FAIL', 'ERROR', 'NACK', 'TIMEOUT', '失敗', '錯誤', '超時', '異常']
                 if any(keyword in error_value.upper() for keyword in error_keywords):
                     is_real_error = True
         
         if is_real_error:
-            # 真正的錯誤項目顯示紅色
-            self.tree.item(item_id, tags=('fail_main_red',))
-            self.tree.tag_configure('fail_main_red', foreground='red', font=('Arial', 10, 'bold'))
+            self.tree.item(item_id, tags=('fail_main_red', stripe_tag))
+            self.tree.tag_configure('fail_main_red', foreground='red', font=('Arial', self.font_size, 'bold'))
         else:
-            # 其他FAIL項目顯示黑色（包括"未找到指令"）
-            self.tree.item(item_id, tags=('fail_main_black',))
-            self.tree.tag_configure('fail_main_black', foreground='black', font=('Arial', 10, 'bold'))
+            self.tree.item(item_id, tags=('fail_main_black', stripe_tag))
+            self.tree.tag_configure('fail_main_black', foreground='black', font=('Arial', self.font_size, 'bold'))
         
-        # 儲存完整回應內容到字典中
         if full_response:
             self.full_content_storage[item_id] = full_response
         
-        # 存儲測試項資料到 all_items_data 中
         item_data = {
             'item_id': item_id,
             'step_name': enhanced_values[0],
@@ -553,7 +605,6 @@ class EnhancedTreeview:
             'type': 'fail'
         }
         self.all_items_data.append(item_data)
-        
         return item_id
     
     def clear(self):

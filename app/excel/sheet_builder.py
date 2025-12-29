@@ -81,23 +81,49 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
     # --- 步驟 A: 預先計算置頂區塊高度 ---
     curr_h_row = start_row # 通常是 3 或更高
 
-    # --- 步驟 B: 僅對 FAIL 日誌寫入預覽區塊 ---
-    preview_rows_count = 0
+    # --- 步驟 B: 僅對 FAIL 日誌寫入預覽區塊 (Premium Box) ---
     if error_line_idx is not None and log_type == 'FAIL':
-        # [ 直接前往錯誤點 ]
-        jump_cell = ws.cell(row=curr_h_row, column=1, value="[ 發現錯誤點 ] (點擊跳轉至 Log 正確位置)")
-        jump_cell.font = Font(name='Calibri', size=11, bold=True, color="FF0000", underline="single")
-        p_row_jump = curr_h_row
+        # 繪製 Premium 錯誤預覽框
+        pink_fill = PatternFill('solid', fgColor='FFFFE1E1')
+        red_font = Font(name='Consolas', size=11, color='FFC00000', bold=True)
+        title_font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FFFFFF')
+        title_fill = PatternFill('solid', fgColor='FFFF0000') # 純紅標題
+        
+        # 1. 標題行
+        title_cell = ws.cell(row=curr_h_row, column=1, value="  [ 發現錯誤點 (預覽) ]  ")
+        title_cell.font = title_font
+        title_cell.fill = title_fill
+        title_cell.alignment = Alignment(horizontal='center', vertical='center')
         curr_h_row += 1
         
+        # 2. 錯誤內容 (每行皆可點擊跳轉)
         if error_block_preview:
-            pink_fill = PatternFill('solid', fgColor='FFFFE1E1')
-            for line_p in error_block_preview:
+            for i, line_p in enumerate(error_block_preview):
+                target_log_idx = b_start + i
+                # 計算該行在下方的實際 Excel 行號
+                # 注意：actual_log_start 是下方 Log 開始寫入的行
+                target_excel_row = actual_log_start + target_log_idx
+                
                 cp = ws.cell(row=curr_h_row, column=1, value="  >> " + sanitize_cell_text(line_p))
-                cp.font = Font(name='Consolas', size=10, color='FFC00000', bold=True)
+                cp.font = red_font
                 cp.fill = pink_fill
+                
+                # 建立超連結跳轉到下方對應位置
+                cp.hyperlink = f"#'{ws.title}'!A{target_excel_row}"
+                cp.tooltip = f"點擊跳轉到第 {target_log_idx + 1} 行"
+                
                 curr_h_row += 1
-            curr_h_row += 1 # 留空行
+        
+        # 3. 跳轉按鈕行
+        jump_row = curr_h_row
+        jump_cell = ws.cell(row=jump_row, column=1, value=" [ 點擊跳轉至下方 Log 實際位置 ] ")
+        jump_cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color="FF0000BB", underline="single")
+        jump_cell.fill = pink_fill
+        jump_cell.alignment = Alignment(horizontal='center')
+        curr_h_row += 2 # 留空行
+        
+        # 儲存跳轉資訊
+        p_row_jump = jump_row
     
     actual_log_start = curr_h_row
     

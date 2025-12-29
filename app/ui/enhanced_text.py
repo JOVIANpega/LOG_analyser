@@ -250,7 +250,7 @@ class EnhancedText:
         # 恢復游標樣式
         self.text.config(cursor='xterm')
     
-    def insert_log_with_highlighting(self, log_content, test_results, header_content=None, ui_annotations=None, error_preview_text=None):
+    def insert_log_with_highlighting(self, log_content, test_results, header_content=None, ui_annotations=None, error_preview_data=None):
         """插入log內容並進行語法高亮（使用解析器提供的標註）"""
         self.text.delete('1.0', tk.END)
         self.step_positions.clear()
@@ -263,7 +263,7 @@ class EnhancedText:
             self.text.insert(tk.INSERT, "\n") # 空一行
             
         # === 插入錯誤原因預覽 (置頂顯示錯誤區塊) ===
-        if error_preview_text:
+        if error_preview_data:
             # 設定預覽框樣式 (同步 Excel)
             if 'error_preview_box' not in self.text.tag_names():
                 self.text.tag_configure('error_preview_box', 
@@ -272,8 +272,31 @@ class EnhancedText:
                 self.text.tag_configure('preview_title', 
                                       foreground='red', font=('Arial', 12, 'bold'))
 
+            # 標籤頭
             self.text.insert(tk.INSERT, "┌──────────────── [ 發現錯誤點 (預覽) ] ────────────────┐\n", 'preview_title')
-            self.text.insert(tk.INSERT, error_preview_text + "\n", 'error_preview_box')
+            
+            # 使用列表資料進行精確跳轉
+            for item in error_preview_data:
+                p_line = item.get('content', '')
+                l_idx = item.get('line_idx')
+                if not p_line.strip(): continue
+                
+                # 建立唯一標籤用於跳轉
+                p_tag = f"p_jump_{self.item_counter}"
+                self.item_counter += 1
+                
+                display_text = "  >> " + p_line + "\n"
+                self.text.insert(tk.INSERT, display_text, ('error_preview_box', p_tag, 'step_clickable'))
+                
+                # 綁定點擊事件 (優先使用行號)
+                if l_idx is not None:
+                     # 向下宣告 _jump_to_log_line
+                     self.text.tag_bind(p_tag, '<Button-1>', lambda e, idx=l_idx: self._jump_to_log_line(idx))
+                else:
+                     # Fallback: 模糊搜尋
+                     search_key = p_line.strip()
+                     self.text.tag_bind(p_tag, '<Button-1>', lambda e, sk=search_key: self._jump_to_log_content(sk))
+            
             self.text.insert(tk.INSERT, "└───────────────────────────────────────────────────────┘\n\n", 'preview_title')
         
         if not log_content:
@@ -404,75 +427,89 @@ class EnhancedText:
             self.text.see(position)
             self.text.mark_set(tk.INSERT, position)
     
+    def _jump_to_log_line(self, line_idx):
+        """根據解析時的原始行號精確跳轉"""
+        # 因為 Text widget 前方插入了 Header 和 預覽框，所以行號會偏移
+        # 策略：搜尋行首帶有 "   50 " (對應 line_idx=49) 格式的行號標記
+        search_str = f"{line_idx + 1:5d} "
+        pos = self.text.search(search_str, "20.0", tk.END)
+        if pos:
+            # 高亮該行
+            self.text.tag_remove('search_highlight', '1.0', tk.END)
+            self.text.tag_add('search_highlight', pos, f"{pos} lineend")
+            self.text.tag_raise('search_highlight')
+            
+            # 跳轉並中心對齊
+            self.text.see(pos)
+            self.text.mark_set(tk.INSERT, pos)
+            self.text.yview_scroll(-3, 'units')
+        else:
+            # 如果找不到帶行號的標記 (可能被折疊或格式不同)，則嘗試直接計算 (較不準)
+            pass
+
+    def _jump_to_log_content(self, search_text):
+        """從預覽區點擊跳轉到日誌本體中的對應行"""
+        if not search_text: return
+        
+        # 搜尋時避開置頂的預覽區 (從 30.0 開始搜尋通常比較安全)
+        pos = self.text.search(search_text, "20.0", tk.END)
+        if pos:
+            # 高亮該行
+            self.text.tag_remove('search_highlight', '1.0', tk.END)
+            self.text.tag_add('search_highlight', pos, f"{pos} lineend")
+            self.text.tag_raise('search_highlight')
+            
+            # 跳轉並中心對齊
+            self.text.see(pos)
+            self.text.mark_set(tk.INSERT, pos)
+            # 輔助：稍微滾動一點點讓它靠近中間
+            self.text.yview_scroll(-3, 'units')
+        else:
+            # 如果沒找到精確匹配，嘗試部分匹配
+            parts = search_text.split(']')
+            if len(parts) > 1:
+                self._jump_to_log_content(parts[0] + ']')
+
     def highlight_error_block(self, start_line, end_line):
         """高亮錯誤區塊"""
-        # 如果有Header，行號會有偏移。
-        # 簡單做法：重新計算位置或是讓使用者直接看文字，不特別依賴行號跳轉的精確度
-        # 或者在插入 Header 時記錄行數
-        # 暫時假設 start_line 是 log 的行號，需要加上 Header 的行數
-        # 這裡先保持原樣，因為 EnhancedText 中行號是自己生成的，但 `see` 是看 index
-        # 如果上方插入了 Header，原始的 "1.0" 會變成 "HeaderLines + 1.0"
-        # 但我們下面是直接用 `start_line` 也就是 log 的行號去對應，Text widget 的行號是絕對的
-        # 所以如果插入 Header，log 的第一行可能變成第 6 行
-        # 因此這部分邏輯可能有問題，需要修正。
-        # 為了安全，暫時不修改 highlight_error_block，而是讓 insert 完後回傳 log 起始行？.
-        # 更好的方式： header 插入後，搜尋 "1    " 這樣的行號標記？
-        # 或者簡單點： header 不影響行號？ 不，Text widget 是連續的。
-        # 修正策略：讓 highlight_error_block 搜尋對應的 Log 行號標記
-        
-        start_pos = f"{start_line}.0" # 這是絕對行號，如果有 Header 這會錯
-        
-        # 尋找含有該行號的文字
-        # 格式是 "   1 "
-        search_str = f"{start_line:4d} "
+        # 搜尋對應的 Log 行號標記
+        search_str = f"{start_line:5d} "
         found = self.text.search(search_str, '1.0', tk.END)
         if found:
-            # found 就是該行的起始位置
             self.text.tag_add('error_block', found, f"{found} lineend")
             self.text.see(found)
-        else:
-            # Fallback
-             pass
 
     def focus_first_error_line(self):
-        """聚焦到第一個錯誤行"""
+        """聚焦到第一個錯誤行 (優先顯示置頂摘要)"""
         try:
-            # 獲取所有文字內容
+            # 如果有標題或預覽框，就留在最上面
+            tags = self.text.tag_names()
+            if 'preview_title' in tags or 'header_style' in tags:
+                self.text.see("1.0")
+                self.text.mark_set(tk.INSERT, "1.0")
+                return
+
+            # 原有邏輯：尋找第一個包含錯誤關鍵字的行
             content = self.text.get('1.0', tk.END)
             lines = content.split('\n')
-            
-            # 尋找第一個包含錯誤關鍵字的行
-            # 注意：這裡 lines 包含了 Header 和行號
             for i, line in enumerate(lines):
                 line_lower = line.lower()
-                # 排除 Header 行 (通常 Header 沒有行號前綴)
-                # 我們可以檢查是否以數字開頭 (行號格式 "   1 ")
-                if not re.match(r'\s*\d+\s', line):
-                     continue
+                if not re.match(r'\s*\d+\s', line): continue
 
                 if (any(critical_error in line_lower for critical_error in [
                     'segmentation fault', 'core dumped', 'executes fail', 
                     "doesn't match", 'timeout', 'exception', 'wrong'
                 ]) or 'is fail' in line_lower or 'is failed' in line_lower):
-                    # 跳轉到該行
                     line_num = i + 1
                     self.text.see(f"{line_num}.0")
                     self.text.mark_set(tk.INSERT, f"{line_num}.0")
-                    # 避免 Header 誤判，這一行必須包含行號
                     break
         except Exception as e:
             print(f"聚焦錯誤行失敗: {e}")
-    
 
     def _highlight_fail_regions(self, fail_items, header_offset):
-        """將所有FAIL項目區域標記為紅色高亮"""
-        # 注意：end_idx 是 inclusive 的，但在 Tkinter 中我們需要多加一行來包含它
-        # Tkinter index 格式: 'line.char'
-        
-        # 統計總行數，防止索引越界
+        """將所有FAIL項目區域標記為紅色高亮 (不再自動跳轉離置頂區域)"""
         try:
-           # 注意：tk.END 是 index，需要轉換
-           # 獲取最後一行的行號
            last_idx = self.text.index("end-1c")
            total_lines = int(last_idx.split('.')[0])
         except:
@@ -480,41 +517,23 @@ class EnhancedText:
         
         for item in fail_items:
             start_idx = item.get('start_idx')
-            end_idx = item.get('end_idx')
+            end_idx = item.get('end_idx') or start_idx
             
             if start_idx is not None:
-                # 處理 end_idx 為 None 的防禦性邏輯
-                if end_idx is None:
-                    end_idx = start_idx
-                
-                # 轉換為 Tkinter 行號 (1-based)
-                # item['start_idx'] 是 0-based，加上 1 變成 1-based
-                # 加上 header_offset 因為 LOG 前面可能插入了 Header
-                
                 start_line = start_idx + 1 + header_offset
                 end_line = end_idx + 1 + header_offset
                 
-                # 邊界檢查
                 if start_line > total_lines: continue
                 
                 start_pos = f"{start_line}.0"
-                # end_line + 1 因為我們要包含最後一行
                 end_pos = f"{end_line + 1}.0"
                 
-                # 應用紅色樣式
                 self.text.tag_add('error_block', start_pos, end_pos)
                 self.text.tag_add('fail_text', start_pos, end_pos)
-                
-        # 滾動到第一個錯誤處
-        if fail_items:
-            try:
-                first_fail = fail_items[0]
-                start_idx = first_fail.get('start_idx')
-                if start_idx is not None:
-                     start_line = start_idx + 1 + header_offset
-                     self.text.see(f"{start_line}.0")
-            except:
-                pass
+        
+        # 修改：預設回到最頂部看摘要
+        self.text.see("1.0")
+        self.text.mark_set(tk.INSERT, "1.0")
 
     def _on_mouse_move(self, event):
         """處理滑鼠移動，高亮當前行 (優化效能)"""

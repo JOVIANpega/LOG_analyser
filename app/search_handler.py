@@ -360,8 +360,8 @@ class SearchHandlerMixin:
         try:
             if hasattr(self, 'search_count_label'):
                 if count > 0:
-                    self.search_count_label.config(text=f"找到 {count} 個匹配項目", fg='#2196F3')
+                    self.search_count_label.config(text=f"搜尋結果：共 {count} 筆", foreground='#2196F3')
                 else:
-                    self.search_count_label.config(text="未找到匹配項目", fg='#F44336')
+                    self.search_count_label.config(text="搜尋結果：未找到匹配項目", foreground='#F44336')
         except Exception as e:
             print(f"更新搜尋計數時發生錯誤: {e}")

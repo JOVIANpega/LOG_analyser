@@ -202,21 +202,75 @@ class LogParser:
         
         # 尋找 Command 和 Response
         for line in lines:
+            line_str = str(line).strip()
             if not command:
-                cmd_match = self.cmd_pattern.search(line)
+                cmd_match = self.cmd_pattern.search(line_str)
                 if cmd_match:
                      command = cmd_match.group(1).strip()
-            
             if not response:
-                resp_match = self.resp_pattern.search(line)
+                resp_match = self.resp_pattern.search(line_str)
                 if resp_match:
                     response = resp_match.group(1).strip()
+        
+        # 提取比對項目
+        validations = self._extract_validations(lines)
         
         return {
             'step_name': step_name_raw,
             'test_id': '',
             'command': command,
             'response': response,
+            'validations': validations,
+            'result': 'PASS',
+            'retry': 0,
+            'error': '',
+            'has_retry_but_pass': False,
+            'step_number': step_number
+        }
+
+    def _extract_validations(self, lines):
+        """從 Log 行中提取所有 'The validation:' 資訊"""
+        validations = []
+        criteria_pattern = re.compile(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)')
+        
+        for line in lines:
+            line_str = str(line).strip()
+            if 'The validation:' in line_str:
+                parts = line_str.split('The validation:', 1)
+                v_content = parts[1].strip() if len(parts) > 1 else line_str
+                
+                v_status = 'PASS'
+                c_match = criteria_pattern.search(line_str)
+                if c_match:
+                    try:
+                        # 取得實際被檢查的字串 (等號後、左括號前)
+                        val_str = line_str.split('=')[-1].split('(')[0].strip()
+                        v_num = float(c_match.group(1))
+                        l_lim = float(c_match.group(2))
+                        r_lim = float(c_match.group(3))
+                        
+                        # 優先以數值大小判定，若失敗則檢查字串長度 (針對 ISN/SN)
+                        if not (l_lim <= v_num <= r_lim):
+                            if not (l_lim <= len(val_str) <= r_lim):
+                                v_status = 'FAIL'
+                    except:
+                        if 'is FAIL' in line_str or 'status:FAIL' in line_str.lower(): v_status = 'FAIL'
+                else:
+                    if 'is FAIL' in line_str or 'status:FAIL' in line_str.lower():
+                        v_status = 'FAIL'
+                
+                validations.append({
+                    'content': v_content,
+                    'status': v_status
+                })
+        return validations
+        
+        return {
+            'step_name': step_name_raw,
+            'test_id': '',
+            'command': command,
+            'response': response,
+            'validations': validations, # 新增欄位
             'result': 'PASS',
             'retry': 0,
             'error': '',
@@ -287,6 +341,10 @@ class LogParser:
             numbered_content.append(f"{i:4d}. {line}")
         
         step['full_response'] = '\n'.join(numbered_content)
+        
+        # 確保提取了比對項目 (如果是在 _parse_fail_log 中建立的)
+        if 'validations' not in step:
+            step['validations'] = self._extract_validations(step['full_log'])
         
         if not step.get('command'):
             is_pass_like = step.get('is_pass') is True or step.get('result') == 'PASS'

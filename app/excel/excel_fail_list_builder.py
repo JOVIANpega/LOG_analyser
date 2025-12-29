@@ -189,7 +189,7 @@ class FailListBuilder:
                 else: # suggestion 置中靠上
                     cell.alignment = Alignment(wrap_text=True, vertical='center', horizontal='left')
                 
-        # 強制自動調整欄寬
+        # 自動調整欄寬
         min_widths = {
             1: 25, # ISN
             2: 30, # Station
@@ -200,12 +200,14 @@ class FailListBuilder:
         }
         auto_fit_columns(ws, min_widths=min_widths)
         
-        # 圓餅圖已移除（使用者要求簡化報表）
+        # 恢復錯誤統計表格 (使用者要求保留表格，移除圓餅圖)
+        if error_counts:
+            self._add_error_statistics_table(ws, error_counts)
             
         return ws
 
-    def _add_pie_chart(self, ws, error_counts):
-        """在 FAIL_LIST 頁面添加圓餅圖與統計表"""
+    def _add_error_statistics_table(self, ws, error_counts):
+        """在 FAIL_LIST 頁面添加錯誤統計表 (依使用者要求恢復)"""
         try:
             table_start_row = ws.max_row + 3
             
@@ -214,6 +216,12 @@ class FailListBuilder:
             ws.cell(row=table_start_row + 1, column=2, value="數量").font = self.header_font
             ws.cell(row=table_start_row + 1, column=3, value="佔比").font = self.header_font
             
+            # 套用標題樣式
+            for col in range(1, 4):
+                cell = ws.cell(row=table_start_row + 1, column=col)
+                cell.fill = self.fill_blue
+                cell.alignment = self.center_align
+            
             total_errors = sum(error_counts.values())
             summary_start_row = table_start_row + 2
             
@@ -221,7 +229,7 @@ class FailListBuilder:
             yellow_fill = PatternFill('solid', fgColor='FFFF00')
             from openpyxl.styles import Border, Side
             thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), 
-                               top=Side(style='thin'), bottom=Side(style='thin'))
+                                top=Side(style='thin'), bottom=Side(style='thin'))
             
             for idx, (error_type, count) in enumerate(sorted_items):
                 row = summary_start_row + idx
@@ -239,44 +247,14 @@ class FailListBuilder:
                     
                 c2.alignment = self.center_align
                 c3.alignment = self.center_align
-            
-            # 圖表美化：選用樣式 7
-            from openpyxl.chart import PieChart3D
-            chart = PieChart3D()
-            chart.title = "FAIL Item 佔比統計"
-            chart.style = 7   # 依照要求改為樣式 7
-            chart.legend = None # 確保隱藏圖例 (Series XX)
-            
-            max_r = summary_start_row + len(error_counts) - 1
-            data = Reference(ws, min_col=2, min_row=summary_start_row, max_row=max_r)
-            cats = Reference(ws, min_col=1, min_row=summary_start_row, max_row=max_r)
-            
-            chart.add_data(data, titles_from_data=False)
-            chart.set_categories(cats)
-            
-            # 設定 Data Labels 格式 (顯示項目, 數量, 百分比)
-            chart.dataLabels = DataLabelList()
-            chart.dataLabels.showPercent = True
-            chart.dataLabels.showCatName = True
-            chart.dataLabels.showVal = True 
-            chart.dataLabels.showSerName = False # 確保不顯示數列名稱
-            chart.dataLabels.separator = ", "
-            
-            # 設定字體強制為 Calibri 14pt 加粗
-            try:
-                from openpyxl.drawing.text import CharacterProperties, Paragraph, ParagraphProperties, RichTextProperties, Font as DrawingFont
-                cp = CharacterProperties(sz=1400, b=True, latin=DrawingFont(typeface='Calibri'))
-                chart.dataLabels.txPr = RichTextProperties(p=[Paragraph(pPr=ParagraphProperties(defRPr=cp), endParaRPr=cp)])
-            except Exception as e:
-                print(f"[DEBUG] 設定圖表字體失敗: {e}")
-            
-            # 調整圖表大小
-            chart.height = 13
-            chart.width = 20
-            
-            chart_row = max_r + 6
-            ws.add_chart(chart, f"A{chart_row}")
         except Exception as e:
-            print(f"[WARNING] 圓餅圖生成失敗: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"[WARNING] 錯誤統計表生成失敗: {e}")
+
+    def _add_pie_chart(self, ws, error_counts):
+        """原有的圓餅圖函數 (目前不再調用，保留供未來參考)"""
+        try:
+            # 原本的完整統計邏輯在上面已經抽離為 _add_error_statistics_table
+            pass
+        except Exception:
+            pass
+

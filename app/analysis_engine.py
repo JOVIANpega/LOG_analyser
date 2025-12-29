@@ -175,19 +175,30 @@ class AnalysisEngineMixin:
         self._update_progress(f"準備顯示結果...")
         yield
 
-        # Step 2: PASS Items (現在只顯示大章節清單)
-        self._update_progress(f"更新 PASS 章節清單...")
+        # Step 2: PASS Items (顯示章節與細項比對內容)
+        self._update_progress(f"更新 PASS 列表內容...")
         if hasattr(self, 'pass_tree_enhanced'):
-            current_phase = None
+            # 追蹤 Phase 是否已存在，避免重複顯示大標題
+            seen_phases_map = {} # phase_name -> parent_id
             
-            # 使用 set 或 dict 確保每個 Phase 只出現一次，保持順序
-            seen_phases = []
             for item in pass_items:
                 phase_name = item.get('phase', 'Unknown Phase')
-                if phase_name not in seen_phases:
-                    seen_phases.append(phase_name)
-                    # 直接插入 Phase 大標題
-                    self.pass_tree_enhanced.insert_phase_header(phase_name)
+                
+                # 如果是新的 Phase，建立大標題
+                if phase_name not in seen_phases_map:
+                    p_id = self.pass_tree_enhanced.insert_phase_header(phase_name)
+                    seen_phases_map[phase_name] = p_id
+                
+                parent_id = seen_phases_map[phase_name]
+                
+                # 插入此測項內的所有比對結果 (Validations)
+                validations = item.get('validations', [])
+                for v in validations:
+                    self.pass_tree_enhanced.insert_validation_item(
+                        parent_id, 
+                        v.get('content', ''), 
+                        v.get('status', 'PASS')
+                    )
         yield
 
         # Step 3: FAIL Items
@@ -209,18 +220,16 @@ class AnalysisEngineMixin:
             log_content = '\n'.join(raw_lines)
             
             # === 新增：提取錯誤預覽段落（將錯誤區塊置頂顯示）===
-            error_preview_text = None
-            # 只有 FAIL 日志才生成預覽 (判斷依據: fail_items 存在且非空)
+            error_preview_data = [] # 改用列表結構儲存 (內容, 行號)
             if fail_items:
-                preview_lines = []
                 if result.get('ui_annotations'):
                     for ann in result['ui_annotations']:
                         # 提取所有標記為錯誤背景的行 (COLOR_ERROR_BG = #FFE1E1)
                         if ann.get('background') == '#FFE1E1':
-                            preview_lines.append("  >> " + ann.get('line_content', ''))
-                
-                if preview_lines:
-                    error_preview_text = "\n".join(preview_lines)
+                            error_preview_data.append({
+                                'content': ann.get('line_content', ''),
+                                'line_idx': ann.get('line_idx')
+                            })
 
             # NOTE: 已延遲插入以優化性能 (yield)
             # 現在傳入 ui_annotations 以便進行精確的行高亮（包含 Criteria 的綠色/紅粉色）
@@ -228,7 +237,7 @@ class AnalysisEngineMixin:
                 'fail_line_idx': fail_line_idx,
                 'pass_items': pass_items,
                 'fail_items': fail_items
-            }, header_content=header_info, ui_annotations=result.get('ui_annotations'), error_preview_text=error_preview_text)
+            }, header_content=header_info, ui_annotations=result.get('ui_annotations'), error_preview_data=error_preview_data)
             
             if fail_line_idx is not None and fail_line_idx < len(raw_lines):
                 self.log_text_enhanced.highlight_error_block(fail_line_idx + 1, fail_line_idx + 1)
