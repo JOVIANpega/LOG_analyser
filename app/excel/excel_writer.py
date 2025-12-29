@@ -167,7 +167,7 @@ class ExcelWriter:
         c_bot.fill = deep_blue_fill
         c_bot.alignment = Alignment(horizontal='center')
         
-        auto_fit_columns(ws, {1: 100})
+        auto_fit_columns(ws, {1: 130})
         
         # 返回錯誤行位置 (供 FAIL_LIST 超鏈接使用)
         return error_excel_row

@@ -166,8 +166,8 @@ def auto_fit_columns(ws, min_widths: dict | None = None):
         adjusted_width = (curr_max_length + 2) * 1.2
         if adjusted_width < min_w:
             adjusted_width = min_w
-        if adjusted_width > 100: # 最大寬度限制
-            adjusted_width = 100
+        if adjusted_width > 180: # 提升最大寬度限制，配合 LOG 顯示
+            adjusted_width = 180
             
         ws.column_dimensions[column_letter].width = adjusted_width
 
