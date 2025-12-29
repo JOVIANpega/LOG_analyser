@@ -78,8 +78,14 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
                     break
             error_block_preview = raw_lines[b_start : b_end + 1]
 
-    # --- 步驟 A: 預先計算置頂區塊高度 ---
-    curr_h_row = start_row # 通常是 3 或更高
+    # --- 步驟 A: 預先計算預覽區塊高度以利超連結定位 ---
+    preview_box_height = 0
+    if error_line_idx is not None and log_type == 'FAIL':
+        # 標題行(1) + 內容行(len) + 跳轉按鈕(1) + 間隔行(1)
+        preview_box_height = 1 + len(error_block_preview) + 1 + 1
+    
+    actual_log_start = start_row + preview_box_height
+    curr_h_row = start_row
 
     # --- 步驟 B: 僅對 FAIL 日誌寫入預覽區塊 (Premium Box) ---
     if error_line_idx is not None and log_type == 'FAIL':
@@ -98,10 +104,15 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         
         # 2. 錯誤內容 (每行皆可點擊跳轉)
         if error_block_preview:
+            # 取得 error_block 在 raw_lines 中的起始 index
+            b_start_idx = error_line_idx
+            for j in range(error_line_idx, max(-1, error_line_idx - 20), -1):
+                if '>' in raw_lines[j] or 'Do @STEP' in raw_lines[j]:
+                    b_start_idx = j
+                    break
+            
             for i, line_p in enumerate(error_block_preview):
-                target_log_idx = b_start + i
-                # 計算該行在下方的實際 Excel 行號
-                # 注意：actual_log_start 是下方 Log 開始寫入的行
+                target_log_idx = b_start_idx + i
                 target_excel_row = actual_log_start + target_log_idx
                 
                 cp = ws.cell(row=curr_h_row, column=1, value="  >> " + sanitize_cell_text(line_p))
@@ -111,27 +122,17 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
                 # 建立超連結跳轉到下方對應位置
                 cp.hyperlink = f"#'{ws.title}'!A{target_excel_row}"
                 cp.tooltip = f"點擊跳轉到第 {target_log_idx + 1} 行"
-                
                 curr_h_row += 1
         
         # 3. 跳轉按鈕行
-        jump_row = curr_h_row
-        jump_cell = ws.cell(row=jump_row, column=1, value=" [ 點擊跳轉至下方 Log 實際位置 ] ")
+        error_excel_row = actual_log_start + error_line_idx
+        jump_cell = ws.cell(row=curr_h_row, column=1, value=f" [ 🚀 直接跳轉至錯誤行 Row {error_excel_row} ] ")
         jump_cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color="FF0000BB", underline="single")
         jump_cell.fill = pink_fill
         jump_cell.alignment = Alignment(horizontal='center')
-        curr_h_row += 2 # 留空行
+        jump_cell.hyperlink = f"#'{ws.title}'!A{error_excel_row}"
         
-        # 儲存跳轉資訊
-        p_row_jump = jump_row
-    
-    actual_log_start = curr_h_row
-    
-    # --- 步驟 C: 更新 Hyperlink (僅 FAIL) ---
-    if error_line_idx is not None and log_type == 'FAIL':
-        error_excel_row = actual_log_start + error_line_idx
-        ws.cell(row=p_row_jump, column=1).value = f"[ 直接前往錯誤點 (Row {error_excel_row}) ]"
-        ws.cell(row=p_row_jump, column=1).hyperlink = f"#'{ws.title}'!A{error_excel_row}"
+        curr_h_row += 2 # 留空行
 
     # --- 步驟 D: 寫入正式 Log ---
     for i, raw in enumerate(raw_lines):
