@@ -177,24 +177,28 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         curr_h_row += 1
         
         # 2. 內容渲染 (標題 + 比對細項)
-        light_blue_fill = PatternFill('solid', fgColor='FFE1F0FF')
-        blue_font = Font(name='Consolas', size=11, color='FF000080', bold=True)
-        detail_font = Font(name='Consolas', size=10, color='FF000080')
+        # Phase 標題：採用清晰的黑字
+        phase_fill = PatternFill('solid', fgColor='FFF2F7FF') # 極淺藍(接近白)
+        phase_font = Font(name='Consolas', size=11, color='FF000000', bold=True)
+        
+        # 比對細節：採用 GUI 風格的綠色系 (PASS 代表色)
+        pass_detail_fill = PatternFill('solid', fgColor='FFE2EFDA') # 淺綠背景
+        pass_detail_font = Font(name='Consolas', size=10, color='FF375623') # 深綠文字
         
         total_rendered = 0
-        limit = 100 # 總量上限 (增加到 100 以顯示更多 Phase)
+        limit = 100 # 總量上限
         
         for phase_name, validations in pass_phases_preview.items():
             if total_rendered >= limit: break
             
-            # --- 顯示 Phase 標題 ---
+            # --- 顯示 Phase 標題 (黑字) ---
             p_cell = ws.cell(row=curr_h_row, column=1, value=f"  ■ {phase_name}")
-            p_cell.font = blue_font
-            p_cell.fill = light_blue_fill
+            p_cell.font = phase_font
+            p_cell.fill = phase_fill
             curr_h_row += 1
             total_rendered += 1
             
-            # --- 顯示該 Phase 下的所有比對項 ---
+            # --- 顯示該 Phase 下的所有比對項 (綠色系) ---
             for v in validations:
                 if total_rendered >= limit: break
                 
@@ -205,8 +209,16 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
                 # 仿照 GUI 的層次感：縮排並加上圖示
                 detail_text = f"     └ {mark} {v_content}"
                 d_cell = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(detail_text))
-                d_cell.font = detail_font
-                d_cell.fill = light_blue_fill
+                
+                # 根據狀態決定顏色 (通常 PASS 為主)
+                if v_status == 'PASS':
+                    d_cell.font = pass_detail_font
+                    d_cell.fill = pass_detail_fill
+                else:
+                    # 如果有異常，顯示紅粉色
+                    d_cell.font = Font(name='Consolas', size=10, color='FFC00000')
+                    d_cell.fill = PatternFill('solid', fgColor='FFFFE1E1')
+                    
                 curr_h_row += 1
                 total_rendered += 1
         
