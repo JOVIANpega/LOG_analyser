@@ -60,26 +60,46 @@ def extract_isn_from_filename(filename: str) -> str:
 
 def extract_station_from_filename(filename: str) -> str:
     """
-    從檔名提取 Station 名稱
-    規則範例: 1+4cam stitching1 test-1110... -> 4cam stitching1
-    去除前面的數字和+號，去除 test- 及其後面所有內容
+    從檔名提取 Station/專案 名稱 (終極精簡版)
+    目標：只留下純粹的站別名稱，移除序號、時間、LotID 等
     """
     base_name = os.path.splitext(os.path.basename(filename))[0]
     
-    # 去除時間戳 (14位數字)
+    # 1. 移除 14 位數字的時間戳
     base_name = re.sub(r'\d{14}', '', base_name)
     
-    # 去除 test- 及其後所有內容
+    # 2. 移除 ISN 與 序號 (包含 WE 開頭、或是 8 位以上純數字)
+    base_name = re.sub(r'[-_]?WE\d+', '', base_name, flags=re.IGNORECASE)
+    base_name = re.sub(r'[-_]?\d{8,}', '', base_name)
+    
+    # 3. 移除包含多個數字的塊 (如 -222-, -06G0) -> 這些通常是流水號或 Lot
+    # 我們移除含有 3 個以上數字的獨立塊
+    base_name = re.sub(r'[-_][A-Z0-9]*\d{3,}[A-Z0-9]*', '', base_name)
+    
+    # 4. 移除常見測試狀態與字眼
+    base_name = re.sub(r'[-_]?(PASS|FAIL|LOG|TEST)', '', base_name, flags=re.IGNORECASE)
+    
+    # 5. 移除前面的 數字+ (如 1+)
+    base_name = re.sub(r'^\d+\+', '', base_name)
+    
+    # 6. 移除結尾的底線或橫槓接數字 (流水號)
+    base_name = re.sub(r'[-_]\d+$', '', base_name)
+    
+    # 7. 針對 Funtion_1 這種特別模式再清理一次
+    base_name = re.sub(r'Funtion_\d+', 'Funtion', base_name, flags=re.IGNORECASE)
+    
+    # 8. 如果有 test- 則切斷
     if 'test-' in base_name.lower():
         base_name = re.split(r'test-', base_name, flags=re.IGNORECASE)[0]
     
-    # 去除前面的數字+加號 (例如 "1+")
-    base_name = re.sub(r'^\d+\+', '', base_name)
-    
-    # 清理空白
+    # 清理空白與連接符
     station = base_name.strip(' _-')
     
-    return station if station else "Unknown"
+    # 如果剩餘太短或是無效字眼，給個 Analysis 保底
+    if not station or len(station) < 2 or station.lower() in ('pass', 'fail', 'log'):
+        return "Analysis"
+        
+    return station
 
 
 def sanitize_sheet_title(title: str) -> str:

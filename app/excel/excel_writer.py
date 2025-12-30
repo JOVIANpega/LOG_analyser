@@ -83,7 +83,7 @@ class ExcelWriter:
         # 2. 處理 PASS 活頁簿
         pass_name = f"{prefix}PASS匯總.xlsx"
         pass_path = os.path.join(folder_path, pass_name)
-        pass_saved_path = self._build_pass_workbook(pass_path, pass_logs)
+        pass_saved_path = self._build_pass_workbook(pass_path, pass_logs, prefix=prefix)
         
         return pass_saved_path, fail_saved_path, None
 
@@ -150,7 +150,7 @@ class ExcelWriter:
             
         return safe_save_workbook(wb, output_path)
 
-    def _build_pass_workbook(self, output_path, logs):
+    def _build_pass_workbook(self, output_path, logs, prefix=""):
         import openpyxl
         wb = openpyxl.Workbook()
         
@@ -161,8 +161,8 @@ class ExcelWriter:
             entry['sheet_name'] = sheet_name
             wb.create_sheet(sheet_name)
             
-        # 1. 建立 Summary
-        sws = self.summary_builder.create_summary_sheet(wb, logs, title="Summary")
+        # 1. 建立 Summary (傳入前綴關鍵字)
+        sws = self.summary_builder.create_summary_sheet(wb, logs, title="Summary", prefix=prefix)
         try:
             sws.sheet_properties.tabColor = '0000FF'
         except:

@@ -23,8 +23,8 @@ class SummaryBuilder:
         self.center_align = Alignment(horizontal='center', vertical='center')
         self.left_top_align = Alignment(horizontal='left', vertical='top', wrap_text=True)
 
-    def create_summary_sheet(self, wb, logs, title="Summary"):
-        """建立匯總頁面"""
+    def create_summary_sheet(self, wb, logs, title="Summary", prefix=""):
+        """建立匯總頁面 (包含置頂統計與時間曲線)"""
         ws = wb.create_sheet(title, 0)
         
         # 1. 預留頂部空間並插入匯總資訊 (A1:B6 區域)
@@ -39,7 +39,7 @@ class SummaryBuilder:
                 label = isn if isn else fname[:20]
                 time_labels_data.append((label, test_secs))
         
-        self._add_summary_header(ws, len(logs), time_labels_data)
+        self._add_summary_header(ws, len(logs), time_labels_data, prefix=prefix)
         
         # 2. 寫入清單標題 (從第 9 行開始，留出空間給 Top Summary)
         list_start_row = 9
@@ -86,11 +86,13 @@ class SummaryBuilder:
             
         return ws
 
-    def _add_summary_header(self, ws, total_count, time_data):
+    def _add_summary_header(self, ws, total_count, time_data, prefix=""):
         """插入頂部置頂資訊與統計 (同步 FAIL 風格)"""
         # 標題列
         ws.merge_cells('A1:F1')
-        title_cell = ws.cell(row=1, column=1, value=" 📋 PASS 分析匯總報告 (Summary & List) ")
+        clean_prefix = prefix.strip('_ ')
+        display_title = f" 📋 {clean_prefix} PASS 分析匯總報告 " if clean_prefix else " 📋 PASS 分析匯總報告 (Summary & List) "
+        title_cell = ws.cell(row=1, column=1, value=display_title)
         title_cell.font = Font(name='Calibri', size=16, bold=True, color='FFFFFF')
         title_cell.fill = PatternFill('solid', fgColor='2E7D32') # 綠色
         title_cell.alignment = Alignment(horizontal='center', vertical='center')
@@ -116,53 +118,65 @@ class SummaryBuilder:
             v_cell.alignment = Alignment(horizontal='center')
 
     def _add_time_distribution_chart(self, ws, time_data):
-        """新增測試時間分佈圖 (點圖/Dot Map) 錨定在頂部 E3"""
+        """新增測試時間分佈圖 (採用獨立數據分頁，提高 Excel 相容性)"""
         try:
-            from openpyxl.chart import LineChart, Reference
-            
-            # 使用 Z 欄之後儲存隱藏數據
-            data_col = 26 # Z
+            wb = ws.parent
+            # 1. 建立獨立的隱藏數據分頁
+            data_sheet_name = "ChartInfo_Hidden"
+            if data_sheet_name in wb.sheetnames:
+                ds = wb[data_sheet_name]
+            else:
+                ds = wb.create_sheet(data_sheet_name)
+                ds.sheet_state = 'veryHidden' # 深度隱藏，不干擾使用者
+                
+            # 2. 寫入數據
+            ds.cell(row=1, column=1, value="ID")
+            ds.cell(row=1, column=2, value="Time")
             for i, (label, val) in enumerate(time_data):
-                ws.cell(row=i+1, column=data_col, value=label)
-                ws.cell(row=i+1, column=data_col+1, value=val)
+                ds.cell(row=i+2, column=1, value=sanitize_cell_text(label))
+                ds.cell(row=i+2, column=2, value=val)
+                
+            # 3. 建立圖表
+            from openpyxl.chart import LineChart, Reference
+            from openpyxl.drawing.fill import SolidFillProperties
             
             chart = LineChart()
-            chart.title = "測試時間分佈圖 (Time Curve)"
+            chart.title = "測試時間分佈圖 (Time Curve / Sec)"
             chart.style = 13
-            chart.y_axis.title = "秒數 (Sec)"
-            chart.x_axis.title = "測試項 (ID)"
-            
-            # 設定座標軸刻度單位 (100 sec)
+            chart.y_axis.title = "Time (Sec)"
+            chart.x_axis.title = "Units"
             chart.y_axis.majorUnit = 100
             
-            # 數據引用 (時間值在 AA 欄)
-            data_ref = Reference(ws, min_col=data_col+1, min_row=1, max_row=len(time_data))
-            # 分類引用 (ISN 在 Z 欄)
-            cats_ref = Reference(ws, min_col=data_col, min_row=1, max_row=len(time_data))
+            # 引用數據 (從 DataSheet 抓取)
+            data_ref = Reference(ds, min_col=2, min_row=1, max_row=len(time_data)+1)
+            cats_ref = Reference(ds, min_col=1, min_row=2, max_row=len(time_data)+1)
             
-            chart.add_data(data_ref)
+            # titles_from_data=True 表示第一行是標題
+            chart.add_data(data_ref, titles_from_data=True)
             chart.set_categories(cats_ref)
             
-            # 配置數據系列
-            series = chart.series[0]
-            series.marker.symbol = "circle"
-            series.marker.size = 5
+            # 4. 配置系列樣式 (綠線紅點)
+            if chart.series:
+                s = chart.series[0]
+                s.marker.symbol = "circle"
+                s.marker.size = 6
+                # 線條顏色 (深綠色)
+                s.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="2E7D32")
+                # 數據點顏色 (鮮紅色)
+                s.marker.graphicalProperties.solidFill = SolidFillProperties(srgbClr="FF0000")
+                s.marker.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="FF0000")
+                
+            chart.legend = None
+            chart.width = 32
+            chart.height = 12
             
-            # 配色與線條
-            from openpyxl.drawing.fill import SolidFillProperties
-            # 這裡我們保留線條，讓它看起來像曲線 (Curve)
-            series.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="2E7D32") # 綠色線
-            series.marker.graphicalProperties.solidFill = SolidFillProperties(srgbClr="FF0000") # 紅色點
-            
-            chart.legend = None # 單一數據不需要圖例
-            chart.width = 30
-            chart.height = 10
-            
-            # 錨定在 E3
-            ws.add_chart(chart, "E3")
+            # 5. 錨定在 Summary 頁面的 G3
+            ws.add_chart(chart, "G3")
             
         except Exception as e:
-            print(f"[WARNING] PASS 時間分布圖生成失敗: {e}")
+            import traceback
+            print(f"[ERROR] 圖表生成失敗: {str(e)}")
+            traceback.print_exc()
 
     def _add_time_statistics_table(self, ws, times):
         """(過時) 舊的時間統計表，目前由 _add_time_distribution_chart 取代"""
