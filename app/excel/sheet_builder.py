@@ -95,9 +95,9 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
     if error_line_idx is not None and log_type == 'FAIL':
         preview_box_height = 1 + len(error_block_preview) + 1 + 1
     
-    # PASS 日誌：測試項目預覽框 (按 Phase 分組)
+    # PASS/FAIL 日誌：測試項目預覽框 (按 Phase 分組)
     pass_phases_preview = {} # phase_name -> [validations]
-    if log_type == 'PASS' and fail_items:
+    if fail_items:
         # 將所有項按照 Phase 進行分組
         for item in fail_items:
             p_name = item.get('phase', 'Unknown Phase')
@@ -109,7 +109,8 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
             for v in validations:
                 pass_phases_preview[p_name].append({
                     'content': v.get('content', ''),
-                    'status': v.get('status', 'PASS')
+                    'status': v.get('status', 'PASS'),
+                    'line_idx': v.get('line_idx')
                 })
         
         # 預算顯示高度：每個 Phase 標題(1) + 每個 Validation(1)
@@ -165,9 +166,11 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         
         curr_h_row += 2 # 留空行
     
-    # --- 步驟 B2: PASS 日誌寫入測試項目預覽區塊 (分組層次顯示) ---
-    if log_type == 'PASS' and pass_phases_preview:
+    # --- 步驟 B2: 寫入測試項目預覽區塊 (分組層次顯示) ---
+    detail_preview_row = 1 # 預設第一行
+    if pass_phases_preview:
         # 1. 標題行 (藍底白字)
+        detail_preview_row = curr_h_row
         title_font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FFFFFF')
         title_fill = PatternFill('solid', fgColor='FF4472C4')  # 藍色標題
         title_cell = ws.cell(row=curr_h_row, column=1, value="  [ 比對項目細節 ]  ")
@@ -210,6 +213,16 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
                 detail_text = f"     └ {mark} {v_content}"
                 d_cell = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(detail_text))
                 
+                # --- 新增：超連結跳轉到原始 Log 位置 ---
+                target_log_idx = v.get('line_idx')
+                if target_log_idx is not None:
+                    target_excel_row = actual_log_start + target_log_idx
+                    d_cell.hyperlink = f"#'{ws.title}'!A{target_excel_row}"
+                    # 為可點擊項增加底線
+                    # d_cell.font = Font(name='Consolas', size=10, color='FF375623', underline='single') 
+                    # 考慮到表格美觀，暫不強制底線，滑鼠移上去會有手勢即可
+                
+                
                 # 根據狀態決定顏色 (通常 PASS 為主)
                 if v_status == 'PASS':
                     d_cell.font = pass_detail_font
@@ -234,9 +247,15 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         if anno.get('show_separator'):
             title = anno.get('separator_title', 'PHASE')
             sep_cell = ws.cell(row=row_idx, column=1, value=f" --   [ {title} ]")
-            sep_cell.font = Font(name='Consolas', size=12, bold=True, color='FFFFFF')
+            sep_cell.font = Font(name='Consolas', size=12, bold=True, color='FFFFFF', underline='single')
             sep_cell.fill = PatternFill('solid', fgColor='FF2E7D32') 
             sep_cell.alignment = Alignment(horizontal='center')
+            # PHASE 加上超連結回預覽框 (或 Summary)
+            if detail_preview_row > 1:
+                sep_cell.hyperlink = f"#'{ws.title}'!A{detail_preview_row}"
+            else:
+                back_sheet = 'FAIL_LIST' if log_type == 'FAIL' else 'Summary'
+                sep_cell.hyperlink = f"#'{back_sheet}'!A1"
             continue 
 
         # 一般日誌行
@@ -262,9 +281,9 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
     if log_type == 'FAIL' and error_line_idx is not None:
         error_excel_row = actual_log_start + error_line_idx
 
-    # 返回最後一行和錯誤行位置 (供 FAIL_LIST 超鏈接使用)
+    # 返回最後一行、錯誤行位置以及預覽框起始位置
     last_row = actual_log_start + len(raw_lines)
-    return (last_row, error_excel_row)
+    return (last_row, error_excel_row, detail_preview_row)
 
 def insert_header_info(ws, header_info, start_row=4):
     """插入置頂 Header 資訊"""

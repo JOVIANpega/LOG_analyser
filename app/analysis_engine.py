@@ -197,7 +197,8 @@ class AnalysisEngineMixin:
                     self.pass_tree_enhanced.insert_validation_item(
                         parent_id, 
                         v.get('content', ''), 
-                        v.get('status', 'PASS')
+                        v.get('status', 'PASS'),
+                        line_idx=v.get('line_idx')
                     )
         yield
 
@@ -221,12 +222,22 @@ class AnalysisEngineMixin:
                 
                 # 插入此測項，Phase 欄位留空 (因為已有 Header)
                 # 新版本只保留: 測項名稱, FAIL原因
-                self.fail_tree_enhanced.insert_fail_item(
+                step_id = self.fail_tree_enhanced.insert_fail_item(
                     (item['step_name'], item['error']),
                     full_response=full_response,
                     is_main_fail=is_main_fail,
                     parent=parent_id
                 )
+                
+                # 插入比對項目資訊 (如果有)
+                validations = item.get('validations', [])
+                for v in validations:
+                    self.fail_tree_enhanced.insert_validation_item(
+                        step_id, 
+                        v.get('content', ''), 
+                        v.get('status', 'PASS'),
+                        line_idx=v.get('line_idx')
+                    )
         yield
 
         # Step 4: Raw Logs

@@ -15,7 +15,8 @@ class EnhancedTreeview:
         for col in columns:
             self.tree.heading(col, text=col)
             
-        self.full_content_storage = {}  # 用字典存儲完整內容
+        self.full_content_storage = {}  # 用字典存儲完整內容 (通常是字串)
+        self.validation_line_indices = {} # 儲存比對項目的行號 {item_id: line_idx}
         self.all_items_data = []  # 存儲所有測試項的資料
         self.font_size = 11
         self.settings = settings or {}
@@ -494,7 +495,7 @@ class EnhancedTreeview:
         # 為了美觀，預設展開 Phase
         self.tree.item(item_id, open=True)
         return item_id
-    def insert_validation_item(self, parent_id, content, status):
+    def insert_validation_item(self, parent_id, content, status, line_idx=None):
         """在測項下方插入比對項目資訊 (精簡版)"""
         # 取得目前子節點數量來決定斑馬紋
         stripe_tag = 'even' if len(self.tree.get_children(parent_id)) % 2 == 0 else 'odd'
@@ -505,6 +506,11 @@ class EnhancedTreeview:
         
         # 插入子節點 (第一欄放內容，第二欄放狀態)
         v_id = self.tree.insert(parent_id, 'end', values=(display_text, status), tags=(stripe_tag,))
+        
+        # 儲存 line_idx 供跳轉使用
+        if line_idx is not None:
+            self.validation_line_indices[v_id] = line_idx
+            self.full_content_storage[v_id] = clean_content
         
         # 根據狀態決定整行文字顏色
         tag_name = f"v_color_{status.lower()}"
@@ -653,6 +659,7 @@ class EnhancedTreeview:
         for item in self.tree.get_children():
             self.tree.delete(item)
         self.full_content_storage.clear()  # 清空存儲字典
+        self.validation_line_indices.clear() # 清空行號索引
         self.all_items_data.clear()  # 清空所有測試項資料
 
     def add_navigation_buttons(self):

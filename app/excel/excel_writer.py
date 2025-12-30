@@ -23,15 +23,32 @@ from .excel_summary_builder import SummaryBuilder
 from .sheet_builder import write_raw_log_with_annotations, insert_header_info
 
 def safe_save_workbook(wb, output_path):
-    """安全保存工作簿，處理權限錯誤"""
+    """安全保存工作簿，處理權限錯誤 (如檔案已開啟)"""
+    if not os.path.exists(output_path):
+        try:
+            wb.save(output_path)
+            return output_path
+        except:
+            pass
+
+    # 如果存不進去，嘗試加上時間戳記或序號
+    name, ext = os.path.splitext(output_path)
+    # 第一次嘗試：精簡時間戳
+    ts = datetime.now().strftime("%H%M%S")
+    new_path = f"{name}_{ts}{ext}"
+    
     try:
-        wb.save(output_path)
-    except PermissionError:
-        ts = datetime.now().strftime("%H%M%S")
-        name, ext = os.path.splitext(output_path)
-        new_path = f"{name}_{ts}{ext}"
         wb.save(new_path)
         return new_path
+    except:
+        # 最終嘗試：不斷嘗試序號直到成功
+        for i in range(1, 100):
+            final_path = f"{name}_{ts}_{i}{ext}"
+            try:
+                wb.save(final_path)
+                return final_path
+            except:
+                continue
     return output_path
 
 class ExcelWriter:
@@ -135,7 +152,10 @@ class ExcelWriter:
     def _write_detailed_log(self, ws, entry):
         """寫入詳細的 LOG 內容與標註 (同步 GUI 外觀並補回超連結)"""
         
-        # 1. 置頂 [回到 Summary/FAIL_LIST] 連結 - Font 16, 深藍底白字
+    def _write_detailed_log(self, ws, entry):
+        """寫入詳細的 LOG 內容與標註 (同步 GUI 外觀並補回超連結)"""
+        
+        # 1. 置頂 [回到 Summary/FAIL_LIST] 連結 與 TOP/DOWN - Font 16, 深藍底白字
         link_font = Font(name='Calibri', size=16, bold=True, color="FFFFFF", underline="single")
         deep_blue_fill = PatternFill('solid', fgColor='000080')
         
@@ -143,8 +163,16 @@ class ExcelWriter:
         log_type = entry.get('log_type', 'UNKNOWN')
         back_target = 'FAIL_LIST' if log_type == 'FAIL' else 'Summary'
         
-        c_top = ws.cell(row=1, column=1, value=f"[回到 {back_target}]")
-        c_top.hyperlink = f"#'{back_target}'!A1"
+        # 建立整合的導航列
+        # A1: [回到 Summary], B1: [TOP], C1: [DOWN]
+        c_back = ws.cell(row=1, column=1, value=f"[回到 {back_target}]")
+        c_back.hyperlink = f"#'{back_target}'!A1"
+        c_back.font = link_font
+        c_back.fill = deep_blue_fill
+        c_back.alignment = Alignment(horizontal='center')
+        
+        c_top = ws.cell(row=1, column=2, value="[ TOP ]")
+        c_top.hyperlink = f"#'{ws.title}'!A1"
         c_top.font = link_font
         c_top.fill = deep_blue_fill
         c_top.alignment = Alignment(horizontal='center')
@@ -159,29 +187,40 @@ class ExcelWriter:
         # 3. 原始 LOG (帶有 Premium 背景顏色與文字顏色)
         raw_lines = entry.get('raw_lines', [])
         annotations = entry.get('ui_annotations', [])
-        log_type = entry.get('log_type', 'UNKNOWN')  # ⚠️ 關鍵：取得日誌類型
+        log_type = entry.get('log_type', 'UNKNOWN') 
         
-        # 根據日誌類型取得對應的項目列表
-        if log_type == 'PASS':
-            items_to_display = entry.get('pass_items', [])
-        else:
-            items_to_display = entry.get('fail_items', [])
+        # 準備匯總項目 (包含 PASS 與 FAIL 的，用於 [比對項目細節] 預覽)
+        items_to_display = entry.get('pass_items', []) + entry.get('fail_items', [])
         
         content_font = Font(name='Consolas', size=11)
         
         # ⚠️ 傳入 log_type 和對應的項目列表
-        # ⚠️ 接收返回的錯誤行位置信息
-        last_row, error_excel_row = write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=items_to_display, log_type=log_type)
+        # ⚠️ 接收返回的最後行、錯誤行位置，以及預覽框的起始行
+        # write_raw_log_with_annotations 會回傳 (最後行, 錯誤行, 預覽框起始行)
+        last_data_row, error_excel_row, detail_preview_row = write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=items_to_display, log_type=log_type)
         
-        # 4. 置底 [回到 Summary/FAIL_LIST] 連結 - Font 16, 深藍底白字
-        bottom_row = last_row + 2
+        # 更新導航列中的 DOWN 連結 (指向最下方)
+        c_down = ws.cell(row=1, column=3, value="[ DOWN ]")
+        c_down.hyperlink = f"#'{ws.title}'!A{last_data_row}"
+        c_down.font = link_font
+        c_down.fill = deep_blue_fill
+        c_down.alignment = Alignment(horizontal='center')
+
+        # 4. 置底連動
+        bottom_row = last_data_row + 2
         c_bot = ws.cell(row=bottom_row, column=1, value=f"[回到 {back_target}]")
         c_bot.hyperlink = f"#'{back_target}'!A1"
         c_bot.font = link_font
         c_bot.fill = deep_blue_fill
         c_bot.alignment = Alignment(horizontal='center')
         
-        auto_fit_columns(ws, {1: 130})
+        c_bot_top = ws.cell(row=bottom_row, column=2, value="[ TOP ]")
+        c_bot_top.hyperlink = f"#'{ws.title}'!A1"
+        c_bot_top.font = link_font
+        c_bot_top.fill = deep_blue_fill
+        c_bot_top.alignment = Alignment(horizontal='center')
+        
+        auto_fit_columns(ws, {1: 130, 2: 20, 3: 20})
         
         # 返回錯誤行位置 (供 FAIL_LIST 超鏈接使用)
         return error_excel_row

@@ -178,7 +178,9 @@ class FailListBuilder:
             try:
                 from openpyxl.chart import LineChart, Reference
                 chart = LineChart()
-                chart.title = "測試時間分佈點圖"
+                chart.title = "測試時間分佈圖"
+                chart.y_axis.title = "秒數 (Sec)"
+                chart.y_axis.majorUnit = 100
                 chart.legend = None
                 chart.width = 25
                 chart.height = 10

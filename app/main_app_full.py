@@ -100,6 +100,10 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
             self.fail_tree_enhanced.tree.bind('<Control-Prior>', lambda e: self.fail_error_text.yview_scroll(-1, "pages"))
             self.fail_tree_enhanced.tree.bind('<Control-Next>', lambda e: self.fail_error_text.yview_scroll(1, "pages"))
 
+        # 🟢 PASS 列表連動：點擊比對項目時跳轉到原始 LOG
+        if hasattr(self, 'pass_tree_enhanced'):
+            self.pass_tree_enhanced.tree.bind('<<TreeviewSelect>>', self._on_pass_item_select_jump, add='+')
+
         # 🔄 標籤切換時自動聚焦，確保鍵盤立即可以使用
         if hasattr(self, 'notebook'):
             self.notebook.bind('<<NotebookTabChanged>>', self._on_tab_changed)
@@ -258,7 +262,41 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         if selection:
             item_id = selection[0]
             self._last_fail_hover_item = item_id # 防止懸停重複觸發
+            
+            # 🟢 新增：如果是比對項目 (Validation Item)，則跳轉到原始 LOG
+            line_idx = self.fail_tree_enhanced.validation_line_indices.get(item_id)
+            if line_idx is not None:
+                if hasattr(self, 'log_text_enhanced'):
+                    # 執行跳轉
+                    self.log_text_enhanced._jump_to_log_line(line_idx)
+            
+            # 顯示原有詳細資訊
             self._display_fail_reason_for_item(item_id)
+
+    def _on_pass_item_select_jump(self, event):
+        """當 PASS 列表中的比對項目被選中時，自動跳轉到原始 LOG 對應行"""
+        try:
+            selection = self.pass_tree_enhanced.tree.selection()
+            if not selection: return
+            
+            item_id = selection[0]
+            # 從 validation_line_indices 中獲取儲存的 line_idx
+            line_idx = self.pass_tree_enhanced.validation_line_indices.get(item_id)
+            
+            if line_idx is not None and hasattr(self, 'log_text_enhanced'):
+                    # 切換到「原始LOG」分頁
+                    if hasattr(self, 'notebook') and hasattr(self, 'tab_log'):
+                        # 找到索引
+                        tabs = self.notebook.tabs()
+                        for i, tab in enumerate(tabs):
+                            if self.notebook.tab(tab, 'text') == "📖 原始LOG":
+                                self.notebook.select(i)
+                                break
+                    
+                    # 執行跳轉
+                    self.log_text_enhanced._jump_to_log_line(line_idx)
+        except Exception as e:
+            print(f"PASS項目跳轉失敗: {e}")
 
     def _apply_font_size(self):
         """應用字體設定並更新介面"""

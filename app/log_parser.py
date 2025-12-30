@@ -123,6 +123,10 @@ class LogParser:
                     step_info['full_log'] = block_lines
                     step_info['phase'] = current_phase
                     
+                    for v in step_info.get('validations', []):
+                        if 'line_idx' in v:
+                            v['line_idx'] += block_start
+                    
                     self._finalize_pass_step(step_info, pass_items, no_command_steps)
                 
                 # 更新下一個項目的起始位置
@@ -193,6 +197,10 @@ class LogParser:
             step_info['raw_idx'] = abs_start
             step_info['full_log'] = sub_lines
             
+            for v in step_info.get('validations', []):
+                if 'line_idx' in v:
+                    v['line_idx'] += abs_start
+            
             self._finalize_pass_step(step_info, pass_items, no_command_steps)
     
     def _analyze_block_content(self, lines, step_number, step_name_raw):
@@ -229,23 +237,30 @@ class LogParser:
         }
 
     def _extract_validations(self, lines):
-        """從 Log 行中「嚴格提取」帶有括號比對標準的比對項目 (xxx = OOO (OOO))"""
+        """從 Log 行中提取比對項目資訊 (同步支援 = 或 : 分隔符)"""
         validations = []
-        # 嚴格正則：必須包含括號內的標準才提取
-        strict_pattern = re.compile(r'([\w\s_-]+)\s*=\s*([^ \(\)]+)\s*\(\s*([^,\)]+)\s*(?:,\s*([^ \)]*)\s*)?\)')
+        # 1. 優先匹配標準格式: xxx = OOO (OOO) 或 xxx : OOO (OOO)
+        strict_pattern = re.compile(r'([\w\s_-]+)\s*[=:]\s*([^ \(\)]+)\s*\(\s*([^,\)]+)\s*(?:,\s*([^ \)]*)\s*)?\)')
+        # 2. 備選匹配: 帶有 PASS/FAIL 標記的簡單鍵值對
+        label_pattern = re.compile(r'([\w\s_-]+)\s*[=:]\s*([^ \(\)]+).*(PASS|FAIL)', re.IGNORECASE)
         
-        noise_keywords = ['icmp_seq', 'ttl=', 'time=', 'bytes from', 'reply from']
+        noise_keywords = ['icmp_seq', 'ttl=', 'time=', 'bytes from', 'reply from', 'sfis is', 'script version']
         
-        for line in lines:
+        for idx, line in enumerate(lines):
             line_str = str(line).strip()
+            if not line_str: continue
             
-            # 只有符合 xxx = OOO (OOO) 規律的才列出
+            # 排除噪音
+            if any(kw in line_str.lower() for kw in noise_keywords):
+                continue
+                
+            found = False
+            # 先試標準格式
             c_match = strict_pattern.search(line_str)
             if c_match:
-                if any(kw in line_str.lower() for kw in noise_keywords):
-                    continue
+                v_name = c_match.group(1).strip()
+                v_val = c_match.group(2).strip()
                 
-                # 取得內容 (移除可能的 The validation: 前綴)
                 if 'The validation:' in line_str:
                     v_content = line_str.split('The validation:', 1)[1].strip()
                 else:
@@ -265,11 +280,32 @@ class LogParser:
                         if not (l_lim <= len(val_str) <= r_lim):
                             v_status = 'FAIL'
                 except:
-                    if 'is FAIL' in line_str or 'status:FAIL' in line_str.lower():
+                    if 'is FAIL' in line_str or 'status:FAIL' in line_str.lower() or 'FAIL' in line_str.upper():
                         v_status = 'FAIL'
                 
-                validations.append({'content': v_content, 'status': v_status})
+                validations.append({
+                    'content': v_content, 
+                    'status': v_status,
+                    'line_idx': idx
+                })
+                found = True
+            
+            # 如果標準沒中，試試帶有 PASS/FAIL 的標籤格式
+            if not found:
+                l_match = label_pattern.search(line_str)
+                if l_match:
+                    v_name = l_match.group(1).strip()
+                    v_val = l_match.group(2).strip()
+                    v_status = l_match.group(3).upper()
                     
+                    # 避免抓到太模糊的（例如只有一個單字）
+                    if len(v_name) > 2:
+                        validations.append({
+                            'content': f"{v_name} = {v_val}",
+                            'status': v_status,
+                            'line_idx': idx
+                        })
+                        
         return validations
         
         return {
@@ -352,6 +388,11 @@ class LogParser:
         # 確保提取了比對項目 (如果是在 _parse_fail_log 中建立的)
         if 'validations' not in step:
             step['validations'] = self._extract_validations(step['full_log'])
+            # 調整為全域索引
+            start_off = step.get('start_idx', 0)
+            for v in step['validations']:
+                if 'line_idx' in v:
+                    v['line_idx'] += start_off
         
         if not step.get('command'):
             is_pass_like = step.get('is_pass') is True or step.get('result') == 'PASS'
