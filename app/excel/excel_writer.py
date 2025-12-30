@@ -223,7 +223,7 @@ class ExcelWriter:
         # 準備匯總項目 (包含 PASS 與 FAIL 的，用於 [比對項目細節] 預覽)
         items_to_display = entry.get('pass_items', []) + entry.get('fail_items', [])
         
-        content_font = Font(name='Consolas', size=11)
+        content_font = Font(name='Calibri', size=11)
         
         # ⚠️ 傳入 log_type 和對應的項目列表
         # ⚠️ 接收返回的最後行、錯誤行位置，以及預覽框的起始行

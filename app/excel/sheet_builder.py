@@ -130,7 +130,7 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
     # --- 步驟 B1: FAIL 日誌寫入錯誤預覽區塊 ---
     if error_line_idx is not None and log_type == 'FAIL':
         # 1. 標題行
-        title_font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FFFFFF')
+        title_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
         title_fill = PatternFill('solid', fgColor='FFFF0000') # 純紅標題
         title_cell = ws.cell(row=curr_h_row, column=1, value="  [ 發現錯誤點 (預覽) ]  ")
         title_cell.font = title_font
@@ -141,7 +141,7 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         # 2. 錯誤內容 (每行皆可點擊跳轉)
         # 使用剛才擷取預覽塊時的 b_start 作為索引基底
         pink_fill = PatternFill('solid', fgColor='FFFFE1E1')
-        red_font = Font(name='Consolas', size=11, color='FFC00000', bold=True)
+        red_font = Font(name='Calibri', size=11, color='FFC00000', bold=True)
         
         if error_block_preview:
             for i, line_p in enumerate(error_block_preview):
@@ -159,7 +159,7 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         # 3. 底部跳轉按鈕 (整塊 Box 的結尾)
         target_err_row = actual_log_start + error_line_idx
         jump_cell = ws.cell(row=curr_h_row, column=1, value=f" [ 🚀 直接跳轉至錯誤行 Row {target_err_row} ] ")
-        jump_cell.font = Font(name='Microsoft JhengHei', size=11, bold=True, color="FF0000BB", underline="single")
+        jump_cell.font = Font(name='Calibri', size=11, bold=True, color="FF0000BB", underline="single")
         jump_cell.fill = pink_fill
         jump_cell.alignment = Alignment(horizontal='center')
         jump_cell.hyperlink = f"#'{ws.title}'!A{target_err_row}"
@@ -171,7 +171,7 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
     if pass_phases_preview:
         # 1. 標題行 (藍底白字)
         detail_preview_row = curr_h_row
-        title_font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FFFFFF')
+        title_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
         title_fill = PatternFill('solid', fgColor='FF4472C4')  # 藍色標題
         title_cell = ws.cell(row=curr_h_row, column=1, value="  [ 比對項目細節 ]  ")
         title_cell.font = title_font
@@ -182,11 +182,11 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         # 2. 內容渲染 (標題 + 比對細項)
         # Phase 標題：採用清晰的黑字
         phase_fill = PatternFill('solid', fgColor='FFF2F7FF') # 極淺藍(接近白)
-        phase_font = Font(name='Consolas', size=11, color='FF000000', bold=True)
+        phase_font = Font(name='Calibri', size=11, color='FF000000', bold=True)
         
         # 比對細節：採用 GUI 風格的綠色系 (PASS 代表色)
         pass_detail_fill = PatternFill('solid', fgColor='FFE2EFDA') # 淺綠背景
-        pass_detail_font = Font(name='Consolas', size=10, color='FF375623') # 深綠文字
+        pass_detail_font = Font(name='Calibri', size=10, color='FF375623') # 深綠文字
         
         total_rendered = 0
         limit = 100 # 總量上限
@@ -219,7 +219,7 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
                     target_excel_row = actual_log_start + target_log_idx
                     d_cell.hyperlink = f"#'{ws.title}'!A{target_excel_row}"
                     # 為可點擊項增加底線
-                    # d_cell.font = Font(name='Consolas', size=10, color='FF375623', underline='single') 
+                    # d_cell.font = Font(name='Calibri', size=10, color='FF375623', underline='single') 
                     # 考慮到表格美觀，暫不強制底線，滑鼠移上去會有手勢即可
                 
                 
@@ -229,7 +229,7 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
                     d_cell.fill = pass_detail_fill
                 else:
                     # 如果有異常，顯示紅粉色
-                    d_cell.font = Font(name='Consolas', size=10, color='FFC00000')
+                    d_cell.font = Font(name='Calibri', size=10, color='FFC00000')
                     d_cell.fill = PatternFill('solid', fgColor='FFFFE1E1')
                     
                 curr_h_row += 1
@@ -247,7 +247,7 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         if anno.get('show_separator'):
             title = anno.get('separator_title', 'PHASE')
             sep_cell = ws.cell(row=row_idx, column=1, value=f" --   [ {title} ]")
-            sep_cell.font = Font(name='Consolas', size=12, bold=True, color='FFFFFF', underline='single')
+            sep_cell.font = Font(name='Calibri', size=12, bold=True, color='FFFFFF', underline='single')
             sep_cell.fill = PatternFill('solid', fgColor='FF2E7D32') 
             sep_cell.alignment = Alignment(horizontal='center')
             # PHASE 加上超連結回預覽框 (或 Summary)
@@ -275,7 +275,7 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
             pass # 預設白色底
         
         # 應用字體
-        cell.font = Font(name='Consolas', size=10, color=txt_color, bold=is_bold)
+        cell.font = Font(name='Calibri', size=10, color=txt_color, bold=is_bold)
 
     error_excel_row = None
     if log_type == 'FAIL' and error_line_idx is not None:
@@ -291,7 +291,7 @@ def insert_header_info(ws, header_info, start_row=4):
         return start_row
         
     lines = header_info.split('\n')
-    header_font = Font(name='Consolas', size=14, bold=True, color='000000')
+    header_font = Font(name='Calibri', size=14, bold=True, color='000000')
     header_fill = PatternFill('solid', fgColor='90EE90') # 淺綠
     
     for i, line in enumerate(lines):

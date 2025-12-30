@@ -76,7 +76,7 @@ class SummaryBuilder:
             # 連結 (變更文字)
             cell_link = ws.cell(row=curr_row, column=4, value=f"查看LOG {sheet_name}")
             cell_link.hyperlink = f"#'{sheet_name}'!A1"
-            cell_link.font = Font(color="0000FF", underline="single")
+            cell_link.font = Font(name='Calibri', color="0000FF", underline="single")
             
         auto_fit_columns(ws, {1: 60, 2: 10, 3: 15, 4: 25})
         
@@ -112,31 +112,30 @@ class SummaryBuilder:
         for i, (label, val) in enumerate(stats):
             row = 3 + i
             # Label
-            ws.cell(row=row, column=1, value=label).font = Font(bold=True)
+            lbl_cell = ws.cell(row=row, column=1, value=label)
+            lbl_cell.font = Font(name='Calibri', size=11, bold=True)
             # Value
             v_cell = ws.cell(row=row, column=2, value=val)
+            v_cell.font = Font(name='Calibri', size=11)
             v_cell.alignment = Alignment(horizontal='center')
 
     def _add_time_distribution_chart(self, ws, time_data):
-        """新增測試時間分佈圖 (採用獨立數據分頁，提高 Excel 相容性)"""
+        """新增測試時間分佈圖 (數據回歸到本頁遠端 Z 欄，提高相容性與穩定性)"""
         try:
-            wb = ws.parent
-            # 1. 建立獨立的隱藏數據分頁
-            data_sheet_name = "ChartInfo_Hidden"
-            if data_sheet_name in wb.sheetnames:
-                ds = wb[data_sheet_name]
-            else:
-                ds = wb.create_sheet(data_sheet_name)
-                ds.sheet_state = 'veryHidden' # 深度隱藏，不干擾使用者
-                
-            # 2. 寫入數據
-            ds.cell(row=1, column=1, value="ID")
-            ds.cell(row=1, column=2, value="Time")
+            # 1. 寫入數據到 Z 欄之後 (Column 26+)
+            data_col = 26 # Z
+            ws.cell(row=1, column=data_col, value="ID").font = self.content_font
+            ws.cell(row=1, column=data_col+1, value="Time").font = self.content_font
+            
             for i, (label, val) in enumerate(time_data):
-                ds.cell(row=i+2, column=1, value=sanitize_cell_text(label))
-                ds.cell(row=i+2, column=2, value=val)
+                # ID (Z欄)
+                c_id = ws.cell(row=i+2, column=data_col, value=sanitize_cell_text(label))
+                c_id.font = self.content_font
+                # Time (AA欄)
+                c_val = ws.cell(row=i+2, column=data_col+1, value=val)
+                c_val.font = self.content_font
                 
-            # 3. 建立圖表
+            # 2. 建立圖表
             from openpyxl.chart import LineChart, Reference
             from openpyxl.drawing.fill import SolidFillProperties
             
@@ -147,30 +146,27 @@ class SummaryBuilder:
             chart.x_axis.title = "Units"
             chart.y_axis.majorUnit = 100
             
-            # 引用數據 (從 DataSheet 抓取)
-            data_ref = Reference(ds, min_col=2, min_row=1, max_row=len(time_data)+1)
-            cats_ref = Reference(ds, min_col=1, min_row=2, max_row=len(time_data)+1)
+            # 使用當前頁面的 Reference (不跨頁，最穩定)
+            data_ref = Reference(ws, min_col=data_col+1, min_row=1, max_row=len(time_data)+1)
+            cats_ref = Reference(ws, min_col=data_col, min_row=2, max_row=len(time_data)+1)
             
-            # titles_from_data=True 表示第一行是標題
             chart.add_data(data_ref, titles_from_data=True)
             chart.set_categories(cats_ref)
             
-            # 4. 配置系列樣式 (綠線紅點)
+            # 3. 配置系列樣式 (綠線紅點)
             if chart.series:
                 s = chart.series[0]
                 s.marker.symbol = "circle"
                 s.marker.size = 6
-                # 線條顏色 (深綠色)
-                s.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="2E7D32")
-                # 數據點顏色 (鮮紅色)
-                s.marker.graphicalProperties.solidFill = SolidFillProperties(srgbClr="FF0000")
+                s.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="2E7D32") # 深綠色
+                s.marker.graphicalProperties.solidFill = SolidFillProperties(srgbClr="FF0000") # 鮮紅色
                 s.marker.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="FF0000")
                 
             chart.legend = None
-            chart.width = 32
+            chart.width = 30
             chart.height = 12
             
-            # 5. 錨定在 Summary 頁面的 G3
+            # 4. 錨定在 G3
             ws.add_chart(chart, "G3")
             
         except Exception as e:

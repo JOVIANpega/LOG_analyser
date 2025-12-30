@@ -170,35 +170,59 @@ class FailListBuilder:
         
         for i, (label, val) in enumerate(stats):
             row = 3 + i
-            ws.cell(row=row, column=1, value=label).font = Font(bold=True)
-            ws.cell(row=row, column=2, value=val).alignment = self.center_align
+            lbl_cell = ws.cell(row=row, column=1, value=label)
+            lbl_cell.font = self.content_font
+            lbl_cell.font = Font(name='Calibri', size=11, bold=True)
+            
+            v_cell = ws.cell(row=row, column=2, value=val)
+            v_cell.font = self.content_font
+            v_cell.alignment = self.center_align
             
         # 圖表 - 錨定在 E3
         if times:
             try:
                 from openpyxl.chart import LineChart, Reference
+                from openpyxl.drawing.fill import SolidFillProperties
+                
                 chart = LineChart()
-                chart.title = "測試時間分佈圖"
-                chart.y_axis.title = "秒數 (Sec)"
+                chart.title = "測試時間分佈圖 (Time Curve / Sec)"
+                chart.y_axis.title = "Time (Sec)"
                 chart.y_axis.majorUnit = 100
                 chart.legend = None
                 chart.width = 25
                 chart.height = 10
                 
-                # 建立隱藏數據區域於 Column Z 之後，避免汙染主畫面
+                # 建立隱藏數據區域於 Column Z 之後
                 data_col = 26 # Z
+                ws.cell(row=1, column=data_col, value="ID").font = self.content_font
+                ws.cell(row=1, column=data_col+1, value="Time").font = self.content_font
                 for i, (label, val) in enumerate(times):
-                    ws.cell(row=i+1, column=data_col, value=label)
-                    ws.cell(row=i+1, column=data_col+1, value=val)
+                    ws.cell(row=i+2, column=data_col, value=label).font = self.content_font
+                    ws.cell(row=i+2, column=data_col+1, value=val).font = self.content_font
                 
-                data_ref = Reference(ws, min_col=data_col+1, min_row=1, max_row=len(times))
-                chart.add_data(data_ref)
+                data_ref = Reference(ws, min_col=data_col+1, min_row=1, max_row=len(times)+1)
+                cats_ref = Reference(ws, min_col=data_col, min_row=2, max_row=len(times)+1)
+                
+                chart.add_data(data_ref, titles_from_data=True)
+                chart.set_categories(cats_ref)
+                
+                # 樣式設定
+                if chart.series:
+                    s = chart.series[0]
+                    s.marker.symbol = "circle"
+                    s.marker.size = 5
+                    s.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="2E7D32")
+                    s.marker.graphicalProperties.solidFill = SolidFillProperties(srgbClr="FF0000")
+                    s.marker.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="FF0000")
+                
                 ws.add_chart(chart, "E3")
             except: pass
 
     def _add_item_breakdown_table(self, ws, error_counts, start_col=1, start_row=8):
         """插入分組統計表格"""
-        ws.cell(row=start_row, column=start_col, value=" 📊 FAIL Item 統計 (記數) ").font = Font(bold=True)
+        title_cell = ws.cell(row=start_row, column=start_col, value=" 📊 FAIL Item 統計 (記數) ")
+        title_cell.font = Font(name='Calibri', size=11, bold=True)
+        
         h_row = start_row + 1
         c1 = ws.cell(row=h_row, column=start_col, value="FAIL Item 名稱")
         c2 = ws.cell(row=h_row, column=start_col+1, value="數量")
