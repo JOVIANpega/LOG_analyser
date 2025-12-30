@@ -600,7 +600,7 @@ class AnalysisEngineMixin:
                     
                     if hasattr(self, 'excel_writer'):
                         pass_path, fail_path, _ = self.excel_writer.export_pass_fail_workbooks(
-                            out_dir, pass_logs, fail_logs
+                            out_dir, pass_logs, fail_logs, source_path=self.current_log_path
                         )
                         # 生成完成
                         msg_success = f"\033[92mExcel 生成成功！\033[0m 耗時 {int(time.time() - self.progress_manager._start_time)}s"

@@ -68,19 +68,50 @@ class ExcelWriter:
          from .excel_utils import extract_isn_from_filename
          return extract_isn_from_filename(filename)
 
-    def export_pass_fail_workbooks(self, folder_path: str, pass_logs: list, fail_logs: list):
+    def export_pass_fail_workbooks(self, folder_path: str, pass_logs: list, fail_logs: list, source_path: str | list | None = None):
         """
-        輸出兩個活頁簿
+        輸出兩個活頁簿，並根據來源自動命名
         """
+        # 提取前綴關鍵字 (如 4Cam_Calibration)
+        prefix = self._determine_prefix(fail_logs + pass_logs, source_path)
+        
         # 1. 處理 FAIL 活頁簿
-        fail_path = os.path.join(folder_path, "FAIL匯總.xlsx")
+        fail_name = f"{prefix}FAIL匯總.xlsx"
+        fail_path = os.path.join(folder_path, fail_name)
         fail_saved_path = self._build_fail_workbook(fail_path, fail_logs)
         
         # 2. 處理 PASS 活頁簿
-        pass_path = os.path.join(folder_path, "PASS匯總.xlsx")
+        pass_name = f"{prefix}PASS匯總.xlsx"
+        pass_path = os.path.join(folder_path, pass_name)
         pass_saved_path = self._build_pass_workbook(pass_path, pass_logs)
         
         return pass_saved_path, fail_saved_path, None
+
+    def _determine_prefix(self, logs: list, source_path: str | list | None = None) -> str:
+        """從 LOG 檔名或來源壓縮檔提取關鍵字 (例如 4Cam_Calibration)"""
+        candidate = ""
+        from .excel_utils import extract_station_from_filename
+        
+        # A. 優先檢查來源路徑 (如果是 zip 或 7z)
+        if isinstance(source_path, str) and (source_path.lower().endswith('.zip') or source_path.lower().endswith('.7z')):
+            candidate = extract_station_from_filename(source_path)
+            
+        # B. 如果沒結果，檢查 logs 中的第一個
+        if (not candidate or candidate == "Unknown") and logs:
+            for entry in logs:
+                fname = entry.get('file_name', entry.get('filename', ''))
+                if fname:
+                    candidate = extract_station_from_filename(fname)
+                    if candidate and candidate != "Unknown":
+                        break
+        
+        if candidate and candidate != "Unknown":
+            # 避免前綴含有不合法字元
+            from .excel_utils import sanitize_sheet_title
+            safe_prefix = sanitize_sheet_title(candidate)
+            return f"{safe_prefix}_"
+            
+        return ""
 
     def _build_fail_workbook(self, output_path, logs):
         import openpyxl
