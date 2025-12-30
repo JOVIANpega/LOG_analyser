@@ -19,9 +19,9 @@ def show_mixed_content_dialog(parent, archives, log_count, folder_path):
     dialog.title("發現混合內容 - 請選擇操作")
     dialog.configure(bg='white')
     
-    # 根據字體調整視窗大小
-    win_w = int(680 * (ui_font_size / 12))
-    win_h = int(580 * (ui_font_size / 12))
+    # 根據字體調整視窗大小 (增加更多寬裕空間)
+    win_w = int(750 * (ui_font_size / 12))
+    win_h = int(680 * (ui_font_size / 12))
     
     dialog.transient(parent)
     dialog.attributes("-topmost", True)  # 🟢 強制最上層
@@ -60,7 +60,11 @@ def show_mixed_content_dialog(parent, archives, log_count, folder_path):
     tk.Label(header, text="請檢視並勾選要處理的壓縮檔：", font=('Microsoft JhengHei', ui_font_size - 1),
              fg='#666', bg='white').pack(anchor='w', pady=(10, 0))
     
-    # 列表區 (卡片式)
+    # 🟢 按鈕區 (Pack at the bottom of main_frame FIRST)
+    btn_frame = tk.Frame(main_frame, bg='white', pady=15)
+    btn_frame.pack(side=tk.BOTTOM, fill=tk.X)
+    
+    # 列表區 (卡片式) - Pack after buttons to take remaining space
     list_frame = tk.Frame(main_frame, bg='white', relief=tk.SOLID, borderwidth=1)
     list_frame.pack(fill=tk.BOTH, expand=True, pady=10)
     
@@ -91,10 +95,6 @@ def show_mixed_content_dialog(parent, archives, log_count, folder_path):
         chk.pack(fill=tk.X, padx=10, pady=3)
         vars_.append((var, p))
         
-    # 按鈕區
-    btn_frame = tk.Frame(main_frame, bg='white', pady=15)
-    btn_frame.pack(fill=tk.X)
-    
     # 左側：全選/全不選
     def check_all(val):
         for v, _ in vars_: v.set(val)

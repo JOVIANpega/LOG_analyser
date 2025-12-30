@@ -70,20 +70,24 @@ class ExcelWriter:
 
     def export_pass_fail_workbooks(self, folder_path: str, pass_logs: list, fail_logs: list, source_path: str | list | None = None):
         """
-        輸出兩個活頁簿，並根據來源自動命名
+        輸出活頁簿，並根據來源自動命名
         """
         # 提取前綴關鍵字 (如 4Cam_Calibration)
         prefix = self._determine_prefix(fail_logs + pass_logs, source_path)
         
-        # 1. 處理 FAIL 活頁簿
-        fail_name = f"{prefix}FAIL匯總.xlsx"
-        fail_path = os.path.join(folder_path, fail_name)
-        fail_saved_path = self._build_fail_workbook(fail_path, fail_logs)
+        fail_saved_path = None
+        # 1. 處理 FAIL 活頁簿 (僅當有內容時)
+        if fail_logs:
+            fail_name = f"{prefix}FAIL匯總.xlsx"
+            fail_path = os.path.join(folder_path, fail_name)
+            fail_saved_path = self._build_fail_workbook(fail_path, fail_logs)
         
-        # 2. 處理 PASS 活頁簿
-        pass_name = f"{prefix}PASS匯總.xlsx"
-        pass_path = os.path.join(folder_path, pass_name)
-        pass_saved_path = self._build_pass_workbook(pass_path, pass_logs, prefix=prefix)
+        pass_saved_path = None
+        # 2. 處理 PASS 活頁簿 (僅當有內容時)
+        if pass_logs:
+            pass_name = f"{prefix}PASS匯總.xlsx"
+            pass_path = os.path.join(folder_path, pass_name)
+            pass_saved_path = self._build_pass_workbook(pass_path, pass_logs, prefix=prefix)
         
         return pass_saved_path, fail_saved_path, None
 

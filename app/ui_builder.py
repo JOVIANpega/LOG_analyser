@@ -405,8 +405,8 @@ class UIBuilderMixin:
         except Exception as e:
             print(f"自動調整文字視窗大小失敗: {e}")
 
-    def _show_open_folder_prompt(self, out_dir: str, total_files: int, pass_count: int, fail_count: int, pass_path: str, fail_path: str, fail_path_new: str = None):
-        """徹底解決白底一片白問題：使用標準 tk 元件確保可見度與按鈕位置"""
+    def _show_open_folder_prompt(self, out_dir: str, total_files: int, pass_count: int, fail_count: int, report_list: list):
+        """精簡化報表完成對話框：支援多站別、預設不勾選、路徑清晰"""
         import tkinter as tk
         from tkinter import ttk
         
@@ -414,100 +414,123 @@ class UIBuilderMixin:
         win.title("匯出完成")
         win.configure(bg='white')
         
-        # 根據字體大小調整最小視窗尺寸
+        # 根據字體調整視窗大小 (增加一些緩衝空間)
         base_size = self.settings.get('ui_font_size', 12)
-        win_w = max(780, int(780 * (base_size / 12)))
-        win_h = max(550, int(580 * (base_size / 12)))
+        win_w = max(860, int(860 * (base_size / 12)))
+        win_h = max(550, int(600 * (base_size / 12))) # 增加高度基準
         
-        # 居中與最上層
+        # 居中與旗標
         win.transient(self.root)
-        win.attributes("-topmost", True)  # 🟢 強制最上層，避免被主視窗擋住
+        win.attributes("-topmost", True)
         win.grab_set()
         x = (win.winfo_screenwidth() // 2) - (win_w // 2)
         y = (win.winfo_screenheight() // 2) - (win_h // 2)
         win.geometry(f"{win_w}x{win_h}+{x}+{y}")
         
-        # 主容器 (tk.Frame 確保 bg='white' 有效)
-        main_frame = tk.Frame(win, bg='white', padx=30, pady=25)
+        main_frame = tk.Frame(win, bg='white', padx=40, pady=20) # 減少 pady
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # 1. 標題
-        tk.Label(main_frame, text="🎉 報表匯出完成", font=('Microsoft JhengHei', base_size + 8, 'bold'), 
-                 fg='#2E7D32', bg='white').pack(pady=(0, 20))
-        
-        # 2. 統計卡片
-        stats_box = tk.Frame(main_frame, bg='#F1F8E9', padx=15, pady=12, bd=1, relief=tk.SOLID)
-        stats_box.pack(fill=tk.X, pady=10)
-        
-        stats_msg = f"共分析 {total_files} 個檔案，其中 "
-        tk.Label(stats_box, text=stats_msg, font=('Microsoft JhengHei', base_size), bg='#F1F8E9').pack(side=tk.LEFT)
-        tk.Label(stats_box, text=f"PASS: {pass_count}", font=('Microsoft JhengHei', base_size, 'bold'), fg='#2E7D32', bg='#F1F8E9').pack(side=tk.LEFT, padx=5)
-        tk.Label(stats_box, text=f"FAIL: {fail_count}", font=('Microsoft JhengHei', base_size, 'bold'), fg='#D32F2F', bg='#F1F8E9').pack(side=tk.LEFT, padx=5)
-        
-        # 3. 路徑列表
-        path_area = tk.Frame(main_frame, bg='white', pady=10)
-        path_area.pack(fill=tk.X)
-        tk.Label(path_area, text="產生的檔案路徑：", font=('Microsoft JhengHei', base_size, 'bold'), bg='white').pack(anchor='w', pady=(0, 5))
-        
-        paths = [("PASS 匯總", pass_path), ("FAIL 匯總", fail_path)]
-        if fail_path_new: paths.append(("新版 Dashboard", fail_path_new))
-        
-        for name, p in paths:
-            row_f = tk.Frame(path_area, bg='white')
-            row_f.pack(fill=tk.X, pady=2)
-            tk.Label(row_f, text=f"• {name}: ", font=('Microsoft JhengHei', base_size), bg='white').pack(side=tk.LEFT)
-            tk.Label(row_f, text=p, font=('Consolas', base_size - 1), fg='#1565C0', bg='white').pack(side=tk.LEFT)
-            
-        # 4. 開啟選項 (Checkbuttons)
-        tk.Label(main_frame, text="請選擇要立即開啟的項目：", font=('Microsoft JhengHei', base_size, 'bold'), bg='white').pack(anchor='w', pady=(15, 8))
-        
-        check_box = tk.Frame(main_frame, bg='white', padx=20)
-        check_box.pack(fill=tk.X)
-        
-        vars_map = {
-            'folder': tk.BooleanVar(value=True),
-            'pass': tk.BooleanVar(value=pass_count > 0),
-            'fail': tk.BooleanVar(value=fail_count > 0),
-            'dashboard': tk.BooleanVar(value=True if fail_path_new else False)
-        }
-        
-        options = [
-            ('folder', "開啟輸出資料夾 (Explorer)", True),
-            ('pass', f"直接開啟 {os.path.basename(pass_path)}", os.path.exists(pass_path)),
-            ('fail', f"直接開啟 {os.path.basename(fail_path)}", os.path.exists(fail_path)),
-            ('dashboard', "開啟 Dashboard 新版報表", fail_path_new and os.path.exists(fail_path_new))
-        ]
-        
-        for key, text, cond in options:
-            if cond:
-                cb = tk.Checkbutton(check_box, text=text, variable=vars_map[key], bg='white', 
-                                   font=('Microsoft JhengHei', base_size), activebackground='white')
-                cb.pack(anchor='w', pady=3)
-        
-        # 5. 按鈕區 (固定在底部)
-        btn_frame = tk.Frame(main_frame, bg='white', pady=20)
+
+        # === 關鍵修正：先 Pack 按鈕區，確保永遠在最底部且可見 ===
+        btn_frame = tk.Frame(main_frame, bg='white', pady=10)
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X)
         
-        def on_confirm():
+        # 1. 簡約標題
+        tk.Label(main_frame, text="✅ 報表匯出完成", font=('Microsoft JhengHei', base_size + 6, 'bold'), 
+                 fg='#1B5E20', bg='white').pack(anchor='w', pady=(0, 10))
+        
+        # 2. 統計訊息 (精簡一行)
+        stats_text = f"共分析 {total_files} 個 Log 檔案 | PASS: {pass_count} | FAIL: {fail_count}"
+        tk.Label(main_frame, text=stats_text, font=('Microsoft JhengHei', base_size), 
+                 bg='white', fg='#424242').pack(anchor='w', pady=(0, 15))
+
+        # 3. 輸出路徑提示
+        path_hint = tk.Frame(main_frame, bg='#FAFAFA', padx=10, pady=5)
+        path_hint.pack(fill=tk.X, pady=(0, 15))
+        tk.Label(path_hint, text=f"📂 輸出目錄: {out_dir}", font=('Consolas', base_size - 1), 
+                 bg='#FAFAFA', fg='#455A64').pack(side=tk.LEFT)
+
+        # 4. 報表清單 (捲動區域)
+        tk.Label(main_frame, text="產生的 Excel 報表列表：", 
+                 font=('Microsoft JhengHei', base_size, 'bold'), bg='white').pack(anchor='w', pady=(5, 5))
+        
+        list_container = tk.Frame(main_frame, bg='white', bd=1, relief=tk.SOLID)
+        list_container.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        canvas = tk.Canvas(list_container, bg='white', highlightthickness=0)
+        scrollbar = tk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg='white')
+        
+        scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        
+        # 建立清單 (包含勾選框，預設不打勾)
+        check_vars = [] # 儲存 (var, path)
+        
+        for station, p_path, f_path in report_list:
+            items = []
+            if p_path and os.path.exists(p_path):
+                items.append(('PASS', p_path, '#2E7D32'))
+            if f_path and os.path.exists(f_path):
+                items.append(('FAIL', f_path, '#C62828'))
+            
+            for type_label, full_path, color in items:
+                fname = os.path.basename(full_path)
+                var = tk.BooleanVar(value=False) # 🟢 預設不打勾
+                
+                row = tk.Frame(scrollable_frame, bg='white', padx=10, pady=4)
+                row.pack(fill=tk.X, anchor='w')
+                
+                cb = tk.Checkbutton(row, text=f" {station} {type_label} 匯總 ", variable=var,
+                                   font=('Microsoft JhengHei', base_size), bg='white', activebackground='white')
+                cb.pack(side=tk.LEFT)
+                
+                tk.Label(row, text=f"({fname})", font=('Consolas', base_size - 2), 
+                         fg='#757575', bg='white').pack(side=tk.LEFT, padx=15)
+                
+                check_vars.append((var, full_path))
+
+        def on_close():
+            win.destroy()
+            
+        def on_open_selected():
             try:
-                if vars_map['folder'].get(): os.startfile(out_dir)
-                if vars_map['pass'].get() and os.path.exists(pass_path): os.startfile(pass_path)
-                if vars_map['fail'].get() and os.path.exists(fail_path): os.startfile(fail_path)
-                if fail_path_new and vars_map['dashboard'].get() and os.path.exists(fail_path_new): os.startfile(fail_path_new)
+                opened = 0
+                # 1. 開啟勾選的 Excel
+                for var, p in check_vars:
+                    if var.get() and os.path.exists(p):
+                        os.startfile(p)
+                        opened += 1
+                
+                # 2. 視需要開啟資料夾
+                if folder_var.get(): 
+                    os.startfile(out_dir)
+                    opened += 1
+                
+                # 若完全沒勾點執行，就直接關閉
+                win.destroy()
             except Exception as e:
                 print(f"開啟失敗: {e}")
-            finally:
                 win.destroy()
-        
-        # 使用更大的按鈕
-        btn_no = tk.Button(btn_frame, text=" 僅關閉 ", font=('Microsoft JhengHei', base_size), 
-                          bg='#E0E0E0', fg='black', width=12, pady=8, cursor='hand2', command=win.destroy)
-        btn_no.pack(side=tk.RIGHT, padx=5)
 
-        btn_run = tk.Button(btn_frame, text=" 執 行 (OK) ", font=('Microsoft JhengHei', base_size, 'bold'), 
-                          bg='#1976D2', fg='white', width=22, pady=8, cursor='hand2', command=on_confirm)
-        btn_run.pack(side=tk.RIGHT, padx=5)
-        
+        # 按鈕反向放置於底部框架
+        btn_ok = tk.Button(btn_frame, text=" 打 開 勾 選 的 Excel 報 表 ", font=('Microsoft JhengHei', base_size, 'bold'), 
+                            bg='#0288D1', fg='white', width=28, pady=8, relief=tk.FLAT, cursor='hand2', command=on_open_selected)
+        btn_ok.pack(side=tk.RIGHT, padx=5)
+
+        btn_cancel = tk.Button(btn_frame, text=" 僅 關 閉 視 窗 ", font=('Microsoft JhengHei', base_size), 
+                            bg='#EEEEEE', fg='#424242', width=15, pady=8, relief=tk.FLAT, cursor='hand2', command=on_close)
+        btn_cancel.pack(side=tk.RIGHT, padx=5)
+
+        # 5. 資料夾選項 (放在按鈕上方)
+        folder_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(main_frame, text=" 打開輸出資料夾 (Explorer)", variable=folder_var, 
+                       font=('Microsoft JhengHei', base_size), bg='white', activebackground='white'
+                       ).pack(side=tk.BOTTOM, anchor='w', pady=10)
+
         win.protocol("WM_DELETE_WINDOW", win.destroy)
         win.wait_window()
 

@@ -10,6 +10,7 @@ for /f "tokens=2 delims==" %%a in ('findstr /C:"VERSION =" "app\version.py"') do
     set "val=!val: =!"
     set "APP_VERSION=!val!"
 )
+set "APP_VERSION=%APP_VERSION: =%"
 
 echo ========================================
 echo PEGA Log Analyzer V%APP_VERSION% 打包工具

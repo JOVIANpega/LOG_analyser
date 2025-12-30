@@ -595,22 +595,71 @@ class AnalysisEngineMixin:
                         out_dir = os.getcwd()
 
                     self._ui_log(f"正在產生 Excel 至: {out_dir}", tag='summary_highlight')
+                    
+                    # === 新增：集中到 生成的EXCEL報表 資料夾 ===
+                    report_dir = os.path.join(out_dir, "生成的EXCEL報表")
+                    try:
+                        if not os.path.exists(report_dir):
+                            os.makedirs(report_dir, exist_ok=True)
+                        out_dir = report_dir
+                        self._ui_log(f"-> 報表將集中存放於: {out_dir}")
+                    except Exception as e:
+                        print(f"建立 EXCEL報表 資料夾失敗: {e}")
+                        # 失敗則維持原目錄
+                    
                     # 此時更新進度到 100% 或幾乎 100%
                     self._safe_update_progress(total_files, total_steps, "正在產生 Excel 報告...")
                     
                     if hasattr(self, 'excel_writer'):
-                        pass_path, fail_path, _ = self.excel_writer.export_pass_fail_workbooks(
-                            out_dir, pass_logs, fail_logs, source_path=self.current_log_path
-                        )
-                        # 生成完成
-                        msg_success = f"\033[92mExcel 生成成功！\033[0m 耗時 {int(time.time() - self.progress_manager._start_time)}s"
+                        from .excel.excel_utils import extract_station_from_filename
+                        
+                        # 1. 分組邏輯：根據站別名稱將 logs 分類
+                        log_groups = {} # station_name -> {'pass': [], 'fail': []}
+                        
+                        # 判斷是否為單一壓縮檔來源 (通常壓縮檔就代表一個完整的測試包)
+                        is_single_archive = False
+                        if isinstance(self.current_log_path, str) and (self.current_log_path.lower().endswith('.zip') or self.current_log_path.lower().endswith('.7z')):
+                            is_single_archive = True
+                            
+                        if is_single_archive:
+                            # 維持原有邏輯：僅分一組，名稱以後綴決定
+                            prefix_name = extract_station_from_filename(self.current_log_path)
+                            log_groups[prefix_name] = {'pass': pass_logs, 'fail': fail_logs}
+                        else:
+                            # 多檔或資料夾：按各自 log 的 station 分組
+                            for log in pass_logs:
+                                s = extract_station_from_filename(log.get('file_name', ''))
+                                if s not in log_groups: log_groups[s] = {'pass': [], 'fail': []}
+                                log_groups[s]['pass'].append(log)
+                            for log in fail_logs:
+                                s = extract_station_from_filename(log.get('file_name', ''))
+                                if s not in log_groups: log_groups[s] = {'pass': [], 'fail': []}
+                                log_groups[s]['fail'].append(log)
+                                
+                        all_generated_paths = [] # 儲存格式: (station_name, pass_path, fail_path)
+                        processed_groups = 0
+                        
+                        # 2. 逐一產生各站別的報告
+                        for station, data in log_groups.items():
+                            if not data['pass'] and not data['fail']: continue
+                            
+                            self._ui_log(f"正在產生 [{station}] 的 Excel 報告...")
+                            p_path, f_path, _ = self.excel_writer.export_pass_fail_workbooks(
+                                out_dir, data['pass'], data['fail'], 
+                                source_path=self.current_log_path if is_single_archive else None
+                            )
+                            all_generated_paths.append((station, p_path, f_path))
+                            processed_groups += 1
+                            self._ui_log(f"-> 站別 {station} 報告產出完成")
+
+                        # 3. 生成完成訊息與提示
+                        msg_success = f"\033[92mExcel 生成成功！(共產出 {processed_groups} 組站別)\033[0m"
                         self._safe_update_progress(total_steps, total_steps, msg_success)
-                        self._ui_log(f"\033[92mExcel 生成成功！\033[0m", tag='summary_highlight')
-                        self._ui_log(f"\033[96mPASS: {os.path.basename(pass_path)}\nFAIL: {os.path.basename(fail_path)}\033[0m", tag='summary_success')
-                        # 使用 root.after 確保在主執行緒彈出
-                        # 參數: out_dir, total_files, pass_count, fail_count, pass_path, fail_path
+                        self._ui_log(f"\033[92mExcel 匯出完成！共 {processed_groups} 個測試站類別。\033[0m", tag='summary_highlight')
+                        
+                        # 傳入所有生成的路徑列表
                         self.root.after(100, lambda: self._show_open_folder_prompt(
-                            out_dir, total_files, len(pass_logs), len(fail_logs), pass_path, fail_path
+                            out_dir, total_files, len(pass_logs), len(fail_logs), all_generated_paths
                         ))
                 except Exception as e:
                     self._ui_log(f"[錯誤] 匯出 Excel 失敗: {str(e)}")

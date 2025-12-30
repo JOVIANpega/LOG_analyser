@@ -351,7 +351,7 @@ class FileHandlerMixin:
                 self.root.after(0, _apply_result)
                 
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\\n{e}"))
+                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\n{e}"))
                 if temp_dir and os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir, ignore_errors=True)
             finally:
@@ -433,14 +433,28 @@ class FileHandlerMixin:
                 self.root.after(0, _apply_result)
                 
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\\n{e}"))
+                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\n{e}"))
                 if temp_dir and os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir, ignore_errors=True)
             finally:
                 self.root.after(0, self._close_progress)
         threading.Thread(target=_bg, daemon=True).start()
 
-    # 保留 _select_compressed_file 供內部調用或向下相容，但 UI 不再直接使用
+    def _show_compressed_selection_window(self, file_paths):
+        """顯示壓縮檔選擇視窗 (當使用者一次選多個壓縮檔時)"""
+        # 1. 顯示預覽
+        self._show_archive_preview(file_paths)
+        
+        # 2. 讓使用者挑選
+        selected_archives = self._choose_archives_dialog(file_paths)
+        if not selected_archives:
+            return
+            
+        # 3. 執行處理 (複用現有邏輯)
+        # 這裡的 folder_path 取第一個檔案的目錄作為代表
+        folder_path = os.path.dirname(selected_archives[0])
+        self._process_selected_archives_direct(selected_archives, folder_path)
+        
     def _select_compressed_file(self):
         """選擇並處理壓縮檔案（支援多選）"""
         # 獲取預設目錄
@@ -620,7 +634,7 @@ class FileHandlerMixin:
                 self.root.after(0, _apply_result)
                 
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\\n{e}"))
+                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮資料夾時發生錯誤：\n{e}"))
                 if temp_dir and os.path.exists(temp_dir):
                     try: shutil.rmtree(temp_dir, ignore_errors=True)
                     except: pass
@@ -646,35 +660,52 @@ class FileHandlerMixin:
     def _choose_archives_dialog(self, archives: list) -> list:
         """彈出多選對話框，讓使用者挑選要處理的壓縮檔。回傳選中的清單。"""
         try:
+            base_size = self.settings.get('ui_font_size', 12)
             win = tk.Toplevel(self.root)
             win.title("選擇要處理的壓縮檔")
-            win.geometry("520x420")
+            
+            # 動態調整視窗大小
+            win_w = max(520, int(520 * (base_size / 12)))
+            win_h = max(450, int(450 * (base_size / 12)))
+            win.geometry(f"{win_w}x{win_h}")
+            
             win.transient(self.root)
             win.grab_set()
-            frm = tk.Frame(win)
-            frm.pack(fill=tk.BOTH, expand=1, padx=10, pady=10)
-            lbl = tk.Label(frm, text="請勾選要處理的壓縮檔：")
-            lbl.pack(anchor='w')
-            lb_frame = tk.Frame(frm)
-            lb_frame.pack(fill=tk.BOTH, expand=1)
-            canvas = tk.Canvas(lb_frame)
+            
+            # 主框架
+            frm = tk.Frame(win, padx=15, pady=15)
+            frm.pack(fill=tk.BOTH, expand=True)
+            
+            lbl = tk.Label(frm, text="請勾選要處理的壓縮檔：", font=('Microsoft JhengHei', base_size, 'bold'))
+            lbl.pack(anchor='w', pady=(0, 10))
+            
+            # 中間滾動區
+            lb_frame = tk.Frame(frm, relief=tk.SUNKEN, bd=1)
+            lb_frame.pack(fill=tk.BOTH, expand=True)
+            
+            canvas = tk.Canvas(lb_frame, bg='white', highlightthickness=0)
             vsb = tk.Scrollbar(lb_frame, orient="vertical", command=canvas.yview)
-            inner = tk.Frame(canvas)
+            inner = tk.Frame(canvas, bg='white')
+            
             inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-            canvas.create_window((0,0), window=inner, anchor='nw')
+            canvas.create_window((0,0), window=inner, anchor='nw', width=win_w-50)
             canvas.configure(yscrollcommand=vsb.set)
+            
             canvas.pack(side="left", fill="both", expand=True)
             vsb.pack(side="right", fill="y")
 
             vars_ = []
             for p in sorted(archives):
                 var = tk.BooleanVar(value=True)
-                cb = tk.Checkbutton(inner, text=os.path.basename(p), variable=var, anchor='w', justify='left')
-                cb.pack(fill=tk.X, anchor='w')
+                cb = tk.Checkbutton(inner, text=os.path.basename(p), variable=var, 
+                                   font=('Microsoft JhengHei', base_size), bg='white',
+                                   activebackground='white', anchor='w', justify='left')
+                cb.pack(fill=tk.X, anchor='w', padx=5, pady=2)
                 vars_.append((var, p))
 
-            btns = tk.Frame(frm)
-            btns.pack(fill=tk.X, pady=8)
+            btns = tk.Frame(frm, pady=10)
+            btns.pack(fill=tk.X, side=tk.BOTTOM)
+            
             selected = []
             def on_ok():
                 nonlocal selected
@@ -683,10 +714,16 @@ class FileHandlerMixin:
             def on_cancel():
                 selected.clear()
                 win.destroy()
-            tk.Button(btns, text="全選", command=lambda: [v.set(True) for v,_ in vars_]).pack(side=tk.LEFT)
-            tk.Button(btns, text="全不選", command=lambda: [v.set(False) for v,_ in vars_]).pack(side=tk.LEFT, padx=6)
-            tk.Button(btns, text="確定", command=on_ok).pack(side=tk.RIGHT)
-            tk.Button(btns, text="取消", command=on_cancel).pack(side=tk.RIGHT, padx=6)
+                
+            tk.Button(btns, text=" 全選 ", font=('Microsoft JhengHei', base_size - 1),
+                      command=lambda: [v.set(True) for v,_ in vars_]).pack(side=tk.LEFT)
+            tk.Button(btns, text=" 全不選 ", font=('Microsoft JhengHei', base_size - 1),
+                      command=lambda: [v.set(False) for v,_ in vars_]).pack(side=tk.LEFT, padx=10)
+            
+            tk.Button(btns, text=" 確定 (OK) ", font=('Microsoft JhengHei', base_size - 1, 'bold'),
+                      bg='#0288D1', fg='white', relief=tk.FLAT, padx=15, command=on_ok).pack(side=tk.RIGHT)
+            tk.Button(btns, text=" 取消 ", font=('Microsoft JhengHei', base_size - 1),
+                      padx=10, command=on_cancel).pack(side=tk.RIGHT, padx=10)
             win.wait_window()
             return selected
         except Exception as e:
@@ -783,7 +820,7 @@ class FileHandlerMixin:
                 self.root.after(0, _apply_result)
                 
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮檔案時發生錯誤：\\n{str(e)}"))
+                self.root.after(0, lambda: messagebox.showerror("錯誤", f"處理壓縮檔案時發生錯誤：\n{str(e)}"))
                 if temp_dir and os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir, ignore_errors=True)
                 self.root.after(0, self._close_progress)
@@ -794,6 +831,13 @@ class FileHandlerMixin:
         """解壓縮 ZIP 檔案"""
         try:
             import zipfile
+            
+            # Windows 長路徑處理
+            if os.name == 'nt':
+                extract_to = os.path.abspath(extract_to)
+                if not extract_to.startswith("\\\\?\\"):
+                    extract_to = "\\\\?\\" + extract_to
+            
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 file_list = zip_ref.namelist()
                 total_files = len(file_list)
@@ -813,23 +857,21 @@ class FileHandlerMixin:
                     
                     zip_ref.extract(member, extract_to)
         except Exception as e:
-            error_msg = f"ZIP檔案解壓縮失敗: {str(e)}\\n\\n檔案: {zip_path}\\n\\n可能的原因:\\n"
-            error_msg += "• 檔案損壞或格式不正確\\n"
-            error_msg += "• 檔案被密碼保護\\n"
-            error_msg += "• 檔案權限不足\\n"
-            error_msg += "• ZIP格式不相容\\n\\n"
-            error_msg += "建議:\\n"
-            error_msg += "• 檢查檔案是否完整\\n"
-            error_msg += "• 嘗試使用其他工具解壓\\n"
-            error_msg += "• 檢查檔案是否被密碼保護"
-            
-            messagebox.showerror("ZIP解壓縮失敗", error_msg)
+            error_msg = f"ZIP檔案解壓縮失敗: {str(e)}\n\n檔案: {zip_path}"
+            # 只印出日誌，由上層統一決定是否顯示對話框
+            print(f"[ERROR] {error_msg}")
             raise
 
     def _extract_7z(self, sevenz_path, extract_to):
         """解壓縮 7Z 檔案（多種方式嘗試）"""
         try:
             import py7zr
+            
+            # Windows 長路徑處理
+            if os.name == 'nt':
+                extract_to = os.path.abspath(extract_to)
+                if not extract_to.startswith("\\\\?\\"):
+                    extract_to = "\\\\?\\" + extract_to
             
             # 設定進度條為不確定模式（因為py7zr不支援細粒度回調）
             self._safe_update_progress_mode('indeterminate')
@@ -866,25 +908,20 @@ class FileHandlerMixin:
             messagebox.showerror("錯誤", "需要安裝 py7zr 套件來支援 7Z 格式\\n請執行：pip install py7zr")
             raise
         except Exception as e:
-            error_msg = f"7Z檔案解壓縮失敗: {str(e)}\\n\\n檔案: {sevenz_path}\\n\\n可能的原因:\\n"
-            error_msg += "• 檔案損壞或格式不正確\\n"
-            error_msg += "• 檔案被密碼保護\\n"
-            error_msg += "• 檔案權限不足\\n"
-            error_msg += "• py7zr版本不相容\\n"
-            error_msg += "• 檔案被加密\\n\\n"
-            error_msg += "建議:\\n"
-            error_msg += "• 檢查檔案是否完整\\n"
-            error_msg += "• 嘗試使用7-Zip軟體手動解壓\\n"
-            error_msg += "• 更新py7zr套件: pip install --upgrade py7zr\\n"
-            error_msg += "• 檢查檔案是否被密碼保護"
-            
-            messagebox.showerror("7Z解壓縮失敗", error_msg)
+            error_msg = f"7Z檔案解壓縮失敗: {str(e)}\n\n檔案: {sevenz_path}"
+            print(f"[ERROR] {error_msg}")
             raise
 
     def _extract_rar(self, rar_path, extract_to):
         """解壓縮 RAR 檔案"""
         try:
             import rarfile
+            
+            # Windows 長路徑處理
+            if os.name == 'nt':
+                extract_to = os.path.abspath(extract_to)
+                if not extract_to.startswith("\\\\?\\"):
+                    extract_to = "\\\\?\\" + extract_to
             
             # 設定進度條為不確定模式
             self._safe_update_progress_mode('indeterminate')
@@ -896,17 +933,8 @@ class FileHandlerMixin:
             messagebox.showerror("錯誤", "需要安裝 rarfile 套件來支援 RAR 格式\\n請執行：pip install rarfile")
             raise
         except Exception as e:
-            error_msg = f"RAR檔案解壓縮失敗: {str(e)}\\n\\n檔案: {rar_path}\\n\\n可能的原因:\\n"
-            error_msg += "• 檔案損壞或格式不正確\\n"
-            error_msg += "• 檔案被密碼保護\\n"
-            error_msg += "• 檔案權限不足\\n"
-            error_msg += "• rarfile版本不相容\\n\\n"
-            error_msg += "建議:\\n"
-            error_msg += "• 檢查檔案是否完整\\n"
-            error_msg += "• 嘗試使用其他工具解壓\\n"
-            error_msg += "• 更新rarfile套件: pip install --upgrade rarfile"
-            
-            messagebox.showerror("RAR解壓縮失敗", error_msg)
+            error_msg = f"RAR檔案解壓縮失敗: {str(e)}\n\n檔案: {rar_path}"
+            print(f"[ERROR] {error_msg}")
             raise
 
     def _is_archive_file(self, filename):
@@ -937,9 +965,11 @@ class FileHandlerMixin:
                     full_path = os.path.join(current_root, fname)
                     if full_path in processed:
                         continue
-                    # 為每個壓縮檔建立對應資料夾（同名去副檔名加 _extracted）
+                    # 為每個壓縮檔建立對應資料夾 (盡量精簡長度)
                     base, _ = os.path.splitext(fname)
-                    target_dir = os.path.join(current_root, f"{base}_extracted")
+                    # 限制檔名前綴長度，避免 Windows 路徑過長問題 (260字符限制)
+                    safe_base = base[:20] if len(base) > 20 else base
+                    target_dir = os.path.join(current_root, f"{safe_base}_ex")
                     try:
                         os.makedirs(target_dir, exist_ok=True)
                         self._extract_archive(full_path, target_dir)

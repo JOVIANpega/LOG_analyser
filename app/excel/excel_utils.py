@@ -72,9 +72,9 @@ def extract_station_from_filename(filename: str) -> str:
     base_name = re.sub(r'[-_]?WE\d+', '', base_name, flags=re.IGNORECASE)
     base_name = re.sub(r'[-_]?\d{8,}', '', base_name)
     
-    # 3. 移除包含多個數字的塊 (如 -222-, -06G0) -> 這些通常是流水號或 Lot
-    # 我們移除含有 3 個以上數字的獨立塊
-    base_name = re.sub(r'[-_][A-Z0-9]*\d{3,}[A-Z0-9]*', '', base_name)
+    # 3. 移除包含多個數字的塊 (如 -222-, -06G0, -0A9, -0E9) -> 這些通常是流水號或 Lot/Config Code
+    # 我們移除含有 2 個以上數字的獨立塊 (不論是否連續，例如 0A9 包含 0 與 9 兩個數字)
+    base_name = re.sub(r'[-_]{1,2}[A-Z0-9]*\d[A-Z0-9]*\d[A-Z0-9]*', '', base_name)
     
     # 4. 移除常見測試狀態與字眼
     base_name = re.sub(r'[-_]?(PASS|FAIL|LOG|TEST)', '', base_name, flags=re.IGNORECASE)
