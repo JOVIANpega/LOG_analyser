@@ -237,74 +237,59 @@ class LogParser:
         }
 
     def _extract_validations(self, lines):
-        """從 Log 行中提取比對項目資訊 (同步支援 = 或 : 分隔符)"""
+        """
+        從 Log 行中提取比對項目資訊 (恢復為穩定模式)
+        規則：必須包含 '=' 以及括號內容，如 OOO = XXX (XXX)
+        """
         validations = []
-        # 1. 優先匹配標準格式: xxx = OOO (OOO) 或 xxx : OOO (OOO)
-        strict_pattern = re.compile(r'([\w\s_-]+)\s*[=:]\s*([^ \(\)]+)\s*\(\s*([^,\)]+)\s*(?:,\s*([^ \)]*)\s*)?\)')
-        # 2. 備選匹配: 帶有 PASS/FAIL 標記的簡單鍵值對
-        label_pattern = re.compile(r'([\w\s_-]+)\s*[=:]\s*([^ \(\)]+).*(PASS|FAIL)', re.IGNORECASE)
+        # 嚴格匹配: 名稱 = 數值 (判定標準)
+        # 支持 (10,50) 或 (100,)
+        pattern = re.compile(r'([\w\s_-]+)\s*=\s*([^ \(\)]+)\s*\(([^)]+)\)')
         
-        noise_keywords = ['icmp_seq', 'ttl=', 'time=', 'bytes from', 'reply from', 'sfis is', 'script version']
+        noise_keywords = ['icmp_seq', 'ttl=', 'time=', 'bytes from', 'reply from', 'sfis is', 'script version', 'version is']
+        exclude_names = ('ISN', 'DATE', 'VERSION', 'TIME', 'SCRIPT', 'OFFSET')
         
         for idx, line in enumerate(lines):
             line_str = str(line).strip()
-            if not line_str: continue
-            
-            # 排除噪音
-            if any(kw in line_str.lower() for kw in noise_keywords):
+            if not line_str or any(kw in line_str.lower() for kw in noise_keywords):
                 continue
+            
+            # 排除時間戳或純日期行 (如 26 13 = 08:27)
+            if re.search(r'^\d{2}[:\s]\d{2}([:\s]\d{2})?\s*[=:]', line_str):
+                continue
+
+            match = pattern.search(line_str)
+            if match:
+                v_name = match.group(1).strip()
+                v_limits = match.group(3).strip()
                 
-            found = False
-            # 先試標準格式
-            c_match = strict_pattern.search(line_str)
-            if c_match:
-                v_name = c_match.group(1).strip()
-                v_val = c_match.group(2).strip()
+                # 規則：名稱含字母，括號內必須包含逗號 (代表範圍或限制，如 (10,50) 或 (100,))
+                # 這樣可以過濾掉單一數值的括號，如 Current message level: 0x... (51)
+                has_letters = re.search(r'[A-Za-z_]', v_name)
+                has_comma = ',' in v_limits
+                is_date = any(m in v_limits for m in ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'])
                 
-                if 'The validation:' in line_str:
-                    v_content = line_str.split('The validation:', 1)[1].strip()
-                else:
-                    v_content = c_match.group(0).strip()
-                
-                v_status = 'PASS'
-                try:
-                    val_str = c_match.group(2).strip()
-                    l_lim_str = c_match.group(3).strip()
-                    r_lim_str = c_match.group(4).strip() if c_match.group(4) else l_lim_str
+                if has_letters and has_comma and v_name.upper() not in exclude_names and not is_date:
+                    v_val = match.group(2).strip()
+                    if 'The validation:' in line_str:
+                        v_content = line_str.split('The validation:', 1)[1].strip()
+                    else:
+                        v_content = match.group(0).strip()
                     
-                    v_num = float(val_str)
-                    l_lim = float(l_lim_str)
-                    r_lim = float(r_lim_str)
-                    
-                    if not (l_lim <= v_num <= r_lim):
-                        if not (l_lim <= len(val_str) <= r_lim):
-                            v_status = 'FAIL'
-                except:
+                    v_status = 'PASS'
                     if 'is FAIL' in line_str or 'status:FAIL' in line_str.lower() or 'FAIL' in line_str.upper():
                         v_status = 'FAIL'
-                
-                validations.append({
-                    'content': v_content, 
-                    'status': v_status,
-                    'line_idx': idx
-                })
-                found = True
-            
-            # 如果標準沒中，試試帶有 PASS/FAIL 的標籤格式
-            if not found:
-                l_match = label_pattern.search(line_str)
-                if l_match:
-                    v_name = l_match.group(1).strip()
-                    v_val = l_match.group(2).strip()
-                    v_status = l_match.group(3).upper()
+                    else:
+                        try:
+                            # 判定數值範圍
+                            parts = v_limits.split(',')
+                            l_lim = float(parts[0].strip())
+                            r_lim = float(parts[-1].strip()) if parts[-1].strip() else l_lim
+                            v_num = float(v_val)
+                            if not (l_lim <= v_num <= r_lim): v_status = 'FAIL'
+                        except: pass
                     
-                    # 避免抓到太模糊的（例如只有一個單字）
-                    if len(v_name) > 2:
-                        validations.append({
-                            'content': f"{v_name} = {v_val}",
-                            'status': v_status,
-                            'line_idx': idx
-                        })
+                    validations.append({'content': v_content, 'status': v_status, 'line_idx': idx})
                         
         return validations
         

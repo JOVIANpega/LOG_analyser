@@ -41,9 +41,9 @@ class SummaryBuilder:
         
         self._add_summary_header(ws, len(logs), time_labels_data, prefix=prefix)
         
-        # 2. 寫入清單標題 (從第 9 行開始，留出空間給 Top Summary)
+        # 2. 寫入清單標題 (從第 9 行開始)
         list_start_row = 9
-        headers = ["測試記錄 (合併資訊)", "狀態", "操作", "工作表連結"]
+        headers = ["ISN (點擊跳轉)", "檔案分析", "站別", "時間 (Sec)", "狀態"]
         for col, h in enumerate(headers, 1):
             cell = ws.cell(row=list_start_row, column=col, value=h)
             cell.font = self.header_font
@@ -55,32 +55,50 @@ class SummaryBuilder:
             curr_row = list_start_row + 1 + row_idx
             fname = entry.get('file_name', entry.get('filename', ''))
             isn = extract_isn_from_filename(fname)
+            station = extract_station_from_filename(fname)
             
-            # 寫入第一欄 (合併資訊)
-            from .excel_utils import generate_header_info_text
-            info_str = generate_header_info_text(entry)
-            cell_info = ws.cell(row=curr_row, column=1, value=info_str)
-            cell_info.alignment = self.left_top_align
-            cell_info.font = self.content_font
+            # 提取時間
+            from .excel_utils import extract_total_secs
+            test_secs, _ = extract_total_secs(entry.get('raw_lines', []))
+            test_time_str = f"{test_secs:.2f}" if test_secs else "Unknown"
             
-            # 寫入狀態
-            status = "PASS" if not entry.get('fail_items') else "FAIL"
-            cell_status = ws.cell(row=curr_row, column=2, value=status)
-            cell_status.alignment = self.center_align
-            if status == "FAIL":
-                cell_status.font = Font(color="FF0000", bold=True)
-            
-            # 工作表格式化名稱
+            # 工作表名稱
             sheet_name = entry.get('sheet_name', isn or fname[:25])
             
-            # 連結 (變更文字)
-            cell_link = ws.cell(row=curr_row, column=4, value=f"查看LOG {sheet_name}")
-            cell_link.hyperlink = f"#'{sheet_name}'!A1"
-            cell_link.font = Font(name='Calibri', color="0000FF", underline="single")
+            # A欄: ISN (綠色 + 連結)
+            cell_isn = ws.cell(row=curr_row, column=1, value=isn if isn else "Unknown ISN")
+            cell_isn.font = Font(name='Calibri', size=11, color='2E7D32', bold=True, underline='single')
+            cell_isn.hyperlink = f"#'{sheet_name}'!A1"
+            cell_isn.alignment = self.center_align
             
-        auto_fit_columns(ws, {1: 60, 2: 10, 3: 15, 4: 25})
+            # B欄: 檔案名稱
+            cell_file = ws.cell(row=curr_row, column=2, value=fname)
+            cell_file.font = self.content_font
+            cell_file.alignment = self.left_top_align
+            
+            # C欄: 站別
+            cell_station = ws.cell(row=curr_row, column=3, value=station)
+            cell_station.font = self.content_font
+            cell_station.alignment = self.center_align
+            
+            # D欄: 時間
+            cell_time = ws.cell(row=curr_row, column=4, value=test_time_str)
+            cell_time.font = self.content_font
+            cell_time.alignment = self.center_align
+            
+            # E欄: 狀態
+            status = "PASS" if not entry.get('fail_items') else "FAIL"
+            cell_status = ws.cell(row=curr_row, column=5, value=status)
+            cell_status.alignment = self.center_align
+            if status == "FAIL":
+                cell_status.font = Font(name='Calibri', size=11, color="FF0000", bold=True)
+            else:
+                cell_status.font = self.content_font
+            
+        # 優化欄寬：ISN寬度適中，檔案分析欄位最寬
+        auto_fit_columns(ws, {1: 22, 2: 55, 3: 30, 4: 15, 5: 10})
         
-        # 4. 新增隱藏的數據分頁 (給圖表用) 或是在 Z 軸之後
+        # 4. 新增圖表
         if time_labels_data:
             self._add_time_distribution_chart(ws, time_labels_data)
             
@@ -120,7 +138,7 @@ class SummaryBuilder:
             v_cell.alignment = Alignment(horizontal='center')
 
     def _add_time_distribution_chart(self, ws, time_data):
-        """新增測試時間分佈圖 (數據回歸到本頁遠端 Z 欄，提高相容性與穩定性)"""
+        """新增測試時間分佈圖 (採用最穩定的資料引用方式)"""
         try:
             # 1. 寫入數據到 Z 欄之後 (Column 26+)
             data_col = 26 # Z
@@ -128,11 +146,11 @@ class SummaryBuilder:
             ws.cell(row=1, column=data_col+1, value="Time").font = self.content_font
             
             for i, (label, val) in enumerate(time_data):
-                # ID (Z欄)
-                c_id = ws.cell(row=i+2, column=data_col, value=sanitize_cell_text(label))
+                # ID (Z欄) - 加上 # 符號強力強制 Excel 視為字串標籤，避免大數值座標軸錯亂
+                c_id = ws.cell(row=i+2, column=data_col, value=f"#{label}")
                 c_id.font = self.content_font
                 # Time (AA欄)
-                c_val = ws.cell(row=i+2, column=data_col+1, value=val)
+                c_val = ws.cell(row=i+2, column=data_col+1, value=float(val))
                 c_val.font = self.content_font
                 
             # 2. 建立圖表
@@ -141,13 +159,14 @@ class SummaryBuilder:
             
             chart = LineChart()
             chart.title = "測試時間分佈圖 (Time Curve / Sec)"
-            chart.style = 13
             chart.y_axis.title = "Time (Sec)"
-            chart.x_axis.title = "Units"
+            chart.x_axis.title = "Logs"
             chart.y_axis.majorUnit = 100
             
             # 使用當前頁面的 Reference (不跨頁，最穩定)
+            # data_ref 指向數值欄位 (AA)
             data_ref = Reference(ws, min_col=data_col+1, min_row=1, max_row=len(time_data)+1)
+            # cats_ref 指向標籤欄位 (Z)
             cats_ref = Reference(ws, min_col=data_col, min_row=2, max_row=len(time_data)+1)
             
             chart.add_data(data_ref, titles_from_data=True)
@@ -157,21 +176,22 @@ class SummaryBuilder:
             if chart.series:
                 s = chart.series[0]
                 s.marker.symbol = "circle"
-                s.marker.size = 6
-                s.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="2E7D32") # 深綠色
-                s.marker.graphicalProperties.solidFill = SolidFillProperties(srgbClr="FF0000") # 鮮紅色
+                s.marker.size = 7
+                # 線條與點的顏色設定 (確保在所有 Excel 版本可見)
+                s.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="2E7D32")
+                s.marker.graphicalProperties.solidFill = SolidFillProperties(srgbClr="FF0000")
                 s.marker.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="FF0000")
                 
             chart.legend = None
-            chart.width = 30
-            chart.height = 12
+            chart.width = 32
+            chart.height = 11
             
             # 4. 錨定在 G3
             ws.add_chart(chart, "G3")
             
         except Exception as e:
             import traceback
-            print(f"[ERROR] 圖表生成失敗: {str(e)}")
+            print(f"[ERROR] PASS 圖表生成失敗: {str(e)}")
             traceback.print_exc()
 
     def _add_time_statistics_table(self, ws, times):

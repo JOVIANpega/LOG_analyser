@@ -178,7 +178,7 @@ class FailListBuilder:
             v_cell.font = self.content_font
             v_cell.alignment = self.center_align
             
-        # 圖表 - 錨定在 E3
+        # 圖表 - 錨定在 E3 (採用 Z/AA 遠端數據區)
         if times:
             try:
                 from openpyxl.chart import LineChart, Reference
@@ -187,36 +187,43 @@ class FailListBuilder:
                 chart = LineChart()
                 chart.title = "測試時間分佈圖 (Time Curve / Sec)"
                 chart.y_axis.title = "Time (Sec)"
+                chart.x_axis.title = "Logs"
                 chart.y_axis.majorUnit = 100
                 chart.legend = None
-                chart.width = 25
-                chart.height = 10
+                chart.width = 30
+                chart.height = 11
                 
-                # 建立隱藏數據區域於 Column Z 之後
                 data_col = 26 # Z
-                ws.cell(row=1, column=data_col, value="ID").font = self.content_font
-                ws.cell(row=1, column=data_col+1, value="Time").font = self.content_font
+                ws.cell(row=1, column=data_col, value="ID").font = self.header_font
+                ws.cell(row=1, column=data_col+1, value="Time").font = self.header_font
+                
                 for i, (label, val) in enumerate(times):
-                    ws.cell(row=i+2, column=data_col, value=label).font = self.content_font
-                    ws.cell(row=i+2, column=data_col+1, value=val).font = self.content_font
+                    # 強制資料型別並加上 # 標記以利標籤顯示
+                    ws.cell(row=i+2, column=data_col, value=f"#{label}").font = self.content_font
+                    ws.cell(row=i+2, column=data_col+1, value=float(val)).font = self.content_font
                 
-                data_ref = Reference(ws, min_col=data_col+1, min_row=1, max_row=len(times)+1)
-                cats_ref = Reference(ws, min_col=data_col, min_row=2, max_row=len(times)+1)
+                # 數據引用: AA 欄 (27)
+                data_series = Reference(ws, min_col=data_col+1, min_row=1, max_row=len(times)+1)
+                # 分類引用: Z 欄 (26)
+                cats_series = Reference(ws, min_col=data_col, min_row=2, max_row=len(times)+1)
                 
-                chart.add_data(data_ref, titles_from_data=True)
-                chart.set_categories(cats_ref)
+                chart.add_data(data_series, titles_from_data=True)
+                chart.set_categories(cats_series)
                 
-                # 樣式設定
                 if chart.series:
                     s = chart.series[0]
                     s.marker.symbol = "circle"
-                    s.marker.size = 5
+                    s.marker.size = 8
                     s.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="2E7D32")
+                    # 數據點紅色
                     s.marker.graphicalProperties.solidFill = SolidFillProperties(srgbClr="FF0000")
                     s.marker.graphicalProperties.line.solidFill = SolidFillProperties(srgbClr="FF0000")
                 
                 ws.add_chart(chart, "E3")
-            except: pass
+            except Exception as chart_err:
+                import traceback
+                print(f"[ERROR] FAIL 報表圖表生成失敗: {chart_err}")
+                traceback.print_exc()
 
     def _add_item_breakdown_table(self, ws, error_counts, start_col=1, start_row=8):
         """插入分組統計表格"""
