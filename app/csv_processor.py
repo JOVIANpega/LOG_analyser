@@ -60,7 +60,27 @@ class CSVProcessor:
         # 創建新視窗顯示CSV檔案列表
         self.selection_window = tk.Toplevel(self.app.root)
         self.selection_window.title("選擇要處理的CSV檔案")
-        self.selection_window.geometry("700x500")
+        self.selection_window.configure(bg='white')
+        
+        # 🟢 強制置頂與模態設定
+        self.selection_window.transient(self.app.root)
+        self.selection_window.attributes("-topmost", True)
+        self.selection_window.grab_set()
+        
+        # 居中設定
+        win_w, win_h = 750, 550
+        try:
+            self.selection_window.update_idletasks()
+            parent_x = self.app.root.winfo_rootx()
+            parent_y = self.app.root.winfo_rooty()
+            parent_w = self.app.root.winfo_width()
+            parent_h = self.app.root.winfo_height()
+            x = parent_x + (parent_w - win_w) // 2
+            y = parent_y + (parent_h - win_h) // 2
+            self.selection_window.geometry(f"{win_w}x{win_h}+{x}+{y}")
+        except:
+            self.selection_window.geometry(f"{win_w}x{win_h}")
+            
         self.selection_window.resizable(True, True)
         
         # 主框架
@@ -69,26 +89,26 @@ class CSVProcessor:
         
         # 標題
         title_label = tk.Label(main_frame, text=f"找到 {len(self.csv_files)} 個CSV檔案", 
-                              font=('Arial', 14, 'bold'))
+                              font=('Microsoft JhengHei', 14, 'bold'), bg='white')
         title_label.pack(pady=(0, 10))
         
         # 說明文字
         info_label = tk.Label(main_frame, 
                              text="請選擇要處理的CSV檔案（至少選擇一個）", 
-                             font=('Arial', 10), fg='blue')
+                             font=('Microsoft JhengHei', 10), fg='#1565C0', bg='white')
         info_label.pack(pady=(0, 10))
         
         # 全選/全不選按鈕框架
         button_frame = tk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=(0, 10))
         
-        tk.Button(button_frame, text="全選", 
+        tk.Button(button_frame, text=" 全選 ", 
                  command=self.select_all_files,
-                 bg='#4CAF50', fg='white', font=('Arial', 9)).pack(side=tk.LEFT, padx=5)
+                 bg='#43A047', fg='white', font=('Microsoft JhengHei', 9)).pack(side=tk.LEFT, padx=5)
         
-        tk.Button(button_frame, text="全不選", 
+        tk.Button(button_frame, text=" 全不選 ", 
                  command=self.deselect_all_files,
-                 bg='#f44336', fg='white', font=('Arial', 9)).pack(side=tk.LEFT, padx=5)
+                 bg='#E53935', fg='white', font=('Microsoft JhengHei', 9)).pack(side=tk.LEFT, padx=5)
         
         # 檔案列表框架
         list_frame = tk.Frame(main_frame)
@@ -145,17 +165,19 @@ class CSVProcessor:
         
         # 狀態標籤
         self.status_label = tk.Label(bottom_frame, text="已選擇 1 個檔案", 
-                                    font=('Arial', 10), fg='green')
-        self.status_label.pack(side=tk.LEFT)
+                                    font=('Microsoft JhengHei', 10), fg='#2E7D32', bg='white')
+        self.status_label.pack(side=tk.RIGHT, padx=20)
         
-        # 按鈕
-        tk.Button(bottom_frame, text="開始處理", 
+        # 按鈕 (調換順序：開始處理放左邊)
+        tk.Button(bottom_frame, text=" 開始處理 ", 
                  command=self.start_processing,
-                 bg='#4CAF50', fg='white', font=('Arial', 10, 'bold')).pack(side=tk.RIGHT, padx=5)
+                 bg='#1565C0', fg='white', font=('Microsoft JhengHei', 10, 'bold'),
+                 width=12, pady=5, cursor='hand2').pack(side=tk.LEFT, padx=5)
         
-        tk.Button(bottom_frame, text="取消", 
+        tk.Button(bottom_frame, text=" 取消 ", 
                  command=self.selection_window.destroy,
-                 bg='#f44336', fg='white').pack(side=tk.RIGHT, padx=5)
+                 bg='#757575', fg='white', font=('Microsoft JhengHei', 10),
+                 width=10, pady=5, cursor='hand2').pack(side=tk.LEFT, padx=5)
         
         # 更新狀態
         self.update_status_label()
@@ -287,36 +309,90 @@ class CSVProcessor:
             messagebox.showerror("失敗", f"所有檔案處理皆失敗 ({fail_count} 個檔案)。請檢查錯誤訊息。")
     
     def ask_open_files(self, success_count, fail_count, output_files):
-        """詢問使用者是否要開啟處理後的檔案"""
-        msg = f"CSV檔案處理完成！\n\n成功: {success_count} 個"
+        """詢問使用者是否要開啟處理後的檔案 - 修正版：強制置頂並美化"""
+        win = tk.Toplevel(self.app.root)
+        win.title("處理完成")
+        win.configure(bg='white')
+        
+        # 🟢 強制置頂與模態設定
+        win.transient(self.app.root)
+        win.attributes("-topmost", True)
+        win.grab_set()
+        
+        # 居中視窗
+        win_w, win_h = 520, 320
+        try:
+            win.update_idletasks()
+            sw = win.winfo_screenwidth()
+            sh = win.winfo_screenheight()
+            x = (sw - win_w) // 2
+            y = (sh - win_h) // 2
+            win.geometry(f"{win_w}x{win_h}+{x}+{y}")
+        except:
+            win.geometry(f"{win_w}x{win_h}")
+
+        main_frame = tk.Frame(win, bg='white', padx=35, pady=30)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # 標題
+        tk.Label(main_frame, text="✅ CSV 報表處理完成", 
+                 font=('Microsoft JhengHei', 16, 'bold'), 
+                 fg='#2E7D32', bg='white').pack(pady=(0, 20))
+
+        # 內容資訊
+        msg = f"成功處理: {success_count} 個檔案"
         if fail_count > 0:
-            msg += f"\n失敗: {fail_count} 個"
+            msg += f"\n失敗: {fail_count} 個檔案"
         
-        result = messagebox.askyesno(
-            "處理完成", 
-            f"{msg}\n\n是否要開啟報表檔案與資料夾？"
-        )
-        
-        if result:
-            # 開啟資料夾
+        tk.Label(main_frame, text=msg, font=('Microsoft JhengHei', 12), bg='white', justify=tk.LEFT).pack(pady=5)
+        tk.Label(main_frame, text="是否要立即開啟生成的 Excel 報表與資料夾？", 
+                 font=('Microsoft JhengHei', 11), bg='white', fg='#666').pack(pady=(15, 10))
+
+        # 按鈕區
+        btn_frame = tk.Frame(main_frame, bg='white', pady=10)
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+        def on_confirm():
             import subprocess
             import platform
             
-            # 開啟生成的 Excel 檔案 (最多 5 個避免當機)
+            # 開啟生成的 Excel 檔案 (最多 5 個)
             for i, f in enumerate(output_files):
                 if i >= 5: break 
                 try:
-                    os.startfile(f) if platform.system() == "Windows" else subprocess.run(["open", f])
+                    if platform.system() == "Windows":
+                        os.startfile(f)
+                    else:
+                        subprocess.run(["open", f])
                 except:
                     pass
 
             # 最後開啟目錄
-            if platform.system() == "Windows":
-                subprocess.run(["explorer", self.analysis_dir])
-            elif platform.system() == "Darwin":  # macOS
-                subprocess.run(["open", self.analysis_dir])
-            else:  # Linux
-                subprocess.run(["xdg-open", self.analysis_dir])
+            try:
+                if platform.system() == "Windows":
+                    subprocess.run(["explorer", self.analysis_dir])
+                elif platform.system() == "Darwin":
+                    subprocess.run(["open", self.analysis_dir])
+                else:
+                    subprocess.run(["xdg-open", self.analysis_dir])
+            except:
+                pass
+            win.destroy()
+
+        def on_cancel():
+            win.destroy()
+
+        # 使用標準 tk 按鈕並模擬現代外觀
+        tk.Button(btn_frame, text=" 否 (僅關閉) ", command=on_cancel, 
+                  bg='#E0E0E0', fg='black', font=('Microsoft JhengHei', 10),
+                  width=15, pady=8, cursor='hand2', relief=tk.FLAT).pack(side=tk.RIGHT, padx=5)
+
+        tk.Button(btn_frame, text=" 是 (開啟報表) ", command=on_confirm, 
+                  bg='#1976D2', fg='white', font=('Microsoft JhengHei', 10, 'bold'),
+                  width=18, pady=8, cursor='hand2', relief=tk.FLAT).pack(side=tk.RIGHT, padx=5)
+        
+        win.protocol("WM_DELETE_WINDOW", on_cancel)
+        win.wait_window()
     
     def copy_file(self, source_file):
         """複製檔案到Analysis_CSV_FILE目錄"""
@@ -606,15 +682,44 @@ class CSVProcessor:
         ws.cell(row=current_row, column=2, value=f"{len(df.columns)}").font = normal_font
         current_row += 2
         
-        # 統計數據（包含錯誤代碼分類）
+        # 尋找時長欄位 (支援多種常見命名)
+        time_col = None
+        # 優先搜尋明確表示時長的關鍵字，排除可能包含時間戳記的關鍵字
+        priority_time_names = ['cycle_time', 'duration', 'time(s)', 'elapsed']
+        fallback_time_names = ['test_time', 'total_time', 'time']
+        
+        for k in priority_time_names:
+            for col in df.columns:
+                if k in str(col).lower():
+                    time_col = col
+                    break
+            if time_col: break
+            
+        if not time_col:
+            for k in fallback_time_names:
+                for col in df.columns:
+                    if k in str(col).lower():
+                        time_col = col
+                        break
+                if time_col: break
+        
+        # 統計數據初始化
         pass_count = 0
         fail_count = 0
         fail_codes = {}  # 錯誤代碼統計 {錯誤代碼: 數量}
+
+        # 一次性遍列數據，計算計數與時長 (優化性能)
+        pass_times = []
+        fail_times = []
         
         for _, row in df.iterrows():
-            if self.is_pass_row(row):
+            is_p = self.is_pass_row(row)
+            is_f = self.is_fail_row(row)
+            
+            # 計數
+            if is_p:
                 pass_count += 1
-            elif self.is_fail_row(row):
+            elif is_f:
                 fail_count += 1
                 # 提取錯誤代碼
                 fail_code = self.extract_fail_code(row)
@@ -622,10 +727,34 @@ class CSVProcessor:
                     fail_codes[fail_code] = fail_codes.get(fail_code, 0) + 1
                 else:
                     fail_codes['未知錯誤'] = fail_codes.get('未知錯誤', 0) + 1
-        
+            
+            # 時長採集 (加入防呆，排除大於 10 萬的數值，因為那通常是時間戳記 YYYYMMDD...)
+            if time_col and pd.notna(row.get(time_col)):
+                try:
+                    val = float(row[time_col])
+                    if val < 50000: # 排除可能的 Timestamp (如果一個測試超過 50000s = 13小時也太誇張)
+                        if is_p: pass_times.append(val)
+                        elif is_f: fail_times.append(val)
+                except:
+                    pass
+
+        # 定義時間轉換函數
+        def format_duration(seconds):
+            if not isinstance(seconds, (int, float)) or seconds < 0: return "N/A"
+            h = int(seconds // 3600)
+            m = int((seconds % 3600) // 60)
+            s = seconds % 60
+            if h > 0: return f"{h}h {m}m {s:.1f}s"
+            if m > 0: return f"{m}m {s:.1f}s"
+            return f"{s:.2f} s"
+
+        # 預計算平均時長
+        pass_avg_time = format_duration(sum(pass_times)/len(pass_times)) if pass_times else "N/A"
+        fail_avg_time = format_duration(sum(fail_times)/len(fail_times)) if fail_times else "N/A"
+
         total_count = len(df)
         other_count = total_count - pass_count - fail_count
-        
+
         # 統計表格標題
         ws.cell(row=current_row, column=1, value="項目").fill = header_fill
         ws.cell(row=current_row, column=1).font = header_font
@@ -641,6 +770,11 @@ class CSVProcessor:
         ws.cell(row=current_row, column=3).font = header_font
         ws.cell(row=current_row, column=3).border = border
         ws.cell(row=current_row, column=3).alignment = Alignment(horizontal='center', vertical='center')
+
+        ws.cell(row=current_row, column=4, value="平均測試時長").fill = header_fill
+        ws.cell(row=current_row, column=4).font = header_font
+        ws.cell(row=current_row, column=4).border = border
+        ws.cell(row=current_row, column=4).alignment = Alignment(horizontal='center', vertical='center')
         current_row += 1
         
         # PASS統計
@@ -656,6 +790,11 @@ class CSVProcessor:
         ws.cell(row=current_row, column=3).font = normal_font
         ws.cell(row=current_row, column=3).border = border
         ws.cell(row=current_row, column=3).alignment = Alignment(horizontal='center')
+        # 平均時長 (PASS)
+        ws.cell(row=current_row, column=4, value=pass_avg_time).fill = pass_fill
+        ws.cell(row=current_row, column=4).font = normal_font
+        ws.cell(row=current_row, column=4).border = border
+        ws.cell(row=current_row, column=4).alignment = Alignment(horizontal='center')
         current_row += 1
         
         # FAIL統計
@@ -671,6 +810,11 @@ class CSVProcessor:
         ws.cell(row=current_row, column=3).font = normal_font
         ws.cell(row=current_row, column=3).border = border
         ws.cell(row=current_row, column=3).alignment = Alignment(horizontal='center')
+        # 平均時長 (FAIL)
+        ws.cell(row=current_row, column=4, value=fail_avg_time).fill = fail_fill
+        ws.cell(row=current_row, column=4).font = normal_font
+        ws.cell(row=current_row, column=4).border = border
+        ws.cell(row=current_row, column=4).alignment = Alignment(horizontal='center')
         current_row += 1
         
         # 其他統計
@@ -819,9 +963,18 @@ class CSVProcessor:
             for col_num, value in enumerate(row, 1):
                 cell = ws.cell(row=row_num, column=col_num)
                 
-                # 處理文字內容（保留完整內容，不截斷）
+                # 處理內容（數值四捨五入到三位，文字保留）
                 if pd.notna(value) and str(value).strip():
-                    cell.value = str(value)
+                    try:
+                        # 嘗試轉換為數值進行四捨五入
+                        f_val = float(value)
+                        # 如果是整數，則直接使用 int，否則 round 到三位
+                        if f_val == int(f_val):
+                            cell.value = int(f_val)
+                        else:
+                            cell.value = round(f_val, 3)
+                    except:
+                        cell.value = str(value)
                 else:
                     cell.value = ""
                 
@@ -852,7 +1005,7 @@ class CSVProcessor:
         ws.freeze_panes = 'A4'
         
         # 設定行高 (優化)
-        ws.row_dimensions[1].height = 35  # 表頭加高以利換行顯示
+        ws.row_dimensions[1].height = 50  # 增加表頭高度以利換行 (從 35 提升到 50)
         ws.row_dimensions[2].height = 20  # UpperLimit
         ws.row_dimensions[3].height = 20  # LowerLimit
         for row_idx in range(4, ws.max_row + 1):
@@ -969,51 +1122,53 @@ class CSVProcessor:
         return None
     
     def auto_adjust_column_width_optimized(self, ws):
-        """優化的自動調整欄寬功能"""
+        """優化的自動調整欄寬功能：智慧處理長標題換行與數據寬度平衡"""
+        import re
         for column in ws.columns:
-            max_length = 0
             column_letter = get_column_letter(column[0].column)
             
-            # 只檢查前100行以提升性能（標題行+前100行數據）
-            cells_to_check = list(column[:101]) if len(column) > 101 else list(column)
+            # 分離標題與數據
+            header_cell = column[0]
+            # 只檢查前 50 行數據以平衡性能與準確度
+            data_cells = list(column[1:51]) if len(column) > 51 else list(column[1:])
             
-            for cell in cells_to_check:
+            # --- 1. 計算數據的最大理想寬度 ---
+            max_data_width = 0
+            for cell in data_cells:
                 try:
                     if cell.value:
-                        # 計算文字長度（考慮中文字符）
-                        text_length = len(str(cell.value))
-                        
-                        # 中文字符權重調整（中文字符通常更寬）
-                        chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', str(cell.value)))
-                        adjusted_length = text_length + chinese_chars * 0.8
-                        
-                        if adjusted_length > max_length:
-                            max_length = adjusted_length
+                        val_str = str(cell.value)
+                        text_length = len(val_str)
+                        chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', val_str))
+                        # 基礎計算：字元數 + 中文補償
+                        width = text_length + chinese_chars * 0.8
+                        if width > max_data_width:
+                            max_data_width = width
                 except:
                     pass
             
-            # 設定欄寬（優化計算）
-            if max_length == 0:
-                adjusted_width = 10
-            elif max_length < 10:
-                adjusted_width = max_length + 2
-            elif max_length <= 20:
-                adjusted_width = max_length + 3
-            elif max_length <= 50:
-                adjusted_width = max_length + 4
+            # --- 2. 計算標題的理想寬度 ---
+            header_val = str(header_cell.value) if header_cell.value else ""
+            header_text_len = len(header_val)
+            header_chinese = len(re.findall(r'[\u4e00-\u9fff]', header_val))
+            header_width = header_text_len + header_chinese * 0.8
+            
+            # --- 3. 決策邏輯：平衡寬度與換行 ---
+            # 如果標題很長但數據很短，我們強制標題換行，而不是把欄位拉到無限寬
+            if header_width > 20 and max_data_width < 10:
+                # 這種情況下，寬度設定在 15-18 左右，讓標題自動包裝成 2-3 行
+                final_width = 16
             else:
-                # 對於很長的內容，設定合理上限，但允許更寬
-                adjusted_width = min(max_length + 5, 80)
+                # 正常的取數據與標題的較大值，但標題部分的影響力加權降低
+                # 確保標題至少能看到大部分關鍵字
+                suggested_width = max(max_data_width + 3, min(header_width, 25))
+                final_width = suggested_width
             
-            # 設定最小和最大寬度
-            adjusted_width = max(adjusted_width, 8)  # 最小寬度
-            adjusted_width = min(adjusted_width, 80)  # 最大寬度（增加到80）
+            # --- 4. 套用限制與最小寬度 ---
+            final_width = max(final_width, 10)  # 最小寬度 10
+            final_width = min(final_width, 50)  # 最大寬度 50
             
-            # 設定最小和最大寬度
-            adjusted_width = max(adjusted_width, 10)  # 稍微放寬最小值以防擠壓
-            adjusted_width = min(adjusted_width, 60)  # 將上限從 80 縮減到 60, 更為緊湊
-            
-            ws.column_dimensions[column_letter].width = adjusted_width
+            ws.column_dimensions[column_letter].width = final_width
     
     def create_analysis_charts_sheet(self, wb, df, metadata_info):
         """創建分析圖表工作表（柏拉圖和趨勢圖）"""
@@ -1083,10 +1238,20 @@ class CSVProcessor:
         
         if numeric_cols and len(df) > 1:
             start_row = 30
-            ws.cell(row=start_row, column=1, value="關鍵數值趨勢數據 (前3個欄位)").font = Font(name=font_name, bold=True, size=14)
+            # 輔助標題
+            title = "關鍵指標趨勢分析 (Key Trend Analysis)"
+            ws.cell(row=start_row, column=1, value=title).font = Font(name=font_name, bold=True, size=15, color="1565C0")
+            
+            # 詳細解釋 (字體 12，斜體)
+            explanation = "【說明】此區域自動篩選出前 3 個含有 PixelsShift / Brightness / discontinue 關鍵字的數值欄位，"
+            ws.cell(row=start_row+1, column=1, value=explanation).font = Font(name=font_name, size=12, italic=True)
+            explanation2 = "並依測試序號繪製波動圖。這能幫助您快速識別各個 Camera 通道或感測器數值是否出現異常抖動或規律性偏差。"
+            ws.cell(row=start_row+2, column=1, value=explanation2).font = Font(name=font_name, size=12, italic=True)
             
             # 為了避免 Excel 太大，我們只在分析表放前3個關鍵數值的趨勢
             display_cols = numeric_cols[:3]
+            start_table_row = start_row + 4
+            ws.cell(row=start_table_row-1, column=1, value="分析對象 (Top 3 Items):").font = Font(name=font_name, bold=True)
             for c_idx, col_name in enumerate(display_cols, 1):
                 ws.cell(row=start_row+1, column=c_idx, value=str(col_name))
                 # 數據已經在 "數據明細" 表，我們可以引用或者複製一部分
@@ -1262,7 +1427,24 @@ class ProgressWindow:
     def __init__(self, parent, title):
         self.window = tk.Toplevel(parent)
         self.window.title(title)
-        self.window.geometry("400x150")
+        self.window.configure(bg='white')
+        self.window.geometry("420x150")
+        
+        # 🟢 強制置頂與居中
+        self.window.transient(parent)
+        self.window.attributes("-topmost", True)
+        self.window.grab_set()
+        
+        try:
+            self.window.update_idletasks()
+            sw = self.window.winfo_screenwidth()
+            sh = self.window.winfo_screenheight()
+            x = (sw - 420) // 2
+            y = (sh - 150) // 2
+            self.window.geometry(f"420x150+{(sw-420)//2}+{(sh-150)//2}")
+        except:
+            pass
+            
         self.window.resizable(False, False)
         
         # 進度條

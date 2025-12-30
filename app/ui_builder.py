@@ -419,8 +419,9 @@ class UIBuilderMixin:
         win_w = max(780, int(780 * (base_size / 12)))
         win_h = max(550, int(580 * (base_size / 12)))
         
-        # 居中
+        # 居中與最上層
         win.transient(self.root)
+        win.attributes("-topmost", True)  # 🟢 強制最上層，避免被主視窗擋住
         win.grab_set()
         x = (win.winfo_screenwidth() // 2) - (win_w // 2)
         y = (win.winfo_screenheight() // 2) - (win_h // 2)

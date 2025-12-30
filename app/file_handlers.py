@@ -131,8 +131,8 @@ class FileHandlerMixin:
     
     def _select_folder_unified(self):
         """
-        統一的資料夾選擇功能（智慧模式）
-        改用 File Dialog 讓使用者可以看到檔案，再決定是要處理選取的檔案還是所在的資料夾
+        統一的資料夾選擇功能
+        優化：直接彈出資料夾選擇器，避免『取消後才彈出』的奇怪體驗。
         """
         # 判斷是否要記憶路徑
         remember = self.settings.get('remember_path', True)
@@ -147,79 +147,18 @@ class FileHandlerMixin:
         else:
             default_dir = self._get_default_directory()
             
-        # 使用 askopenfilenames 讓使用者能看到內容
-        file_paths = filedialog.askopenfilenames(
-            title="請選擇資料夾內的任一檔案以識別資料夾 (Log/壓縮檔)",
-            filetypes=[
-                ("支援的檔案", "*.log;*.zip;*.7z;*.rar"),
-                ("Log檔案", "*.log"),
-                ("壓縮檔案", "*.zip;*.7z;*.rar"),
-                ("所有檔案", "*.*")
-            ],
+        # 🟢 直接使用 askdirectory (符合使用者點擊『選擇資料夾』的直覺預期)
+        folder_path = filedialog.askdirectory(
+            title="請選擇 LOG 來源資料夾 (程式將自動搜尋其中的 Log 與 壓縮檔)",
             initialdir=default_dir
         )
         
-        if not file_paths:
-            # 使用者取消，或是因為資料夾是空的選不到。
-            # 給予一個 fallback 選項
-            fallback = messagebox.askyesno(
-                "提示", 
-                "未選擇檔案。\n\n如果您想選擇一個『空資料夾』或『不包含支援檔案的資料夾』（例如只包含子資料夾），\n請點擊【是】使用傳統資料夾選擇器。\n\n點擊【否】取消操作。"
-            )
-            if fallback:
-                self._select_folder_classic(initial_dir=default_dir)
+        if not folder_path:
             return
 
-        # 取得所在資料夾
-        folder_path = os.path.dirname(file_paths[0])
-        
-        # 儲存路徑
-        self.settings['last_folder_path'] = folder_path
-        self._save_settings_silent()
-        
-        # 記錄原始路徑用於 UI 顯示
-        self.original_log_path = folder_path
+        # 執行原本的處理邏輯 (複用 classic 邏輯，包含路徑記憶、掃描與混合內容處理)
+        self._select_folder_classic(target_path=folder_path)
 
-        # 智能判斷：如果只選了一個檔案，檢查同目錄下是否有其他 LOG 檔案
-        if len(file_paths) == 1:
-            folder_path = os.path.dirname(file_paths[0])
-            try:
-                # 快速掃描同目錄下的其他 .log 檔案
-                other_logs = [f for f in os.listdir(folder_path) 
-                            if f.lower().endswith('.log') and f != os.path.basename(file_paths[0])]
-                
-                if other_logs:
-                    # 發現其他 LOG，詢問使用者
-                    count = len(other_logs)
-                    msg = f"在同個資料夾中發現另外 {count} 個 LOG 檔案。\\n\\n是否要一併處理整個資料夾？\\n(選擇【否】將只處理選定的這個檔案)"
-                    if messagebox.askyesno("智慧偵測", msg):
-                        # 處理整個資料夾
-                        print(f"[DEBUG] - 使用者選擇處理整個資料夾: {folder_path}")
-                        self._select_folder_classic(target_path=folder_path)
-                        return
-                    else:
-                        print(f"[DEBUG] - 使用者選擇只處理單一檔案")
-            except Exception as e:
-                print(f"[DEBUG] 智慧偵測失敗: {e}")
-        
-        # 執行原本的處理邏輯 (如果是多檔，直接處理；如果是單檔且使用者選否，也直接處理)
-        has_archives = any(self._is_archive_file(f) for f in file_paths)
-        print(f"[DEBUG] - 包含壓縮檔: {has_archives}")
-        
-        if has_archives:
-            archives = [f for f in file_paths if self._is_archive_file(f)]
-            logs = [f for f in file_paths if f.lower().endswith('.log')]
-            
-            if archives and not logs:
-                self._process_selected_archives_direct(archives, folder_path)
-            elif logs and not archives:
-                self._process_selected_logs_direct(logs)
-            else:
-                # 混合：優先處理壓縮檔
-                self._process_selected_archives_direct(archives, folder_path)
-        else:
-            # 純 Log 檔案
-            self._process_selected_logs_direct(list(file_paths))
             
     def _process_selected_logs_direct(self, file_paths):
         """直接處理選定的 LOG 檔案列表"""
