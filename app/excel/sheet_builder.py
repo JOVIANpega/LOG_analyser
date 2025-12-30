@@ -95,13 +95,33 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
     if error_line_idx is not None and log_type == 'FAIL':
         preview_box_height = 1 + len(error_block_preview) + 1 + 1
     
-    # PASS 日誌：測試項目預覽框
-    pass_items_preview = []
+    # PASS 日誌：測試項目預覽框 (按 Phase 分組)
+    pass_phases_preview = {} # phase_name -> [validations]
     if log_type == 'PASS' and fail_items:
-        # fail_items 在 PASS 日誌中實際包含的是 pass_items
-        pass_items_preview = fail_items[:15]  # 最多顯示前15個測試項目
-        if pass_items_preview:
-            preview_box_height = 1 + len(pass_items_preview) + 1
+        # 將所有項按照 Phase 進行分組
+        for item in fail_items:
+            p_name = item.get('phase', 'Unknown Phase')
+            if p_name not in pass_phases_preview:
+                pass_phases_preview[p_name] = []
+            
+            # 收集此測項內的所有比對結果
+            validations = item.get('validations', [])
+            for v in validations:
+                pass_phases_preview[p_name].append({
+                    'content': v.get('content', ''),
+                    'status': v.get('status', 'PASS')
+                })
+        
+        # 預算顯示高度：每個 Phase 標題(1) + 每個 Validation(1)
+        # 限制總行數避免預覽框過長 (增加限制到 100 行，確保能看到後面的項)
+        temp_row_count = 0
+        for p_name, v_list in pass_phases_preview.items():
+            temp_row_count += 1 # 標題
+            temp_row_count += len(v_list) # 比對項
+            if temp_row_count > 100: break # 硬限制
+        
+        if temp_row_count > 0:
+            preview_box_height = 1 + temp_row_count + 1
     
     actual_log_start = start_row + preview_box_height
     curr_h_row = start_row
@@ -145,8 +165,8 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         
         curr_h_row += 2 # 留空行
     
-    # --- 步驟 B2: PASS 日誌寫入測試項目預覽區塊 ---
-    if log_type == 'PASS' and pass_items_preview:
+    # --- 步驟 B2: PASS 日誌寫入測試項目預覽區塊 (分組層次顯示) ---
+    if log_type == 'PASS' and pass_phases_preview:
         # 1. 標題行 (藍底白字)
         title_font = Font(name='Microsoft JhengHei', size=12, bold=True, color='FFFFFF')
         title_fill = PatternFill('solid', fgColor='FF4472C4')  # 藍色標題
@@ -156,41 +176,39 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         title_cell.alignment = Alignment(horizontal='center', vertical='center')
         curr_h_row += 1
         
-        # 2. 測試項目內容 (淺藍背景)
+        # 2. 內容渲染 (標題 + 比對細項)
         light_blue_fill = PatternFill('solid', fgColor='FFE1F0FF')
         blue_font = Font(name='Consolas', size=11, color='FF000080', bold=True)
         detail_font = Font(name='Consolas', size=10, color='FF000080')
         
-        for item in pass_items_preview:
-            step_name = item.get('step_name', 'Unknown Step')
-            result = item.get('result', '')
+        total_rendered = 0
+        limit = 100 # 總量上限 (增加到 100 以顯示更多 Phase)
+        
+        for phase_name, validations in pass_phases_preview.items():
+            if total_rendered >= limit: break
             
-            # 顯示主要的 Phase 標題
-            display_text = f"  ■ {step_name}"
-            if result and result not in step_name and '=' not in result:
-                display_text += f" = {result}"
-            
-            cp = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(display_text))
-            cp.font = blue_font
-            cp.fill = light_blue_fill
+            # --- 顯示 Phase 標題 ---
+            p_cell = ws.cell(row=curr_h_row, column=1, value=f"  ■ {phase_name}")
+            p_cell.font = blue_font
+            p_cell.fill = light_blue_fill
             curr_h_row += 1
+            total_rendered += 1
             
-            # 直接使用 validations 欄位（已由 log_parser 提取）
-            validations = item.get('validations', [])
-            
-            # 顯示比對細節（縮排顯示）
-            for validation in validations[:10]:  # 最多顯示10個比對項
-                v_content = validation.get('content', '')
-                v_status = validation.get('status', 'PASS')
+            # --- 顯示該 Phase 下的所有比對項 ---
+            for v in validations:
+                if total_rendered >= limit: break
                 
-                # 格式化顯示
-                status_mark = '✓' if v_status == 'PASS' else '✗'
-                detail_text = f"    └ {status_mark} {v_content}"
+                v_content = v.get('content', '')
+                v_status = v.get('status', 'PASS')
+                mark = '✓' if v_status == 'PASS' else '✗'
                 
-                cd = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(detail_text))
-                cd.font = detail_font
-                cd.fill = light_blue_fill
+                # 仿照 GUI 的層次感：縮排並加上圖示
+                detail_text = f"     └ {mark} {v_content}"
+                d_cell = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(detail_text))
+                d_cell.font = detail_font
+                d_cell.fill = light_blue_fill
                 curr_h_row += 1
+                total_rendered += 1
         
         curr_h_row += 1  # 留空行
 
