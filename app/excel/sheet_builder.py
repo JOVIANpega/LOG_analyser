@@ -175,22 +175,18 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
             cp.fill = light_blue_fill
             curr_h_row += 1
             
-            # 提取並顯示詳細的比對資料（從 full_log 中）
-            full_log = item.get('full_log', [])
-            comparison_lines = []
-            
-            for log_line in full_log:
-                line_str = str(log_line).strip()
-                # 尋找包含 '=' 和 '(' 的比對行（例如 "LAN_SPEED = 1000 (1000,)"）
-                if '=' in line_str and '(' in line_str and ')' in line_str:
-                    # 移除前面的符號和空白
-                    clean_line = line_str.lstrip('└├│ \t')
-                    if clean_line and not clean_line.startswith('>'):
-                        comparison_lines.append(clean_line)
+            # 直接使用 validations 欄位（已由 log_parser 提取）
+            validations = item.get('validations', [])
             
             # 顯示比對細節（縮排顯示）
-            for comp_line in comparison_lines[:5]:  # 最多顯示5個比對項
-                detail_text = f"    └ {comp_line}"
+            for validation in validations[:10]:  # 最多顯示10個比對項
+                v_content = validation.get('content', '')
+                v_status = validation.get('status', 'PASS')
+                
+                # 格式化顯示
+                status_mark = '✓' if v_status == 'PASS' else '✗'
+                detail_text = f"    └ {status_mark} {v_content}"
+                
                 cd = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(detail_text))
                 cd.font = detail_font
                 cd.fill = light_blue_fill
