@@ -76,6 +76,7 @@ REM 封裝資源與库
 set "OPTS=%OPTS% --version-file=assets/version_info.txt"
 set "OPTS=%OPTS% --add-data=assets;assets"
 set "OPTS=%OPTS% --add-data=docs;docs"
+set "OPTS=%OPTS% --add-data=IMAGES;IMAGES"
 set "OPTS=%OPTS% --add-data=app;app"
 set "OPTS=%OPTS% --add-data=owl.png;."
 set "OPTS=%OPTS% --add-data=scare.png;."
@@ -99,8 +100,9 @@ if errorlevel 1 goto ERROR_EXIT
 
 REM --- 額外複製文件到輸出目錄的根目錄 ---
 if "%PACK_MODE%"=="2" (
-    echo [整理] 正在複製 HTML、INI 與其他文件至根目錄...
+    echo [整理] 正在複製 HTML、IMAGES、INI 與其他文件至根目錄...
     if exist "docs" xcopy /E /I /Y "docs" "dist\%EXE_NAME%\docs" >nul
+    if exist "IMAGES" xcopy /E /I /Y "IMAGES" "dist\%EXE_NAME%\IMAGES" >nul
     if exist "*.ini" copy /Y "*.ini" "dist\%EXE_NAME%\" >nul
     if exist "settings.json" copy /Y "settings.json" "dist\%EXE_NAME%\" >nul
     if exist "docs\*.html" copy /Y "docs\*.html" "dist\%EXE_NAME%\" >nul

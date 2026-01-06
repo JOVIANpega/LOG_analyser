@@ -325,11 +325,17 @@ class UIBuilderMixin:
     def _open_html_help(self):
         """以系統預設瀏覽器開啟操作說明 HTML（docs/USER_GUIDE.html）"""
         try:
-            html_path = get_resource_path(os.path.join('docs', 'USER_GUIDE.html'))
-            if not os.path.exists(html_path):
+            import urllib.parse
+            import pathlib
+            
+            html_path_str = get_resource_path(os.path.join('docs', 'USER_GUIDE.html'))
+            if not os.path.exists(html_path_str):
                 # 後備使用 README
                 return self._open_markdown_help()
-            webbrowser.open(f"file:///{html_path}")
+            
+            # 使用 pathlib 與 urljoin 確保路徑編碼正確，支援空格與特殊字元
+            html_url = pathlib.Path(html_path_str).absolute().as_uri()
+            webbrowser.open(html_url)
         except Exception as e:
             try:
                 messagebox.showerror("錯誤", f"無法開啟操作說明：{e}")

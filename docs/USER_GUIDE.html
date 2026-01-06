@@ -51,56 +51,33 @@
       margin-top: 0;
     }
 
-    .feature-list {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin: 20px 0;
+    ul {
+      padding-left: 20px;
     }
 
-    .feature-item {
-      background: #ebf5fb;
-      padding: 15px;
-      border-radius: 8px;
-      border: 1px solid #d6eaf8;
-    }
-
-    .feature-item strong {
-      color: #1b4f72;
-      display: block;
-      margin-bottom: 5px;
-    }
-
-    .step {
-      margin-bottom: 15px;
-      padding-left: 30px;
-      position: relative;
-    }
-
-    .step:before {
-      content: attr(data-number);
-      position: absolute;
-      left: 0;
-      top: 0;
-      background: #2980b9;
-      color: white;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
+    .img-box {
+      margin: 25px 0;
       text-align: center;
-      font-size: 14px;
-      line-height: 22px;
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid #eee;
+      overflow-x: auto;
     }
 
-    code {
-      background: #f0f0f0;
-      padding: 2px 5px;
-      border-radius: 4px;
-      font-family: Consolas, monospace;
+    img {
+      max-width: none;
+      height: auto;
+      border-radius: 5px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      display: block;
+      margin: 0 auto;
     }
 
-    .highlight {
-      color: #e74c3c;
+    .img-caption {
+      margin-top: 12px;
+      font-size: 0.95em;
+      color: #555;
       font-weight: bold;
     }
 
@@ -110,6 +87,12 @@
       font-size: 0.9em;
       margin-top: 50px;
     }
+
+    @media (min-width: 1200px) {
+      body {
+        max-width: 1100px;
+      }
+    }
   </style>
 </head>
 
@@ -117,79 +100,177 @@
 
   <div class="header">
     <h1>PEGA Log Analyzer V2.15.0</h1>
-    <p>專業測試 Log 快速分析工具 - 操作說明手冊</p>
+    <p>測試 Log 快速分析工具 - 使用說明手冊</p>
   </div>
 
   <div class="section">
-    <h2>🌟 核心功能覽</h2>
-    <div class="feature-list">
-      <div class="feature-item">
-        <strong>🚀 多格式支援</strong>
-        支援單一 <code>.log</code>、多選檔案、<code>.zip</code>、<code>.7z</code> 壓縮檔及整個資料夾。
-      </div>
-      <div class="feature-item">
-        <strong>📂 報表自動分類</strong>
-        所有產出的 Excel 報表自動匯總於 <code>EXCEL報表</code> 子資料夾，且智慧合併相似站別。
-      </div>
-      <div class="feature-item">
-        <strong>🔍 錯誤精準定位</strong>
-        FAIL 項目自動關聯原始 Log 位置，滑鼠懸停即可即時預覽錯誤詳情。
-      </div>
-      <div class="feature-item">
-        <strong>📈 Excel 報表生成</strong>
-        一鍵生成統計報表，含失敗原因分類圖表與詳細 PASS/FAIL 清單。
-      </div>
-      <div class="feature-item">
-        <strong>✅ 智慧完成對話框</strong>
-        極簡化設計，支援一鍵開啟所有報表，預設不勾選避免干擾，且按鈕永遠置底可見。
-      </div>
-      <div class="feature-item">
-        <strong>📊 CSV 數據整理</strong>
-        自動分類 CSV 測試數據，生成含良率統計、錯誤代碼 Pareto 圖及關鍵指標趨勢圖的分析報表。
-      </div>
+    <h2>📂 1. 如何載入 Log (支援單檔、壓縮包與文件夾)</h2>
+    <p>點擊左側面板的 <strong>「選擇 LOG 來源」</strong> 按鈕，即可載入測試資料进行分析。</p>
+    <ul>
+      <li><strong>單一/多個檔案</strong>：選取一個或多個 <code>.log</code> 檔案。</li>
+      <li><strong>壓縮檔 (ZIP/7z)</strong>：從 <strong>IPLAS</strong> 下載的整包 Log <strong>不需要解壓縮</strong>，直接讀取即可分析。</li>
+      <li><strong>讀取整個資料夾</strong>：選取資料夾後，程式會智慧過濾，僅針對其中的 Log 檔案進行多檔案分析。</li>
+    </ul>
+
+    <div class="img-box">
+      <img src="../IMAGES/btn_file_source.jpg" alt="選擇 Log 來源">
+      <div class="img-caption">【圖 1】點選藍色按鈕即可載入不同來源，支援 IPLAS 下載的整包壓縮檔</div>
     </div>
   </div>
 
   <div class="section">
-    <h2>⌨️ 鍵盤快捷鍵與導覽 (最高效率)</h2>
+    <h2>📊 2. 規格自動比對 (Criteria) 與錯誤預覽 (單一 Log 分析)</h2>
+    <p>針對<strong>單一 Log</strong> 分析完成後，系統會自動歸納測試結果，並將數值與規格進行比對。</p>
     <ul>
-      <li><strong>方向鍵 [↑ / ↓]</strong>：<span class="highlight">快速翻頁 (Page Up/Down)</span>。適合大範圍快速掃描內容。</li>
-      <li><strong>[Alt + PageUp / PageDown]</strong>：<span class="highlight">下一章節 (@STEP)</span>。直接在不同測試步驟間瞬間跳轉。</li>
-      <li><strong>[Ctrl + Home / End]</strong>：跳轉至整份日誌的最頂端或最末端。</li>
-      <li><strong>[Ctrl + F]</strong>：開啟快速搜尋對話框。</li>
-      <li><strong>[Ctrl + 滾輪]</strong>：即時調整 UI 字體與內容顯示大小。</li>
+      <li><strong>PASS 測項比對</strong>：列表會顯示測項名稱與實測值，並列出對應的 <strong>CRITERIA (規格範圍)</strong>。</li>
+      <li><strong>FAIL 發現錯誤點 (預覽)</strong>：當某項測試失敗時，下方的預覽分頁會主動列出出錯的原因與代碼，方便第一時間掌握重點。</li>
+    </ul>
+
+    <div class="img-box">
+      <img src="../IMAGES/pass_criteria_table.jpg" alt="PASS 測項與規格">
+      <div class="img-caption">【圖 2】系統自動解析測項，並比對其對應的規格範圍 (Criteria)</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/fail_flashpoint_preview.jpg" alt="FAIL 發現錯誤點">
+      <div class="img-caption">【圖 3】提供「發現錯誤點 (預覽)」功能，點選 FAIL 項目即可立即查看出錯原因</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🔍 3. 原始 Log 搜尋與快速導覽 (單一 Log 檢視)</h2>
+    <p>在查看<strong>單一原始日誌</strong>時，您可以透過搜尋與導覽按鈕提高效率。</p>
+    <ul>
+      <li><strong>搜尋關鍵字 (Ctrl+F)</strong>：輸入關鍵字（如 Error 或 ErrorCode），系統會即時標記匹配位置。</li>
+      <li><strong>快速導覽按鈕</strong>：提供 <strong>TOP (置頂)</strong>、<strong>END (最後)</strong> 以及分頁翻轉功能，適合快速掃描萬行 Log。</li>
+    </ul>
+
+    <div class="img-box">
+      <img src="../IMAGES/search_and_nav_panel.jpg" alt="搜尋與導覽功能">
+      <div class="img-caption">【圖 4】搜尋功能配合 TOP/END 按鈕，能在超長 Log 中快速定位到特定內容</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📈 4. Excel 報表生成與完成提示 (載入 2 個以上 Log 時)</h2>
+    <p>當進行<strong>多檔案批次分析</strong>（載入兩個或以上的 Log）完成後，系統會自動彙總數據並生成 Excel 報表，同時給予完成通知。</p>
+    <ul>
+      <li><strong>完成通知</strong>：狀態列會顯示「Excel 生成成功！」，並列出產出的報表路徑。</li>
+      <li><strong>智慧對話框</strong>：分析後會彈出彙總視窗，您可以勾選要開啟的報表並點選「開啟」。</li>
+    </ul>
+
+    <div class="img-box">
+      <img src="../IMAGES/excel_export_success.jpg" alt="Excel 產出成功提示">
+      <div class="img-caption">【圖 5】分析成功後，底部狀態列會顯示產出的 Excel 報表路徑與成功訊息</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/excel_files_view.jpg" alt="產出的 Excel 檔案">
+      <div class="img-caption">【圖 6】系統會自動在輸出資料夾中生成包含 PASS 與 FAIL 彙總的 Excel 檔案</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📝 5. Excel 報表內容說明 (PASS/FAIL 彙總)</h2>
+    <p>生成的 Excel 報表提供詳細的測試數據統計與錯誤點快速連結：</p>
+    <ul>
+      <li><strong>PASS 彙總報表</strong>：包含整體統計與詳細列表。
+        <ul>
+          <li><strong>Summary</strong>：呈現良率統計、平均/最長/最短測試時間等資訊。</li>
+          <li><strong>Detail</strong>：記錄每個 ISN 的詳細測項比對（Criteria Check）結果。</li>
+        </ul>
+      </li>
+      <li><strong>FAIL 彙總報表</strong>：專注於錯誤追蹤與分析。
+        <ul>
+          <li><strong>FAIL_LIST</strong>：彙總所有失敗原因、發生站別及對應的 Log 資訊。</li>
+          <li><strong>錯誤詳情</strong>：主動標註「發現錯誤點 (預覽)」並列出詳細的比對項目細節。</li>
+        </ul>
+      </li>
+    </ul>
+
+    <div class="img-box">
+      <img src="../IMAGES/excel_pass_summary_view.jpg" alt="PASS 彙總列表">
+      <div class="img-caption">【圖 7】PASS 彙總列表：清晰呈現批次測試的所有成功數據與統計資訊</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/excel_pass_details_view.jpg" alt="PASS 詳細比對">
+      <div class="img-caption">【圖 8】PASS 詳細比對：列出每個產品所有測項的實測值與規格範圍</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/excel_fail_summary_view.jpg" alt="FAIL 彙總統計">
+      <div class="img-caption">【圖 9】FAIL 彙總統計：自動歸納錯誤類型與各失敗測項的出現頻率</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/excel_fail_details_view.jpg" alt="FAIL 錯誤原因定位">
+      <div class="img-caption">【圖 10】FAIL 報表細節：整合錯誤原因、腳本名稱與詳細的測項數值比對</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🧪 6. 進階：CSV 統計數據分析</h2>
+    <p>除了讀取 Log 檔案，程式也提供對產線 CSV 數據進行良率統計與圖表分析的功能。
+      <br><small>※ 註：IPLAS 系統亦提供類似的統計數據與良率報告，本工具之分析結果僅供參考。※</small>
+    </p>
+    <ul>
+      <li><strong>啟動功能</strong>：在設定分頁中點選 <strong>「CSV 檔案整理」</strong> 按鈕。</li>
+      <li><strong>智慧模式選擇</strong>：支援「選擇資料夾（自動搜尋）」或「直接選取多個檔案」兩種載入方式。</li>
+      <li><strong>自動分析與彙總</strong>：系統會自動計算各測項的良率、均值，並生成專業的數據統計與圖表報表。</li>
+    </ul>
+
+    <div class="img-box" tooltip="選擇處理模式">
+      <img src="../IMAGES/csv_mode_selection.jpg" alt="CSV 模式選擇">
+      <div class="img-caption">【圖 11】CSV 處理對話框：可根據需求選擇單一檔案或整個資料夾進行掃描</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/csv_file_list.jpg" alt="CSV 檔案清單">
+      <div class="img-caption">【圖 12】檔案過濾清單：系統會列出找到的符合格式檔案，供使用者勾選後開始處理</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/csv_excel_summary.jpg" alt="CSV Excel 彙總">
+      <div class="img-caption">【圖 13】CSV 數據分析報表：自動統計 PASS/FAIL 比例、平均測試時長與錯誤代碼分类</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/csv_excel_pareto.jpg" alt="CSV 柏拉圖分析">
+      <div class="img-caption">【圖 14】錯誤代碼柏拉圖 (Pareto Chart)：直觀展現前幾大失敗原因，協助工程師專注解決主要問題</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/csv_excel_details.jpg" alt="CSV 數據細節">
+      <div class="img-caption">【圖 15】數據細節頁籤：保留完整的測項原始數據，並以顏色標註方便快速掃描異常</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>💡 7. 內行提示與快速鍵 (Pro Tips & Shortcuts)</h2>
+    <p>善用以下功能與快速鍵，可大幅提升您的分析效率：</p>
+    <ul>
+      <li><strong>⌨️ 快速搜尋 (Ctrl + F)</strong>：在 Log 查看視窗中按下此組合鍵，即可快速開啟搜尋框。</li>
+      <li><strong>🖱️ 智慧跳轉</strong>：在「發現錯誤點」預覽框中，<strong>直接點選錯誤訊息</strong>，系統會自動跳轉至 Log 中對應的行號。</li>
+      <li><strong>📑 複製項目 (Ctrl + C)</strong>：在測試結果列表中選中某一列，按下 Ctrl+C 即可將該列數據複製到剪貼簿。</li>
+      <li><strong>🔍 雙擊開啟細節</strong>：在列表上<strong>雙擊左鍵</strong>（或按 Enter），會彈出獨立的詳細視窗，展示該測項完整的 Command 與 Response 內容。</li>
     </ul>
   </div>
 
   <div class="section">
-    <h2>📖 如何使用（三步驟）</h2>
-    <div class="step" data-number="1">
-      <strong>選擇檔案</strong>：使用左側面板的「選擇檔案」、「選擇資料夾」或「選擇壓縮檔」。您可以一次選取多個檔案進行批次分析。
-    </div>
-    <div class="step" data-number="2">
-      <strong>查看與導覽</strong>：
-      <ul>
-        <li><strong>✅ PASS測項</strong>：查看成功的測試步驟。利用左側「快捷導覽」按鈕快速翻轉長列表。</li>
-        <li><strong>❌ FAIL測項</strong>：點選項目可直接在原始 Log 中跳轉。使用鍵盤上下鍵進行翻頁閱讀詳情。</li>
-        <li><strong>📄 原始LOG</strong>：即時查看完整的日誌內容，支援關鍵字高亮快搜。</li>
-      </ul>
-    </div>
-    <div class="step" data-number="3">
-      <strong>產出報表</strong>：分析完成後，系統會詢問是否開啟產出的 Excel 文件。這份文件包含了所有測試項目的彙總，非常適合做為測試報告。
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>⚙️ 進階操作技巧</h2>
+    <h2>🎨 8. 視覺化特色與自動化設計</h2>
+    <p>程式內建多項貼心的視覺化設計，幫助您更輕鬆地判讀數據：</p>
     <ul>
-      <li><strong>懸停預覽</strong>：在 FAIL 列表上移動滑鼠，下方視窗會即時連動顯示錯誤區塊，無需頻繁點擊。</li>
-      <li><strong>高亮關鍵字</strong>：在原始 LOG 頁面使用搜尋功能後，點選「+高亮」可將該字串存入設定，往後打開任何 LOG 都會自動標色。</li>
-      <li><strong>側邊欄搜尋統計</strong>：搜尋框上方會顯示「目前頁面/總共項目」的匹配數量，幫助您精確掌握錯誤點。</li>
+      <li><strong>斑馬紋列表 (Zebra Stripes)</strong>：列表採用灰白相間設計，減少長時間查看數據時的眼部疲勞。</li>
+      <li><strong>自動反黃追蹤</strong>：當滑鼠劃過或使用鍵盤上下鍵移動時，當前行會<strong>自動以淺黃色高亮</strong>，確保視線不跑位。</li>
+      <li><strong>章節分隔線</strong>：Log 中會自動插入<strong>深綠色/深藍色的大標題欄位</strong>（如 Phase 0, Phase 1），將萬行 Log 切割為易讀的區段。</li>
+      <li><strong>自動聚焦錯誤</strong>：載入單一 FAIL Log 時，系統會自動捲動至<strong>第一個關鍵錯誤點</strong>或頂部摘要，省去手動翻找時間。</li>
     </ul>
   </div>
 
   <div class="footer">
-    © 2025 PEGA Advanced Agentic Coding. Version 2.15.0
+    © 2026 PEGA Log Analyzer Team. Version 2.15.0<br>
+    <em>本工具專為提升 Log 診斷效率而生，如有任何功能建議請聯繫開發團隊。</em>
   </div>
 
 </body>
