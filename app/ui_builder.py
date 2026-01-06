@@ -323,19 +323,18 @@ class UIBuilderMixin:
                 pass
 
     def _open_html_help(self):
-        """以系統預設瀏覽器開啟操作說明 HTML（docs/USER_GUIDE.html）"""
+        """以系統預設方式開啟操作說明 HTML（docs/USER_GUIDE.html）"""
         try:
-            import urllib.parse
-            import pathlib
+            html_path = get_resource_path(os.path.join('docs', 'USER_GUIDE.html'))
             
-            html_path_str = get_resource_path(os.path.join('docs', 'USER_GUIDE.html'))
-            if not os.path.exists(html_path_str):
-                # 後備使用 README
+            if not os.path.exists(html_path):
+                # 如果找不到 HTML，後備使用文字版的 README
                 return self._open_markdown_help()
             
-            # 使用 pathlib 與 urljoin 確保路徑編碼正確，支援空格與特殊字元
-            html_url = pathlib.Path(html_path_str).absolute().as_uri()
-            webbrowser.open(html_url)
+            # 使用 Windows 原生的 os.startfile，這是開啟本地檔案最穩定的方式
+            # 它會直接呼叫系統預設瀏覽器開啟檔案，且對路徑中的特殊字元(如括號)支援度最高
+            os.startfile(html_path)
+            
         except Exception as e:
             try:
                 messagebox.showerror("錯誤", f"無法開啟操作說明：{e}")
