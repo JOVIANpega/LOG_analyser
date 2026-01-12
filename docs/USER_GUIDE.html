@@ -152,7 +152,29 @@
   </div>
 
   <div class="section">
-    <h2>📈 4. Excel 報表生成與完成提示 (載入 2 個以上 Log 時)</h2>
+    <h2>📸 4. 圖片檢索功能 (ISN Image Search)</h2>
+    <p>除了分析 Log 外，程式亦提供快速搜圖功能，方便根據 ISN 找到對應的測試影像（如 4cam 拼接圖）。</p>
+    <ul>
+      <li><strong>ISN 自動填入</strong>：當您讀取並分析完一份 Log 後，系統會自動提取其中的 ISN 並帶入圖片檢索欄位。</li>
+      <li><strong>手動切換目錄 (📂)</strong>：在檢索欄位旁提供快速按鈕，可臨時指定特定資料夾進行掃描，不限於預設的 STATION_RECORD 目錄。</li>
+      <li><strong>🖼️ 批次開啟同目錄圖片</strong>：點擊後會一次性開啟該 ISN 目錄下的所有鏡頭影像（每張間隔 0.2 秒以確保視窗順利跳出）。</li>
+      <li><strong>智慧分組顯示</strong>：搜尋結果會按 ISN 主目錄進行智慧分組，將不同分頁或不同鏡頭的圖檔整齊收納，避免清單雜亂。</li>
+      <li><strong>⚙️ 設定連動</strong>：您可以在 <strong>[設定]</strong> 分頁中自定義「搜尋根路徑」與「目標資料夾關鍵字」，並使用「瀏覽...」按鈕快速挑選目錄。</li>
+    </ul>
+
+    <div class="img-box">
+      <img src="../IMAGES/image_search_panel.png" alt="圖片檢索面板">
+      <div class="img-caption">【圖 5】圖片檢索面板：輸入或自動填入 ISN 後即可開始搜圖，支援手動路徑選取</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/image_search_results.png" alt="圖片檢索結果">
+      <div class="img-caption">【圖 6】檢索結果視窗：提供智慧分組、批次開啟與完整路徑預覽功能</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📈 5. Excel 報表生成與完成提示 (載入 2 個以上 Log 時)</h2>
     <p>當進行<strong>多檔案批次分析</strong>（載入兩個或以上的 Log）完成後，系統會自動彙總數據並生成 Excel 報表，同時給予完成通知。</p>
     <ul>
       <li><strong>完成通知</strong>：狀態列會顯示「Excel 生成成功！」，並列出產出的報表路徑。</li>
@@ -161,17 +183,17 @@
 
     <div class="img-box">
       <img src="../IMAGES/excel_export_success.jpg" alt="Excel 產出成功提示">
-      <div class="img-caption">【圖 5】分析成功後，底部狀態列會顯示產出的 Excel 報表路徑與成功訊息</div>
+      <div class="img-caption">【圖 7】分析成功後，底部狀態列會顯示產出的 Excel 報表路徑與成功訊息</div>
     </div>
 
     <div class="img-box">
       <img src="../IMAGES/excel_files_view.jpg" alt="產出的 Excel 檔案">
-      <div class="img-caption">【圖 6】系統會自動在輸出資料夾中生成包含 PASS 與 FAIL 彙總的 Excel 檔案</div>
+      <div class="img-caption">【圖 8】系統會自動在輸出資料夾中生成包含 PASS 與 FAIL 彙總的 Excel 檔案</div>
     </div>
   </div>
 
   <div class="section">
-    <h2>📝 5. Excel 報表內容說明 (PASS/FAIL 彙總)</h2>
+    <h2>📝 6. Excel 報表內容說明 (PASS/FAIL 彙總)</h2>
     <p>生成的 Excel 報表提供詳細的測試數據統計與錯誤點快速連結：</p>
     <ul>
       <li><strong>PASS 彙總報表</strong>：包含整體統計與詳細列表。
@@ -190,27 +212,27 @@
 
     <div class="img-box">
       <img src="../IMAGES/excel_pass_summary_view.jpg" alt="PASS 彙總列表">
-      <div class="img-caption">【圖 7】PASS 彙總列表：清晰呈現批次測試的所有成功數據與統計資訊</div>
+      <div class="img-caption">【圖 9】PASS 彙總列表：清晰呈現批次測試的所有成功數據與統計資訊</div>
     </div>
 
     <div class="img-box">
       <img src="../IMAGES/excel_pass_details_view.jpg" alt="PASS 詳細比對">
-      <div class="img-caption">【圖 8】PASS 詳細比對：列出每個產品所有測項的實測值與規格範圍</div>
+      <div class="img-caption">【圖 10】PASS 詳細比對：列出每個產品所有測項的實測值與規格範圍</div>
     </div>
 
     <div class="img-box">
       <img src="../IMAGES/excel_fail_summary_view.jpg" alt="FAIL 彙總統計">
-      <div class="img-caption">【圖 9】FAIL 彙總統計：自動歸納錯誤類型與各失敗測項的出現頻率</div>
+      <div class="img-caption">【圖 11】FAIL 彙總統計：自動歸納錯誤類型與各失敗測項的出現頻率</div>
     </div>
 
     <div class="img-box">
       <img src="../IMAGES/excel_fail_details_view.jpg" alt="FAIL 錯誤原因定位">
-      <div class="img-caption">【圖 10】FAIL 報表細節：整合錯誤原因、腳本名稱與詳細的測項數值比對</div>
+      <div class="img-caption">【圖 12】FAIL 報表細節：整合錯誤原因、腳本名稱與詳細的測項數值比對</div>
     </div>
   </div>
 
   <div class="section">
-    <h2>🧪 6. 進階：CSV 統計數據分析</h2>
+    <h2>🧪 7. 進階：CSV 統計數據分析</h2>
     <p>除了讀取 Log 檔案，程式也提供對產線 CSV 數據進行良率統計與圖表分析的功能。
       <br><small>※ 註：IPLAS 系統亦提供類似的統計數據與良率報告，本工具之分析結果僅供參考。※</small>
     </p>
@@ -222,48 +244,27 @@
 
     <div class="img-box" tooltip="選擇處理模式">
       <img src="../IMAGES/csv_mode_selection.jpg" alt="CSV 模式選擇">
-      <div class="img-caption">【圖 11】CSV 處理對話框：可根據需求選擇單一檔案或整個資料夾進行掃描</div>
+      <div class="img-caption">【圖 13】CSV 處理對話框：可根據需求選擇單一檔案或整個資料夾進行掃描</div>
     </div>
 
     <div class="img-box">
       <img src="../IMAGES/csv_file_list.jpg" alt="CSV 檔案清單">
-      <div class="img-caption">【圖 12】檔案過濾清單：系統會列出找到的符合格式檔案，供使用者勾選後開始處理</div>
+      <div class="img-caption">【圖 14】檔案過濾清單：系統會列出找到的符合格式檔案，供使用者勾選後開始處理</div>
     </div>
 
     <div class="img-box">
       <img src="../IMAGES/csv_excel_summary.jpg" alt="CSV Excel 彙總">
-      <div class="img-caption">【圖 13】CSV 數據分析報表：自動統計 PASS/FAIL 比例、平均測試時長與錯誤代碼分类</div>
+      <div class="img-caption">【圖 15】CSV 數據分析報表：自動統計 PASS/FAIL 比例、平均測試時長與錯誤代碼分类</div>
     </div>
 
     <div class="img-box">
       <img src="../IMAGES/csv_excel_pareto.jpg" alt="CSV 柏拉圖分析">
-      <div class="img-caption">【圖 14】錯誤代碼柏拉圖 (Pareto Chart)：直觀展現前幾大失敗原因，協助工程師專注解決主要問題</div>
+      <div class="img-caption">【圖 16】錯誤代碼柏拉圖 (Pareto Chart)：直觀展現前幾大失敗原因，協助工程師專注解決主要問題</div>
     </div>
 
     <div class="img-box">
       <img src="../IMAGES/csv_excel_details.jpg" alt="CSV 數據細節">
-      <div class="img-caption">【圖 15】數據細節頁籤：保留完整的測項原始數據，並以顏色標註方便快速掃描異常</div>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>📸 7. 圖片檢索功能 (ISN Image Search)</h2>
-    <p>除了分析 Log 外，程式亦提供快速搜圖功能，方便根據 ISN 找到對應的測試影像（如 4cam 拼接圖）。</p>
-    <ul>
-      <li><strong>ISN 自動填入</strong>：當您讀取並分析完一份 Log 後，系統會自動提取其中的 ISN 並帶入圖片檢索欄位。</li>
-      <li><strong>手動切換目錄 (📂)</strong>：在檢索欄位旁提供快速按鈕，可臨時指定特定資料夾進行掃描，不限於預設的 STATION_RECORD 目錄。</li>
-      <li><strong>🖼️ 批次開啟同目錄圖片</strong>：點擊後會一次性開啟該 ISN 目錄下的所有鏡頭影像（每張間隔 0.2 秒以確保視窗順利跳出）。</li>
-      <li><strong>智慧分組顯示</strong>：搜尋結果會按 ISN 主目錄進行智慧分組，將不同分頁或不同鏡頭的圖檔整齊收納，避免清單雜亂。</li>
-    </ul>
-
-    <div class="img-box">
-      <img src="../IMAGES/image_search_panel.png" alt="圖片檢索面板">
-      <div class="img-caption">【圖 16】圖片檢索面板：輸入或自動填入 ISN 後即可開始搜圖，支援手動路徑選取</div>
-    </div>
-
-    <div class="img-box">
-      <img src="../IMAGES/image_search_results.png" alt="圖片檢索結果">
-      <div class="img-caption">【圖 17】檢索結果視窗：提供智慧分組、批次開啟與完整路徑預覽功能</div>
+      <div class="img-caption">【圖 17】數據細節頁籤：保留完整的測項原始數據，並以顏色標註方便快速掃描異常</div>
     </div>
   </div>
 

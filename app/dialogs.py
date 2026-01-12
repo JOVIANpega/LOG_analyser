@@ -494,19 +494,29 @@ def show_image_results(parent, image_list, isn):
         btn_close = ttk.Button(btn_frame, text=" 關閉 ", command=dialog.destroy)
         btn_close.pack(side=tk.RIGHT, padx=5)
                  
-        # 雙擊單一圖片則維持：只開啟該張
+        # 雙擊單一圖片則維持：只開啟該張；雙擊目錄則開啟該目錄
         def on_double_click(event):
             selected = tree.selection()
             if not selected: return
-            tags = tree.item(selected[0]).get('tags', [])
+            item_id = selected[0]
+            item_data = tree.item(item_id)
+            tags = item_data.get('tags', [])
+            
             if tags and os.path.exists(tags[0]):
                 os.startfile(tags[0])
+            else:
+                # 可能是資料夾節點，嘗試開啟資料夾
+                current_text = item_data['text']
+                for gp in groups.keys():
+                    if f"📂 {os.path.basename(gp)}" == current_text:
+                        if os.path.exists(gp): os.startfile(gp)
+                        break
         
         tree.bind("<Double-1>", on_double_click)
         
-        # 🟢 最後才進行 grab，確保所有元件已載入
-        print("DEBUG: Window setup complete, grabbing focus...")
-        dialog.grab_set()
+        # 🟢 徹底移除 grab_set 以維護視窗縮小與獨立切換功能
+        print("DEBUG: Window setup complete.")
+        # dialog.grab_set() 
         dialog.wait_window()
     except Exception as e:
         print(f"CRITICAL: show_image_results failed: {e}")
