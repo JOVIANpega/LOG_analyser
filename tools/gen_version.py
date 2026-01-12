@@ -2,7 +2,10 @@
 import os
 
 def generate_version_info(version):
-    v_tuple = tuple(version.split('.'))
+    import re
+    # 提取所有數字部分，忽略 V 或其他非數字字元
+    v_parts = re.findall(r'\d+', version)
+    v_tuple = tuple(v_parts)
     # Ensure 4 parts
     while len(v_tuple) < 4:
         v_tuple += ('0',)

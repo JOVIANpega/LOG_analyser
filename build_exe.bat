@@ -2,14 +2,12 @@
 setlocal enabledelayedexpansion
 chcp 65001 >nul
 
-REM 1. 從 app/version.py 提取版本號 (例如 VERSION = "1.9.1")
+REM 1. 從 settings.json 提取版本號 (例如 "version": "V2.5.0")
 set "APP_VERSION=1.0.0"
-for /f "tokens=2 delims==" %%a in ('findstr /C:"VERSION =" "app\version.py"') do (
-    set "val=%%a"
-    set "val=!val:"=!"
-    set "val=!val: =!"
-    set "APP_VERSION=!val!"
+for /f "usebackq tokens=*" %%a in (`powershell -NoProfile -Command "Get-Content 'settings.json' | ConvertFrom-Json | Select-Object -ExpandProperty version"`) do (
+    set "APP_VERSION=%%a"
 )
+REM 移除可能的空格
 set "APP_VERSION=%APP_VERSION: =%"
 
 echo ========================================
@@ -39,8 +37,8 @@ echo [2] 資料夾模式 (OneDir)     - 啟動最快 (建議)
 set "PACK_MODE=2"
 set /p "PACK_MODE=請輸入 1 或 2 (預設為 2): "
 
-set "EXE_NAME=PEGA_Log_Analyzer_V%APP_VERSION%"
-set "OPTS=--noconsole --name=%EXE_NAME%"
+set "EXE_NAME=PEGA_Log_Analyzer_%APP_VERSION%"
+set "OPTS=--noconsole --name=!EXE_NAME!"
 
 REM 2. 更新 assets/version_info.txt 中版本 (使用 Python 腳本確保編碼為 UTF-8)
 echo [更新] 正在產出 assets\version_info.txt...
@@ -72,7 +70,8 @@ set "OPTS=%OPTS% --onedir"
 goto ADD_DATA
 
 :ADD_DATA
-REM 封裝資源與库
+echo [狀態] 封裝資源與庫...
+REM 封裝資源與庫
 set "OPTS=%OPTS% --version-file=assets/version_info.txt"
 set "OPTS=%OPTS% --add-data=assets;assets"
 set "OPTS=%OPTS% --add-data=docs;docs"
@@ -100,12 +99,12 @@ if errorlevel 1 goto ERROR_EXIT
 
 REM --- 額外複製文件到輸出目錄的根目錄 ---
 if "%PACK_MODE%"=="2" (
-    echo [整理] 正在複製 HTML、IMAGES、INI 與其他文件至根目錄...
-    if exist "docs" xcopy /E /I /Y "docs" "dist\%EXE_NAME%\docs" >nul
-    if exist "IMAGES" xcopy /E /I /Y "IMAGES" "dist\%EXE_NAME%\IMAGES" >nul
-    if exist "*.ini" copy /Y "*.ini" "dist\%EXE_NAME%\" >nul
-    if exist "settings.json" copy /Y "settings.json" "dist\%EXE_NAME%\" >nul
-    if exist "docs\*.html" copy /Y "docs\*.html" "dist\%EXE_NAME%\" >nul
+    echo [整理] 正在複製 HTML、IMAGES、JSON 與其他文件至根目錄...
+    if exist "docs" xcopy /E /I /Y "docs" "dist\!EXE_NAME!\docs" >nul
+    if exist "IMAGES" xcopy /E /I /Y "IMAGES" "dist\!EXE_NAME!\IMAGES" >nul
+    if exist "*.ini" copy /Y "*.ini" "dist\!EXE_NAME!\" >nul
+    if exist "settings.json" copy /Y "settings.json" "dist\!EXE_NAME!\" >nul
+    if exist "docs\*.html" copy /Y "docs\*.html" "dist\!EXE_NAME!\" >nul
 )
 
 goto SUCCESS_EXIT
