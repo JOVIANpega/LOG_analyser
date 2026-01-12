@@ -89,9 +89,12 @@ def build_left_panel(parent, app):
     
     # 創建下拉選單 (設定字體以連動 UI 大小)
     ui_font_size = app.settings.get('ui_font_size', 10)
-    selection_menu = tk.Menu(btn_smart, tearoff=0, font=('Arial', ui_font_size))
-    selection_menu.add_command(label="📄 選擇檔案 (Log/壓縮檔)...", command=app._select_files_unified)
-    selection_menu.add_command(label="📁 選擇資料夾 (批次處理)...", command=app._select_folder_unified)
+    selection_menu = tk.Menu(btn_smart, tearoff=0, font=('Arial', ui_font_size),
+                            activebackground='red', activeforeground='white')
+    selection_menu.add_command(label="📄 選擇檔案 (Log/壓縮檔)...", command=app._select_files_unified,
+                              activebackground='red', activeforeground='white')
+    selection_menu.add_command(label="📁 選擇資料夾 (批次處理)...", command=app._select_folder_unified,
+                              activebackground='red', activeforeground='white')
     app.selection_menu = selection_menu
     
     # 綁定點擊事件顯示選單
@@ -161,6 +164,51 @@ def build_left_panel(parent, app):
     
     # 不需要額外的 bold 和 hover 處理
     pass
+    
+    # 🖼️ 圖片檢索區域 (User Requested)
+    image_frame = ttk.LabelFrame(parent, text=" 🖼️ 圖片檢索 ", padding=(10, 10))
+    image_frame.pack(fill=tk.X, padx=10, pady=5)
+    
+    app.isn_image_var = tk.StringVar(value="")
+    isn_frame = ttk.Frame(image_frame)
+    isn_frame.pack(fill=tk.X, pady=5)
+    
+    isn_entry = ttk.Entry(isn_frame, textvariable=app.isn_image_var, font=('Arial', 10))
+    isn_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+    
+    # 📁 新增手動選擇資料夾按鈕 (User Requested)
+    def on_choose_manual_dir():
+        from tkinter import filedialog
+        # 先取得 ISN
+        isn = app.isn_image_var.get().strip()
+        # 決定初始目錄
+        init_dir = app.config_manager.get('image_search_root', 'D:\\')
+        
+        chosen_dir = filedialog.askdirectory(title="選擇要手動掃描的資料夾 (針對 ISN 搜尋)", initialdir=init_dir)
+        if chosen_dir:
+            # 直接觸發特定路徑的智慧搜尋
+            target_dir_keyword = app.config_manager.get('image_search_dir_name', 'STATION_RECORD').lower()
+            sub_dir_keyword = app.config_manager.get('image_search_sub_dir', '').lower()
+            extensions = tuple(ext.strip().lower() for ext in app.config_manager.get('image_search_extensions', 'jpg,png,yuv,bmp').split(','))
+            
+            # 使用現有的搜尋邏輯，但從選擇的路徑開始
+            app._run_image_search_logic_new(isn, chosen_dir, target_dir_keyword, sub_dir_keyword, extensions)
+
+    btn_dir_manual = tk.Button(isn_frame, text=" 📂 ", command=on_choose_manual_dir,
+                             bg='#795548', fg='white', font=('Arial', 9, 'bold'))
+    btn_dir_manual.pack(side=tk.RIGHT, padx=(2, 0))
+    _create_tooltip(btn_dir_manual, "手動選取一個資料夾進行掃描 (不限於預設目錄)", app=app)
+    
+    app.font_scaler.register(isn_entry)
+    app.font_scaler.register(btn_dir_manual)
+    _create_tooltip(isn_entry, "輸入 ISN 以檢索相關圖片\n分析過 Log 後會自動填入", app=app)
+    
+    btn_search_img = tk.Button(image_frame, text=" 🔍 開始檢索圖片 ", 
+                             command=app._search_images_by_isn, bg='#2196F3', fg='white',
+                             font=('Arial', 10, 'bold'), padx=15)
+    btn_search_img.pack(fill=tk.X, pady=5, ipady=3)
+    app.font_scaler.register(btn_search_img)
+    _create_tooltip(btn_search_img, "搜尋 STATION_RECORD 資料夾中的圖片\n(JPG, PNG, YUV, BMP)", app=app)
     
     # 說明文件按鈕 (改用 tk.Button 以確保左對齊)
     help_btn = tk.Button(parent, text=" 📖 查看操作說明 (HTML)", 

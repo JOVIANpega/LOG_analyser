@@ -14,7 +14,11 @@ DEFAULT_SETTINGS = {
     'pane_width': 250,        # 左側面板寬度
     'app_title': 'PEGA test log Aanlyser',  # 應用程式標題（可在設定頁修改並保存）
     'gui_header': 'ONLY FOR CENTIMANIA LOG', # 左側GUI大標題（可在設定頁修改並保存）
-    'user_highlight_keywords': 'SPEC_FAIL, spec_issue:' # 使用者自定義高亮關鍵字
+    'user_highlight_keywords': 'SPEC_FAIL, spec_issue:', # 使用者自定義高亮關鍵字
+    'image_search_root': 'D:\\',             # 圖片搜尋根路徑
+    'image_search_dir_name': 'STATION_RECORD',# 圖片搜尋目標資料夾名稱
+    'image_search_sub_dir': '',              # 圖片搜尋子目錄關鍵字 (選填)
+    'image_search_extensions': 'jpg,png,yuv,bmp' # 圖片副檔名
 }
 
 def load_settings():

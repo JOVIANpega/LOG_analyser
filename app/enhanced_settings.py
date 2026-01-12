@@ -183,6 +183,47 @@ def build_settings_content(app, parent):
     version_info_label.pack(pady=(8, 0))
     app.font_scaler.register(version_info_label)
     
+    # 圖片檢索設定區域
+    image_search_frame = tk.LabelFrame(left_column, text="圖片檢索設定", padx=15, pady=15)
+    image_search_frame.pack(fill=tk.X, pady=5)
+    app.font_scaler.register(image_search_frame)
+    
+    # 搜尋根目錄
+    root_frame = tk.Frame(image_search_frame)
+    root_frame.pack(fill=tk.X, pady=5)
+    
+    lbl_frame = tk.Frame(root_frame)
+    lbl_frame.pack(fill=tk.X)
+    tk.Label(lbl_frame, text="搜尋根路徑 (如 D:\\):", font=('Arial', 10)).pack(side=tk.LEFT)
+    
+    # 📁 新增選擇資料夾按鈕
+    def on_browse_root():
+        from tkinter import filedialog
+        path = filedialog.askdirectory(initialdir=app.image_root_var.get())
+        if path:
+            # 轉換為 Windows 風格路徑並補上反斜線
+            path = path.replace('/', '\\')
+            if not path.endswith('\\'): path += '\\'
+            app.image_root_var.set(path)
+
+    browse_btn = tk.Button(lbl_frame, text=" 📂 瀏覽... ", font=('Arial', 9),
+                          command=on_browse_root, padx=5)
+    browse_btn.pack(side=tk.RIGHT)
+
+    app.image_root_var = tk.StringVar(value=app.settings.get('image_search_root', 'D:\\'))
+    root_entry = tk.Entry(root_frame, textvariable=app.image_root_var, font=('Arial', 10))
+    root_entry.pack(fill=tk.X, pady=(2, 0))
+    
+    # 目標資料夾名稱
+    dir_name_frame = tk.Frame(image_search_frame)
+    dir_name_frame.pack(fill=tk.X, pady=5)
+    tk.Label(dir_name_frame, text="目標資料夾關鍵字 (如 STATION_RECORD):", font=('Arial', 10)).pack(anchor='w')
+    app.image_dir_name_var = tk.StringVar(value=app.settings.get('image_search_dir_name', 'STATION_RECORD'))
+    dir_entry = tk.Entry(dir_name_frame, textvariable=app.image_dir_name_var, font=('Arial', 10))
+    dir_entry.pack(fill=tk.X)
+    
+    # 原本的次級子目錄欄位已移除 (User Requested)
+    
     # ===== 底部按鈕區域 =====
     
     # 分隔線

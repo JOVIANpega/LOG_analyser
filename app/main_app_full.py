@@ -357,6 +357,14 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
                  self.config_manager.set('skip_no_test_time', self.skip_no_test_time_var.get())
             if hasattr(self, 'show_hover_preview_var'):
                  self.config_manager.set('show_hover_preview', self.show_hover_preview_var.get())
+            
+            # 圖片檢索設定
+            if hasattr(self, 'image_root_var'):
+                self.config_manager.set('image_search_root', self.image_root_var.get())
+            if hasattr(self, 'image_dir_name_var'):
+                self.config_manager.set('image_search_dir_name', self.image_dir_name_var.get())
+            if hasattr(self, 'image_sub_dir_var'):
+                self.config_manager.set('image_search_sub_dir', self.image_sub_dir_var.get())
                  
             self.config_manager.save()
             print("設定已保存")
@@ -369,8 +377,8 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         self.root.destroy()
     
     # === Delegate Methods for ProgressManager ===
-    def _show_progress(self, title, message=""):
-        self.root.after(0, lambda: self.progress_manager.show_progress(title, message))
+    def _show_progress(self, title, message="", force_popup=False):
+        self.root.after(0, lambda: self.progress_manager.show_progress(title, message, force_popup))
         
     def _update_progress(self, text):
          self.root.after(0, lambda: self.progress_manager.update_progress(text))
@@ -449,6 +457,14 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
             if hasattr(self, 'skip_no_test_time_var'):
                  self.config_manager.set('skip_no_test_time', self.skip_no_test_time_var.get())
             
+            # 圖片檢索設定
+            if hasattr(self, 'image_root_var'):
+                self.config_manager.set('image_search_root', self.image_root_var.get())
+            if hasattr(self, 'image_dir_name_var'):
+                self.config_manager.set('image_search_dir_name', self.image_dir_name_var.get())
+            if hasattr(self, 'image_sub_dir_var'):
+                self.config_manager.set('image_search_sub_dir', self.image_sub_dir_var.get())
+            
             # 保存
             self.config_manager.save()
             messagebox.showinfo("成功", "設定已保存！")
@@ -460,3 +476,181 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
             
         except Exception as e:
             messagebox.showerror("錯誤", f"保存設定失敗: {e}")
+
+    def _search_images_by_isn(self):
+        """依據 ISN 檢索圖片 (支援取消、強制彈窗、且不分大小寫)"""
+        print("DEBUG: _search_images_by_isn triggered")
+        try:
+            raw_isn = self.isn_image_var.get().strip()
+            print(f"DEBUG: Searching for ISN(s): {raw_isn}")
+            if not raw_isn:
+                messagebox.showwarning("提示", "請輸入 ISN 進行檢索")
+                return
+            
+            # 🟢 支援多個 ISN (以逗號或空格分隔)
+            import re
+            isn_list = [i.strip() for i in re.split(r'[,\s]+', raw_isn) if i.strip()]
+            
+            root_dir = self.config_manager.get('image_search_root', 'D:\\')
+            target_dir_keyword = self.config_manager.get('image_search_dir_name', 'STATION_RECORD').lower()
+            sub_dir_keyword = self.config_manager.get('image_search_sub_dir', '').lower()
+            extensions = tuple(ext.strip().lower() for ext in self.config_manager.get('image_search_extensions', 'jpg,png,yuv,bmp').split(','))
+            
+            if not os.path.exists(root_dir):
+                messagebox.showerror("錯誤", f"搜尋根路徑不存在: {root_dir}")
+                return
+                
+            self._cancel_flag = False
+            results = []
+            
+            # UI 字體自適應
+            from .ui_components import FontScaler
+            ui_font_size = self.config_manager.get('ui_font_size', 12)
+            
+            self._show_progress("正在搜尋圖片", f"階段 1: 預備掃描磁碟目標...\n搜尋起點: {root_dir}\n目標關鍵字: {target_dir_keyword}", force_popup=True)
+        
+            def _search_thread():
+                try:
+                    target_folders = []
+                    # 🟢 標準化起點路徑，移除末端反斜線以便正確認別 basename
+                    search_base = os.path.normpath(root_dir)
+                    
+                    # 1. 找出符合 STATION_RECORD 的資料夾
+                    # 如果使用者關鍵字留空，或是起點路徑本身就包含關鍵字，則直接將起點列為目標
+                    if not target_dir_keyword or target_dir_keyword in os.path.basename(search_base).lower():
+                        target_folders.append(search_base)
+                        print(f"DEBUG: Root directory is already a target: {search_base}")
+                    else:
+                        for root, dirs, files in os.walk(root_dir):
+                            if self._cancel_flag or self.progress_manager.is_cancelled:
+                                self._cancel_flag = True
+                                break
+                            
+                            self._safe_update_progress_text(f"搜尋起點: {root_dir}\n掃描路徑: {os.path.basename(root)}\n已找到 {len(target_folders)} 個目標...")
+                            
+                            current_basename = os.path.basename(os.path.normpath(root)).lower()
+                            if target_dir_keyword in current_basename:
+                                target_folders.append(root)
+                                # 找到目標資料夾後，不再深挖其子目錄尋找同名資料夾 (剪枝)
+                                dirs[:] = []
+                    
+                    if self._cancel_flag:
+                        self.root.after(0, self._close_progress)
+                        return
+
+                    # 2. 檢索圖片 (智慧型剪枝)
+                    total_folders = len(target_folders)
+                    for idx, folder in enumerate(target_folders, 1):
+                        if self._cancel_flag or self.progress_manager.is_cancelled:
+                            self._cancel_flag = True
+                            break
+                            
+                        self._safe_update_progress_text(f"階段 2: 智慧檢索 ({idx}/{total_folders})\n目標: {folder}\nISN: {', '.join(isn_list[:2])}...")
+                        
+                        try:
+                            for root, dirs, files in os.walk(folder):
+                                if self._cancel_flag: break
+                                rel_path = os.path.relpath(root, folder)
+                                
+                                if rel_path == ".":
+                                    # 只鑽進符合任一 ISN 的子目錄
+                                    dirs[:] = [d for d in dirs if any(i.lower() in d.lower() for i in isn_list)]
+                                    for f in files:
+                                        if any(i.lower() in f.lower() for i in isn_list) and any(f.lower().endswith(ext) for ext in extensions):
+                                            results.append(os.path.join(root, f))
+                                else:
+                                    # 已經在 ISN 目錄下，處理 4cam 或直接收圖
+                                    if sub_dir_keyword and rel_path.count(os.sep) == 0:
+                                        sub_matches = [d for d in dirs if sub_dir_keyword in d.lower()]
+                                        if sub_matches: dirs[:] = sub_matches
+                                            
+                                    for f in files:
+                                        if any(f.lower().endswith(ext) for ext in extensions):
+                                            results.append(os.path.join(root, f))
+                        except Exception as e:
+                            print(f"DEBUG: 智慧掃描失敗 {folder}: {e}")
+                    
+                    def _done():
+                        self._close_progress()
+                        if self._cancel_flag:
+                            messagebox.showinfo("提示", "搜尋作業已主動終止")
+                            return
+                            
+                        isn_str = ", ".join(isn_list)
+                        if not results:
+                            # 🟡 精細的未命中原因分析
+                            msg = f"搜尋完成，但找不到任何符合的圖片。\n\n"
+                            msg += f"🔍 搜尋條件確認：\n"
+                            msg += f"• ISN 關鍵字: {isn_str}\n"
+                            msg += f"• 搜尋起點: {root_dir}\n"
+                            msg += f"• 目標資料夾: {target_dir_keyword}\n"
+                            msg += f"• 次級過濾器 (4cam?): {sub_dir_keyword if sub_dir_keyword else '未設定'}\n\n"
+                            
+                            msg += "💡 常見原因：\n"
+                            if sub_dir_keyword:
+                                msg += f"1. [重點] 您啟用了次級過濾 '{sub_dir_keyword}'，但相關圖檔可能不在這個目錄下。\n"
+                            msg += "2. ISN 輸入錯誤，或是在 STATION_RECORD 之下找不到對應目錄。\n\n"
+                            msg += "是否要「擴大範圍」手動選擇一個資料夾進行全盤搜尋？"
+                            
+                            if messagebox.askyesno("未找到結果", msg):
+                                from tkinter import filedialog
+                                manual_dir = filedialog.askdirectory(title="選擇搜尋起點", initialdir=root_dir)
+                                if manual_dir:
+                                    self._run_image_search_logic_new(isn_str, manual_dir, target_dir_keyword, sub_dir_keyword, extensions)
+                        else:
+                            # 🟢 找到結果，告知數量後開啟視窗
+                            messagebox.showinfo("搜尋成功", f"找到 {len(results)} 個項目！即將開啟結果視窗。")
+                            from .dialogs import show_image_results
+                            show_image_results(self, results, isn_str)
+                    
+                    self.root.after(0, _done)
+                except Exception as e:
+                    self.root.after(0, lambda: [self._close_progress(), messagebox.showerror("錯誤", f"搜尋失敗: {e}")])
+                    
+            threading.Thread(target=_search_thread, daemon=True).start()
+        except Exception as e:
+            messagebox.showerror("啟動錯誤", f"無法啟動搜尋程序: {e}")
+
+    def _run_image_search_logic_new(self, isn, root_dir, target_dir_keyword, sub_dir_keyword, extensions):
+        """擴大搜尋 - 強制彈窗"""
+        self._cancel_flag = False
+        self._show_progress("手動擴大搜尋中", f"範圍: {root_dir}\n(搜圖過程中可隨時取消)", force_popup=True)
+        results = []
+        
+        def _thread():
+            try:
+                for root, dirs, files in os.walk(root_dir):
+                    if self._cancel_flag or self.progress_manager.is_cancelled:
+                        self._cancel_flag = True
+                        break
+                        
+                    self._safe_update_progress_text(f"擴大搜尋中: {os.path.basename(root)}\n已找到: {len(results)}")
+                    
+                    # 如果當前路徑還沒包含 ISN，嘗試篩選子資料夾以加速
+                    if isn.lower() not in root.lower():
+                        matches = [d for d in dirs if isn.lower() in d.lower()]
+                        if matches:
+                            dirs[:] = matches # 優先鑽進含 ISN 的目錄
+                    
+                    for f in files:
+                        if any(f.lower().endswith(ext) for ext in extensions):
+                            full_path = os.path.join(root, f)
+                            if isn.lower() in full_path.lower():
+                                if not sub_dir_keyword or sub_dir_keyword in full_path.lower():
+                                    results.append(full_path)
+                                    
+                def _done():
+                    self._close_progress()
+                    if self._cancel_flag:
+                        messagebox.showinfo("提示", "擴大搜尋已終止")
+                        return
+                    if not results:
+                        messagebox.showinfo("檢索結果", f"手動針對 '{root_dir}' 搜尋結果為 0。")
+                    else:
+                        from .dialogs import show_image_results
+                        show_image_results(self, results, isn)
+                self.root.after(0, _done)
+            except Exception as e:
+                self.root.after(0, lambda: [self._close_progress(), messagebox.showerror("錯誤", f"擴搜崩潰: {e}")])
+        
+        threading.Thread(target=_thread, daemon=True).start()

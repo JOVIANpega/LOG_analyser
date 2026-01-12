@@ -90,16 +90,16 @@ class ProgressManager:
     def is_cancelled(self):
         return self._cancel_flag
         
-    def show_progress(self, title: str, message: str = ""):
-        """顯示進度 (優先使用狀態列)"""
+    def show_progress(self, title: str, message: str = "", force_popup: bool = False):
+        """顯示進度 (優先使用狀態列，除非 force_popup=True)"""
         text = message or title
         self._cancel_flag = False
         self._start_time = time.time()
         
         self._start_flashing() # Start blinking logic
         
-        # 如果有嵌入式元件，更新它們
-        if self._status_label and self._main_progress_bar:
+        # 如果有嵌入式元件且不強制彈窗，更新它們
+        if not force_popup and self._status_label and self._main_progress_bar:
             self._status_label.config(text=text)
             self._main_progress_bar['value'] = 0
             self._main_progress_bar.configure(mode='indeterminate')
@@ -115,21 +115,23 @@ class ProgressManager:
             import ttkbootstrap as tb
             win = tb.Toplevel(self.root)
             win.title(title)
-            win.geometry("450x180")
+            # 🟢 增加高度與寬度避免擠壓
+            win_w, win_h = 500, 220
+            win.geometry(f"{win_w}x{win_h}")
             win.transient(self.root)
             win.grab_set()
             
             # 居中顯示
             win.update_idletasks()
-            x = (win.winfo_screenwidth() // 2) - (450 // 2)
-            y = (win.winfo_screenheight() // 2) - (180 // 2)
-            win.geometry(f"450x180+{x}+{y}")
+            x = (win.winfo_screenwidth() // 2) - (win_w // 2)
+            y = (win.winfo_screenheight() // 2) - (win_h // 2)
+            win.geometry(f"{win_w}x{win_h}+{x}+{y}")
             
             frame = ttk.Frame(win, padding=20)
             frame.pack(fill=tk.BOTH, expand=1)
             
             # 主標籤
-            lbl = ttk.Label(frame, text=text, font=('Arial', 10), wraplength=400)
+            lbl = ttk.Label(frame, text=text, font=('Microsoft JhengHei', 10), wraplength=450)
             lbl.pack(fill=tk.X)
             
             # 進度條
@@ -137,16 +139,23 @@ class ProgressManager:
             bar.pack(fill=tk.X, pady=15)
             bar.start(12)
             
-            # 時間估算標籤
-            time_label = ttk.Label(frame, text="預估剩餘時間: 計算中...", font=('Arial', 9))
-            time_label.pack(anchor='w')
+            # 資訊容器 (剩餘時間)
+            info_frame = ttk.Frame(frame)
+            info_frame.pack(fill=tk.X)
+            
+            time_label = ttk.Label(info_frame, text="預估剩餘時間: 計算中...", font=('Microsoft JhengHei', 9))
+            time_label.pack(side=tk.LEFT)
             
             def on_cancel():
                 self._cancel_flag = True
                 lbl.config(text="正在取消，請稍候…")
             
-            btn = ttk.Button(frame, text="取消分析", command=on_cancel, style='danger.Outline.TButton')
-            btn.pack(pady=(15,0))
+            # 下方按鈕區
+            btn_container = ttk.Frame(frame)
+            btn_container.pack(fill=tk.X, pady=(15,0))
+            
+            btn = ttk.Button(btn_container, text=" 取消搜尋 / 中止執行 ", command=on_cancel, style='danger.TButton')
+            btn.pack(expand=True)
             
             # 綁定視窗關閉事件
             win.protocol("WM_DELETE_WINDOW", on_cancel)

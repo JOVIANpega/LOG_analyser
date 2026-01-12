@@ -173,6 +173,14 @@ class AnalysisEngineMixin:
         
         # Step 1: Update Progress Text
         self._update_progress(f"準備顯示結果...")
+        
+        # 🟢 新增：自動填入 ISN 圖片檢索欄位
+        try:
+            isn_match = re.search(r'ISN=([^\n\s]+)', str(header_info))
+            if isn_match and hasattr(self, 'isn_image_var'):
+                self.isn_image_var.set(isn_match.group(1))
+        except: pass
+        
         yield
 
         # Step 2: PASS Items (顯示章節與細項比對內容)
