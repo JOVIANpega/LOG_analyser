@@ -59,9 +59,7 @@ goto ONEDIR_SETTING
 :ONEFILE_SETTING
 echo [狀態] 模式：單一檔案 (OneFile)
 set "OPTS=%OPTS% --onefile"
-if not exist "owl.png" goto ADD_DATA
-echo [狀態] 加入啟動畫面 (Splash Screen)...
-set "OPTS=%OPTS% --splash owl.png"
+REM set "OPTS=%OPTS% --splash owl.png"
 goto ADD_DATA
 
 :ONEDIR_SETTING
@@ -77,9 +75,10 @@ set "OPTS=%OPTS% --add-data=assets;assets"
 set "OPTS=%OPTS% --add-data=docs;docs"
 set "OPTS=%OPTS% --add-data=IMAGES;IMAGES"
 set "OPTS=%OPTS% --add-data=app;app"
-set "OPTS=%OPTS% --add-data=owl.png;."
-set "OPTS=%OPTS% --add-data=scare.png;."
+REM set "OPTS=%OPTS% --add-data=owl.png;."
+REM set "OPTS=%OPTS% --add-data=scare.png;."
 set "OPTS=%OPTS% --add-data=settings.json;."
+set "OPTS=%OPTS% --add-data=README.md;."
 set "OPTS=%OPTS% --collect-all=ttkbootstrap"
 set "OPTS=%OPTS% --collect-all=pandas"
 set "OPTS=%OPTS% --collect-all=openpyxl"

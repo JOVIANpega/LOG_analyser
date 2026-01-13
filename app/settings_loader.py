@@ -17,8 +17,15 @@ DEFAULT_SETTINGS = {
     'user_highlight_keywords': 'SPEC_FAIL, spec_issue:', # 使用者自定義高亮關鍵字
     'image_search_root': 'D:\\',             # 圖片搜尋根路徑
     'image_search_dir_name': 'STATION_RECORD',# 圖片搜尋目標資料夾名稱
-    'image_search_sub_dir': '',              # 圖片搜尋子目錄關鍵字 (選填)
-    'image_search_extensions': 'jpg,png,yuv,bmp' # 圖片副檔名
+    'image_search_sub_dir': '4cam',          # 圖片搜尋子目錄關鍵字 (選填)
+    'image_search_extensions': 'jpg,png,yuv,bmp', # 圖片副檔名
+    'enable_image_search': True,             # 是否啟用圖片檢索功能
+    'theme': 'superhero',                    # 介面主題
+    'auto_analyze': True,                    # 選擇檔案後自動分析
+    'remember_path': True,                   # 記住上次選擇路徑
+    'version': 'V2.5.1',                     # 軟體版本
+    'skip_no_test_time': True,               # 忽略無測試時間 LOG
+    'show_hover_preview': False              # 是否顯示懸停預覽
 }
 
 def load_settings():

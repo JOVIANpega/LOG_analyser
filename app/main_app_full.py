@@ -7,7 +7,8 @@
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+import ttkbootstrap as ttk
+from tkinter import filedialog, messagebox
 import os
 import sys
 import threading
@@ -23,7 +24,7 @@ from .ui_builder import UIBuilderMixin
 from .file_handlers import FileHandlerMixin
 
 from .log_parser import LogParser
-from .excel_writer import ExcelWriter
+from .excel.excel_writer import ExcelWriter
 from .ui_components import FontScaler
 
 class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplayMixin, 
@@ -423,21 +424,13 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         if hasattr(self.root, 'style'):
             self.root.style.theme_use(theme_name)
         else:
-            import ttkbootstrap as ttk
             ttk.Style().theme_use(theme_name)
         
-        # 4. 標題背景也需要同步更新 (因為它是特殊的 tk.Frame)
-        try:
-            import ttkbootstrap as ttk
-            colors = ttk.Style().colors
-            header_bg = colors.primary
-            header_fg = colors.inversefg if hasattr(colors, 'inversefg') else 'white'
-            if hasattr(self, 'left_title_label'):
-                self.left_title_label.config(bg=header_bg, fg=header_fg)
-            if hasattr(self, 'left_title_frame'):
-                self.left_title_frame.config(bg=header_bg)
-        except:
-            pass
+        # 🟢 即時同步到設定，避免關閉時沒存到
+        if hasattr(self, 'settings'):
+            self.settings['theme'] = theme_name
+        if hasattr(self, 'config_manager'):
+            self.config_manager.set('theme', theme_name)
             
         # 5. 主題切換後強制重新套用字體大小，確保樣式刷新
         self._apply_font_size()
@@ -459,11 +452,21 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
             
             # 圖片檢索設定
             if hasattr(self, 'image_root_var'):
-                self.config_manager.set('image_search_root', self.image_root_var.get())
+                 self.config_manager.set('image_search_root', self.image_root_var.get())
             if hasattr(self, 'image_dir_name_var'):
-                self.config_manager.set('image_search_dir_name', self.image_dir_name_var.get())
-            if hasattr(self, 'image_sub_dir_var'):
-                self.config_manager.set('image_search_sub_dir', self.image_sub_dir_var.get())
+                 self.config_manager.set('image_search_dir_name', self.image_dir_name_var.get())
+            if hasattr(self, 'image_sub_dir_var'): # 修正變數名稱以符合 enhanced_settings.py
+                 self.config_manager.set('image_search_sub_dir', self.image_sub_dir_var.get())
+            
+            # 輔助設定
+            if hasattr(self, 'show_hover_preview_var'):
+                 self.config_manager.set('show_hover_preview', self.show_hover_preview_var.get())
+            
+            # 🟢 圖片檢索功能開關
+            if hasattr(self, 'enable_image_search_var'):
+                 is_enabled = self.enable_image_search_var.get()
+                 self.config_manager.set('enable_image_search', is_enabled)
+                 self._refresh_image_search_lock(is_enabled)
             
             # 保存
             self.config_manager.save()
@@ -476,6 +479,23 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
             
         except Exception as e:
             messagebox.showerror("錯誤", f"保存設定失敗: {e}")
+
+    def _refresh_image_search_lock(self, is_enabled):
+        """🟢 即時更新及鎖定左側面板的圖片檢索區域"""
+        try:
+            state_val = tk.NORMAL if is_enabled else tk.DISABLED
+            if hasattr(self, 'left_isn_entry'):
+                self.left_isn_entry.config(state=state_val)
+            if hasattr(self, 'left_btn_dir_manual'):
+                self.left_btn_dir_manual.config(state=state_val)
+            if hasattr(self, 'left_btn_search_img'):
+                self.left_btn_search_img.config(state=state_val)
+            
+            if hasattr(self, 'left_image_frame'):
+                title = " 🖼️ 圖片檢索 " if is_enabled else " 🖼️ 圖片檢索 (已鎖定/LOCK) "
+                self.left_image_frame.configure(text=title)
+        except Exception as e:
+            print(f"刷新圖片檢索鎖定失敗: {e}")
 
     def _search_images_by_isn(self):
         """依據 ISN 檢索圖片 (支援取消、強制彈窗、且不分大小寫)"""

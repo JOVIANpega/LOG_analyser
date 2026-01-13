@@ -279,8 +279,8 @@ def show_image_results(parent, image_list, isn):
         if hasattr(parent, 'settings'):
             ui_font_size = parent.settings.get('ui_font_size', 12)
             
-        win_w = int(900 * (ui_font_size / 12))
-        win_h = int(600 * (ui_font_size / 12))
+        win_w = int(1100 * (ui_font_size / 12))
+        win_h = int(750 * (ui_font_size / 12))
         
         # 設置視窗屬性為「正常視窗」，確保縮小功能可用
         dialog.transient("") 
@@ -308,18 +308,29 @@ def show_image_results(parent, image_list, isn):
         main_frame = tk.Frame(dialog, bg='white', padx=20, pady=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # 標題
-        header = tk.Label(main_frame, text=f"🔍 找到 {len(image_list)} 個與 ISN '{isn}' 相關的項目", 
+        # 標題與過濾區
+        header_frame = tk.Frame(main_frame, bg='white')
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        header = tk.Label(header_frame, text=f"🔍 找到 {len(image_list)} 個與 ISN '{isn}' 相關的項目", 
                          font=('Microsoft JhengHei', ui_font_size, 'bold'), 
                          bg='white', fg='#1565C0')
-        header.pack(anchor='w', pady=(0, 10))
+        header.pack(side=tk.LEFT)
         
+        # 🟢 加入過濾輸入框 (User Requested)
+        filter_frame = tk.Frame(header_frame, bg='white')
+        filter_frame.pack(side=tk.RIGHT)
+        tk.Label(filter_frame, text="篩選關鍵字:", font=('Microsoft JhengHei', ui_font_size - 1), bg='white').pack(side=tk.LEFT, padx=5)
+        filter_var = tk.StringVar()
+        filter_entry = ttk.Entry(filter_frame, textvariable=filter_var, width=20)
+        filter_entry.pack(side=tk.LEFT, padx=(0, 5))
+        filter_entry.focus_set()
+
         # 列表區
         list_frame = tk.Frame(main_frame, bg='white')
         list_frame.pack(fill=tk.BOTH, expand=True)
         
         columns = ("filename", "date", "size")
-        # 🟢 使用 tree headings，第一欄放資料夾/ISN
         tree = ttk.Treeview(list_frame, columns=columns, show='tree headings', selectmode='browse')
         
         tree.heading("#0", text=" 來源目錄 / ISN ")
@@ -327,10 +338,11 @@ def show_image_results(parent, image_list, isn):
         tree.heading("date", text="修改日期")
         tree.heading("size", text="大小")
         
-        tree.column("#0", width=int(250 * (ui_font_size / 12)), anchor='w')
-        tree.column("filename", width=int(300 * (ui_font_size / 12)), anchor='w')
+        # 🟢 加寬第一欄 (User Requested: 來源目錄ISN需要調整才看的到完整)
+        tree.column("#0", width=int(450 * (ui_font_size / 12)), anchor='w')
+        tree.column("filename", width=int(250 * (ui_font_size / 12)), anchor='w')
         tree.column("date", width=int(150 * (ui_font_size / 12)), anchor='center')
-        tree.column("size", width=int(80 * (ui_font_size / 12)), anchor='e')
+        tree.column("size", width=int(90 * (ui_font_size / 12)), anchor='e')
         
         vsb = ttk.Scrollbar(list_frame, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=vsb.set)
@@ -338,7 +350,7 @@ def show_image_results(parent, image_list, isn):
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         vsb.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # 🟢 路徑詳情區 (對接使用者要求：完整顯示、可折行)
+        # 下方路徑詳情區
         path_detail_frame = tk.LabelFrame(main_frame, text=" 完整來源路徑 (Full Path) ", 
                                          font=('Microsoft JhengHei', ui_font_size - 2),
                                          bg='white', fg='#555', pady=5)
@@ -349,54 +361,82 @@ def show_image_results(parent, image_list, isn):
         path_text.pack(fill=tk.X)
         path_text.insert("1.0", "請點選下方項目以查看完整路徑...")
         path_text.config(state=tk.DISABLED)
-        
-        print(f"DEBUG: Categorizing and filling Treeview with {len(image_list)} items...")
-        
-        # 🟢 智慧分組：智慧識別 ISN 根目錄，將同一個搜尋標的可視為一組
-        groups = {}
-        for p in image_list:
-            p_norm = os.path.normpath(p)
-            
-            # 找到包含 isn 的那一層目錄作為組名 (若無則用 dirname)
-            # 例如: STATION_RECORD/0306250012+2025.../4cam/file.jpg -> Group: 0306250012...
+
+        # 全域資料存儲以便過濾
+        full_groups = {} 
+        isn_key = isn.split(',')[0].strip()
+
+        def _format_size(bytes_val):
+            """🟢 格式化檔案大小 (User Requested: MB/KB)"""
+            if bytes_val >= 1024 * 1024:
+                return f"{bytes_val / (1024 * 1024):.2f} MB"
+            return f"{bytes_val / 1024:.1f} KB"
+
+        def _get_group_name(p_norm):
             parts = p_norm.split(os.sep)
-            grp_name = os.path.dirname(p_norm) # 預設預設分組
-            
-            # 從根部往回找第一個包含 isn 的資料夾
-            isn_key = isn.split(',')[0].strip() # 取第一個 ISN 做關鍵字
             for i in range(len(parts)):
                 if isn_key.lower() in parts[i].lower() and parts[i].lower() != "station_record":
-                    # 🟢 修正：如果找到的符合項是最後一個元件 (即檔案名稱)，則退回其父目錄
-                    # 這樣才能讓同目錄下的多張圖 (如 1555_L, 1555_R) 歸類在同一個資料夾分組內
                     if i == len(parts) - 1:
-                        grp_name = os.path.dirname(p_norm)
-                    else:
-                        grp_name = os.sep.join(parts[:i+1])
-                    break
+                        return os.path.dirname(p_norm)
+                    return os.sep.join(parts[:i+1])
+            return os.path.dirname(p_norm)
+
+        # 初始分組
+        for p in image_list:
+            p_norm = os.path.normpath(p)
+            grp_name = _get_group_name(p_norm)
+            if grp_name not in full_groups: full_groups[grp_name] = []
+            full_groups[grp_name].append(p_norm)
+
+        def populate_tree(keyword=""):
+            """🟢 填充 Treeview 並支援搜尋關鍵字 (User Requested)"""
+            # 清空現有項目
+            for item in tree.get_children():
+                tree.delete(item)
             
-            if grp_name not in groups: groups[grp_name] = []
-            groups[grp_name].append(p_norm)
+            keyword = keyword.lower().strip()
+            item_count = 0
             
-        # 填充數據 (依字母排序目錄)
-        for group_path in sorted(groups.keys()):
-            files = groups[group_path]
-            # 建立父節點 (顯示 ISN 資料夾名稱)
-            display_name = os.path.basename(group_path)
-            if not display_name: display_name = group_path
-            
-            folder_node = tree.insert("", tk.END, text=f"📂 {display_name}", open=True, values=("", "", ""))
-            
-            for p in sorted(files):
-                try:
-                    stats = os.stat(p)
-                    dt = datetime.datetime.fromtimestamp(stats.st_mtime).strftime('%Y-%m-%d %H:%M')
-                    size_kb = f"{stats.st_size / 1024:.1f} KB"
-                    # 多顯示一級目錄以便區分 (如果檔名重複)
-                    rel_p = os.path.relpath(p, group_path)
-                    tree.insert(folder_node, tk.END, text="", values=(rel_p, dt, size_kb), tags=(p,))
-                except:
-                    tree.insert(folder_node, tk.END, text="", values=(os.path.basename(p), "Unknown", "Unknown"), tags=(p,))
+            for group_path in sorted(full_groups.keys()):
+                files = full_groups[group_path]
                 
+                # 過濾該分組內的檔案
+                filtered_files = []
+                for p in files:
+                    # 檢查路徑是否包含關鍵字
+                    if not keyword or keyword in p.lower():
+                        filtered_files.append(p)
+                
+                if not filtered_files:
+                    continue
+                
+                display_name = os.path.basename(group_path)
+                if not display_name: display_name = group_path
+                
+                # 🟢 給資料夾節點加上 FOLDER tag，並附上完整路徑
+                folder_node = tree.insert("", tk.END, text=f"📂 {display_name}", open=True, tags=("FOLDER", group_path))
+                
+                for p in sorted(filtered_files):
+                    try:
+                        stats = os.stat(p)
+                        dt = datetime.datetime.fromtimestamp(stats.st_mtime).strftime('%Y-%m-%d %H:%M')
+                        size_str = _format_size(stats.st_size)
+                        # 🟢 User Requested: 僅顯示檔案名稱 (basename)
+                        fname = os.path.basename(p)
+                        tree.insert(folder_node, tk.END, text="", values=(fname, dt, size_str), tags=("FILE", p))
+                        item_count += 1
+                    except:
+                        tree.insert(folder_node, tk.END, text="", values=(os.path.basename(p), "Unknown", "Unknown"), tags=("FILE", p))
+                        item_count += 1
+            
+            header.config(text=f"🔍 找到 {item_count} 個項目 (關鍵字: '{keyword if keyword else '無'}')")
+
+        def on_filter_change(*args):
+            populate_tree(filter_var.get())
+
+        filter_var.trace_add("write", on_filter_change)
+        populate_tree() # 初始填充
+        
         def update_path_detail(event):
             selected = tree.selection()
             if not selected: return
@@ -405,15 +445,12 @@ def show_image_results(parent, image_list, isn):
             
             path_text.config(state=tk.NORMAL)
             path_text.delete("1.0", tk.END)
-            if tags:
-                path_text.insert("1.0", os.path.normpath(tags[0]))
+            if tags and tags[0] == "FILE":
+                path_text.insert("1.0", os.path.normpath(tags[1]))
+            elif tags and tags[0] == "FOLDER":
+                path_text.insert("1.0", os.path.normpath(tags[1]))
             else:
-                # 節點選取：藉由 text 找回完整的 group_path
-                current_text = item['text']
-                for gp in groups.keys():
-                    if f"📂 {os.path.basename(gp)}" == current_text:
-                        path_text.insert("1.0", os.path.normpath(gp))
-                        break
+                path_text.insert("1.0", "請展開並選擇檔案項目...")
             path_text.config(state=tk.DISABLED)
 
         tree.bind("<<TreeviewSelect>>", update_path_detail)
@@ -423,7 +460,6 @@ def show_image_results(parent, image_list, isn):
         btn_frame.pack(fill=tk.X)
         
         def on_open_file():
-            """更改為：開啟同一個目錄下的所有相關圖片 (增強穩定性)"""
             try:
                 selected = tree.selection()
                 if not selected:
@@ -436,112 +472,87 @@ def show_image_results(parent, image_list, isn):
                 
                 target_images = []
                 # 判定所在資料夾節點
-                folder_node = tree.parent(item_id) if tags else item_id
+                is_file = tags and tags[0] == "FILE"
+                folder_node = tree.parent(item_id) if is_file else item_id
                 
-                if not folder_node:
-                    # 如果沒有父節點，說明本身就在根部 (理論上在此分組模式不應發生)
-                    if tags: target_images.append(tags[0])
-                else:
+                if folder_node:
                     children = tree.get_children(folder_node)
-                    print(f"DEBUG: Found folder node {folder_node} with {len(children)} children")
                     for child in children:
                         child_tags = tree.item(child).get('tags', [])
-                        if child_tags:
-                            target_images.append(os.path.normpath(child_tags[0]))
+                        if child_tags and child_tags[0] == "FILE":
+                            target_images.append(os.path.normpath(child_tags[1]))
                 
                 if not target_images:
-                    messagebox.showwarning("提示", "找不到可開啟的相關圖片", parent=dialog)
+                    if is_file: target_images.append(tags[1])
+                
+                if not target_images:
+                    messagebox.showwarning("提示", "找不到可開啟的項目", parent=dialog)
                     return
                 
-                print(f"DEBUG: Preparing to open {len(target_images)} images: {target_images}")
-                
-                # 🟢 分組開啟數量提醒
                 if len(target_images) > 1 :
-                    # 如果超過一張，告知即將開啟的數量
-                    msg = f"即將同時開啟同資料夾內的 {len(target_images)} 個影像檔案。\n確定要繼續？"
+                    msg = f"即將同時開啟 {len(target_images)} 個影像檔案。\n確定要繼續？"
                     if len(target_images) > 10:
-                        if not messagebox.askyesno("警告", msg, parent=dialog):
-                            return
+                        if not messagebox.askyesno("警告", msg, parent=dialog): return
                 
                 import time
-                for idx, img_path in enumerate(target_images):
+                for img_path in target_images:
                     if os.path.exists(img_path):
-                        print(f"DEBUG: Opening ({idx+1}/{len(target_images)}): {img_path}")
                         os.startfile(img_path)
-                        # 🟢 增加微小延遲 (0.2s)，防止 Windows 相片檢視器合併視窗或遺漏指令
-                        if len(target_images) > 1:
-                            time.sleep(0.2)
-                    else:
-                        print(f"DEBUG: File not found: {img_path}")
+                        if len(target_images) > 1: time.sleep(0.2)
                         
             except Exception as e:
-                import traceback
-                traceback.print_exc()
                 messagebox.showerror("錯誤", f"批次開啟失敗: {e}", parent=dialog)
                 
         def on_open_folder():
             try:
                 selected = tree.selection()
-                if not selected:
-                    messagebox.showinfo("提示", "請先選擇一個項目", parent=dialog)
-                    return
+                if not selected: return
                 item_id = selected[0]
                 item_data = tree.item(item_id)
                 tags = item_data.get('tags', [])
                 
-                if tags:
-                    file_path = os.path.normpath(tags[0])
-                    # Windows 特有：開啟資料夾並選中檔案
+                if tags and tags[0] == "FILE":
+                    file_path = os.path.normpath(tags[1])
                     import subprocess
                     subprocess.run(['explorer', '/select,', file_path])
+                elif tags and tags[0] == "FOLDER":
+                    folder_path = os.path.normpath(tags[1])
+                    if os.path.exists(folder_path):
+                        os.startfile(folder_path)
                 else:
-                    # 選到資料夾節點
-                    target_folder = ""
-                    for fld in groups.keys():
-                        if f"📂 {os.path.basename(fld)}" == item_data['text']:
-                            target_folder = fld
-                            break
-                    if target_folder and os.path.exists(target_folder):
-                        os.startfile(target_folder)
-                    else:
-                        messagebox.showerror("錯誤", "資料夾不存在", parent=dialog)
+                    messagebox.showinfo("提示", "請選擇具體的檔案或資料夾項目", parent=dialog)
             except Exception as e:
                 messagebox.showerror("錯誤", f"無法開啟資料夾: {e}", parent=dialog)
     
         def on_copy_images():
-            """批次複製同目錄下的所有圖片到指定位置 (User Requested)"""
             try:
                 selected = tree.selection()
-                if not selected:
-                    messagebox.showinfo("提示", "請先選擇清單中的一個項目", parent=dialog)
-                    return
-                
+                if not selected: return
                 item_id = selected[0]
                 item_data = tree.item(item_id)
                 tags = item_data.get('tags', [])
                 
                 target_images = []
-                # 判定所在資料夾節點 (與開啟邏輯相同)
-                folder_node = tree.parent(item_id) if tags else item_id
+                is_file = tags and tags[0] == "FILE"
+                folder_node = tree.parent(item_id) if is_file else item_id
                 
-                if not folder_node:
-                    if tags: target_images.append(tags[0])
-                else:
+                if folder_node:
                     children = tree.get_children(folder_node)
                     for child in children:
                         child_tags = tree.item(child).get('tags', [])
-                        if child_tags:
-                            target_images.append(os.path.normpath(child_tags[0]))
+                        if child_tags and child_tags[0] == "FILE": 
+                            target_images.append(os.path.normpath(child_tags[1]))
                 
+                if not target_images and is_file:
+                    target_images.append(os.path.normpath(tags[1]))
+
                 if not target_images:
-                    messagebox.showwarning("提示", "找不到可複製的相關圖片", parent=dialog)
+                    messagebox.showwarning("提示", "找不到可複製的圖片", parent=dialog)
                     return
                 
-                # 彈出資料夾選擇視窗
                 from tkinter import filedialog
-                dest_dir = filedialog.askdirectory(title=f"選擇儲存圖片的目的地 ({len(target_images)} 個檔案)")
-                if not dest_dir:
-                    return
+                dest_dir = filedialog.askdirectory(title=f"選擇儲存目的地 ({len(target_images)} 個檔案)")
+                if not dest_dir: return
                 
                 import shutil
                 success_count = 0
@@ -550,61 +561,43 @@ def show_image_results(parent, image_list, isn):
                         try:
                             shutil.copy2(img_path, dest_dir)
                             success_count += 1
-                        except Exception as e:
-                            print(f"複製失敗 {img_path}: {e}")
+                        except: pass
                 
                 if success_count > 0:
-                    messagebox.showinfo("複製成功", f"已成功將 {success_count} 個圖檔複製至：\n{dest_dir}", parent=dialog)
-                    # 自動開啟目的地資料夾
+                    messagebox.showinfo("複製成功", f"已成功複製 {success_count} 個圖檔", parent=dialog)
                     os.startfile(dest_dir)
-                else:
-                    messagebox.showerror("失敗", "未能成功複製任何檔案", parent=dialog)
-                    
             except Exception as e:
-                messagebox.showerror("錯誤", f"批次複製過程中發生錯誤: {e}", parent=dialog)
+                messagebox.showerror("錯誤", f"複製失敗: {e}", parent=dialog)
 
-        # 使用 ttk.Button 以獲取更好的外觀與相容性
         style = ttk.Style()
         style.configure('Action.TButton', font=('Microsoft JhengHei', ui_font_size - 1, 'bold'))
         
         btn_open = ttk.Button(btn_frame, text=" 🖼️ 批次開啟同目錄圖片 ", command=on_open_file, style='Action.TButton')
         btn_open.pack(side=tk.LEFT, padx=5)
-        _create_tooltip_simple(btn_open, "一次開啟同一個 ISN 資料夾下的所有鏡頭影像 (JPG/PNG/BMP/YUV)")
+        _create_tooltip_simple(btn_open, "一次開啟目前分組下的所有影像")
 
         btn_copy = ttk.Button(btn_frame, text=" 💾 複製整組圖片 ", command=on_copy_images, style='Action.TButton')
         btn_copy.pack(side=tk.LEFT, padx=5)
-        _create_tooltip_simple(btn_copy, "將此 ISN 目錄下的所有相關圖片複製到您指定的其他資料夾")
+        _create_tooltip_simple(btn_copy, "將此分組下的所有圖片複製到新資料夾")
                  
         btn_fold = ttk.Button(btn_frame, text=" 📂 開啟資料夾 ", command=on_open_folder)
         btn_fold.pack(side=tk.LEFT, padx=5)
-        _create_tooltip_simple(btn_fold, "在檔案總管中開啟此圖片所在的資料夾")
+        _create_tooltip_simple(btn_fold, "在檔案總管中查看此檔案或開啟資料夾")
                  
         btn_close = ttk.Button(btn_frame, text=" 關閉 ", command=dialog.destroy)
         btn_close.pack(side=tk.RIGHT, padx=5)
                  
-        # 雙擊單一圖片則維持：只開啟該張；雙擊目錄則開啟該目錄
         def on_double_click(event):
             selected = tree.selection()
             if not selected: return
-            item_id = selected[0]
-            item_data = tree.item(item_id)
+            item_data = tree.item(selected[0])
             tags = item_data.get('tags', [])
-            
-            if tags and os.path.exists(tags[0]):
-                os.startfile(tags[0])
-            else:
-                # 可能是資料夾節點，嘗試開啟資料夾
-                current_text = item_data['text']
-                for gp in groups.keys():
-                    if f"📂 {os.path.basename(gp)}" == current_text:
-                        if os.path.exists(gp): os.startfile(gp)
-                        break
+            if tags and tags[0] == "FILE":
+                if os.path.exists(tags[1]): os.startfile(tags[1])
+            elif tags and tags[0] == "FOLDER":
+                if os.path.exists(tags[1]): os.startfile(tags[1])
         
         tree.bind("<Double-1>", on_double_click)
-        
-        # 🟢 徹底移除 grab_set 以維護視窗縮小與獨立切換功能
-        print("DEBUG: Window setup complete.")
-        # dialog.grab_set() 
         dialog.wait_window()
     except Exception as e:
         print(f"CRITICAL: show_image_results failed: {e}")

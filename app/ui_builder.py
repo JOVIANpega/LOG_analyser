@@ -10,7 +10,8 @@ import os
 import sys
 import webbrowser
 from .ui_components import FontScaler, build_output_dir, get_resource_path
-from .ui_enhanced_fixed import EnhancedTreeview, EnhancedText
+from .ui.enhanced_treeview import EnhancedTreeview
+from .ui.enhanced_text import EnhancedText
 from .enhanced_settings import build_settings_content
 from .enhanced_left_panel import build_left_panel
 from .settings_loader import save_settings
@@ -153,25 +154,38 @@ class UIBuilderMixin:
         self.notebook.select(self.tab_log)
     
     def _setup_tab_styles(self):
-        """設定標籤頁樣式"""
+        """設定標籤頁樣式 (移除強制 theme_use('clam') 以避免覆蓋增強版主題)"""
         style = ttk.Style()
         
-        # 設定主題
-        style.theme_use('clam')  # 使用clam主題，支援更多自訂樣式
+        # 不要強制 theme_use('clam')，這會導致灰色一片
+        # style.theme_use('clam')
         
+        # 根據是否為暗色主題動態調整標籤頁顏色
+        is_dark = False
+        try:
+            # 嘗試檢測目前是否為暗色主題 (如 superhero, darkly)
+            if hasattr(style, 'colors') and style.colors.type == 'dark':
+                is_dark = True
+        except:
+            pass
+
         # 設定標籤頁基本樣式
         style.configure('TNotebook.Tab', 
                        font=('Arial', self.ui_font_size),
                        padding=[10, 5])
         
+        # 選中狀態的亮點顏色
+        selected_bg = '#1B5E20' if not is_dark else '#2E7D32'
+        inactive_bg = '#1565C0' if not is_dark else '#1A237E'
+
         # 設定標籤頁顏色映射
         style.map('TNotebook.Tab',
-                 background=[('selected', '#2E7D32'),    # 選中：深綠底
-                            ('active', '#2E7D32'),       # hover：深綠底
-                            ('!selected', '#1565C0')],   # 未選中：深藍底
-                 foreground=[('selected', 'white'),      # 選中：白字
-                            ('active', 'white'),         # hover：白字
-                            ('!selected', 'white')])     # 未選中：白字
+                 background=[('selected', selected_bg),    # 選中
+                            ('active', selected_bg),       # hover
+                            ('!selected', inactive_bg)],   # 未選中
+                 foreground=[('selected', 'white'),      # 選中
+                            ('active', 'white'),         # hover
+                            ('!selected', 'white')])     # 未選中
     
     def _build_enhanced_pass_tab(self):
         """建立PASS標籤頁"""
@@ -304,17 +318,21 @@ class UIBuilderMixin:
             self.notebook.hide(self.tab_fail)
         
     def _open_markdown_help(self):
-        """開啟並顯示 dioc/README.md 或 QUICK_START.md 內容"""
+        """開啟並顯示 README.md 或說明文件內容"""
         try:
-            md_path = get_resource_path(os.path.join('dioc', 'README.md'))
+            # 優先嘗試讀取根目錄的 README.md
+            md_path = get_resource_path('README.md')
+            if not os.path.exists(md_path):
+                # 後備嘗試 docs 目錄 (如果有的話)
+                md_path = get_resource_path(os.path.join('docs', 'README.md'))
+            
+            if not os.path.exists(md_path):
+                messagebox.showinfo("提示", "找不到說明文件 (README.md)")
+                return
+                
             content = ''
-            try:
-                with open(md_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-            except Exception:
-                alt_path = get_resource_path(os.path.join('dioc', 'QUICK_START.md'))
-                with open(alt_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
+            with open(md_path, 'r', encoding='utf-8') as f:
+                content = f.read()
             self._show_text_viewer_window("README 說明", content)
         except Exception as e:
             try:
@@ -484,7 +502,7 @@ class UIBuilderMixin:
             
             for type_label, full_path, color in items:
                 fname = os.path.basename(full_path)
-                var = tk.BooleanVar(value=False) # 🟢 預設不打勾
+                var = tk.BooleanVar(value=True) # 🟢 預設打勾
                 
                 row = tk.Frame(scrollable_frame, bg='white', padx=10, pady=4)
                 row.pack(fill=tk.X, anchor='w')
