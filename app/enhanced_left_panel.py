@@ -210,15 +210,7 @@ def build_left_panel(parent, app):
     app.font_scaler.register(btn_search_img)
     _create_tooltip(btn_search_img, "搜尋 STATION_RECORD 資料夾中的圖片\n(JPG, PNG, YUV, BMP)", app=app)
     
-    # 說明文件按鈕 (改用 tk.Button 以確保左對齊)
-    help_btn = tk.Button(parent, text=" 📖 查看操作說明 (HTML)", 
-                        command=app._open_html_help, bg='#607D8B', fg='white',
-                        font=('Arial', 10, 'bold'), anchor='w', padx=15)
-    help_btn.pack(fill=tk.X, padx=10, pady=(8, 8), ipady=5)
-    app.font_scaler.register(help_btn)
-    _create_tooltip(help_btn, "開啟操作說明文件\n查看詳細使用指南", app=app)
-    
-    # 🚀 跨分頁快捷導覽按鈕區 (User Requested: 放在 HTML 按鈕下方)
+    # 🚀 跨分頁快捷導覽按鈕區 (User Requested)
     nav_labelframe = ttk.LabelFrame(parent, text=" ⚡ 快捷導覽 (隨當前標籤切換) ", padding=(10, 10))
     nav_labelframe.pack(fill=tk.X, padx=10, pady=5)
     
@@ -252,7 +244,15 @@ def build_left_panel(parent, app):
     
     nav_btn_frame.columnconfigure(0, weight=1)
     nav_btn_frame.columnconfigure(1, weight=1)
-    _create_tooltip(nav_labelframe, "快速捲動目前的內容\n💡 鍵盤快捷鍵：\n• 方向鍵 [↑/↓]：直接翻頁 (Page Up/Down)\n• [Alt + PageUp/Dn]：切換測項章節 (@STEP)", app=app)
+    _create_tooltip(nav_labelframe, "快速捲動目前的內容\n💡 鍵盤快捷鍵：\n• 方向鍵 [↑/↓]：直接翻頁 (Page Up/Down)\n• [Alt + PageUp/Dn]：切換測項章節 @STEP", app=app)
+
+    # 📖 說明文件按鈕 (User Requested: 移至導覽下方)
+    help_btn = tk.Button(parent, text=" 📖 查看操作說明 (HTML)", 
+                        command=app._open_html_help, bg='#607D8B', fg='white',
+                        font=('Arial', 10, 'bold'), anchor='w', padx=15)
+    help_btn.pack(fill=tk.X, padx=10, pady=(15, 8), ipady=5)
+    app.font_scaler.register(help_btn)
+    _create_tooltip(help_btn, "開啟操作說明文件\n查看詳細使用指南", app=app)
 
     # 顯示選擇的檔案
     app.file_info_label_left = ttk.Label(file_frame, text="未選擇檔案", 

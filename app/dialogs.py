@@ -248,6 +248,28 @@ def show_image_results(parent, image_list, isn):
         import os
         import datetime
         
+        def _create_tooltip_simple(widget, text):
+            def on_enter(event):
+                if hasattr(widget, 'tooltip'): widget.tooltip.destroy()
+                tooltip = tk.Toplevel()
+                tooltip.wm_overrideredirect(True)
+                tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+                label = tk.Label(tooltip, text=text, background="lightyellow", relief="solid", borderwidth=1, font=("Microsoft JhengHei", 9))
+                label.pack()
+                widget.tooltip = tooltip
+            def on_leave(event):
+                if hasattr(widget, 'tooltip'):
+                    widget.tooltip.destroy()
+                    del widget.tooltip
+            def on_motion(event):
+                if hasattr(widget, 'tooltip'):
+                    widget.tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+            widget.bind("<Enter>", on_enter)
+            widget.bind("<Leave>", on_leave)
+            widget.bind("<Motion>", on_motion)
+            if isinstance(widget, (tk.Button, ttk.Button)):
+                widget.bind("<Button-1>", lambda e: on_leave(e), add="+")
+
         # 🟢 建立「獨立」的視窗（不傳入 parent），使其在工作列有自己的按鈕，這能解決「縮小按鈕沒反應」的問題
         dialog = tk.Toplevel() 
         dialog.title(f"圖片檢索結果 - {isn}")
@@ -344,7 +366,12 @@ def show_image_results(parent, image_list, isn):
             isn_key = isn.split(',')[0].strip() # 取第一個 ISN 做關鍵字
             for i in range(len(parts)):
                 if isn_key.lower() in parts[i].lower() and parts[i].lower() != "station_record":
-                    grp_name = os.sep.join(parts[:i+1])
+                    # 🟢 修正：如果找到的符合項是最後一個元件 (即檔案名稱)，則退回其父目錄
+                    # 這樣才能讓同目錄下的多張圖 (如 1555_L, 1555_R) 歸類在同一個資料夾分組內
+                    if i == len(parts) - 1:
+                        grp_name = os.path.dirname(p_norm)
+                    else:
+                        grp_name = os.sep.join(parts[:i+1])
                     break
             
             if grp_name not in groups: groups[grp_name] = []
@@ -481,15 +508,76 @@ def show_image_results(parent, image_list, isn):
             except Exception as e:
                 messagebox.showerror("錯誤", f"無法開啟資料夾: {e}", parent=dialog)
     
+        def on_copy_images():
+            """批次複製同目錄下的所有圖片到指定位置 (User Requested)"""
+            try:
+                selected = tree.selection()
+                if not selected:
+                    messagebox.showinfo("提示", "請先選擇清單中的一個項目", parent=dialog)
+                    return
+                
+                item_id = selected[0]
+                item_data = tree.item(item_id)
+                tags = item_data.get('tags', [])
+                
+                target_images = []
+                # 判定所在資料夾節點 (與開啟邏輯相同)
+                folder_node = tree.parent(item_id) if tags else item_id
+                
+                if not folder_node:
+                    if tags: target_images.append(tags[0])
+                else:
+                    children = tree.get_children(folder_node)
+                    for child in children:
+                        child_tags = tree.item(child).get('tags', [])
+                        if child_tags:
+                            target_images.append(os.path.normpath(child_tags[0]))
+                
+                if not target_images:
+                    messagebox.showwarning("提示", "找不到可複製的相關圖片", parent=dialog)
+                    return
+                
+                # 彈出資料夾選擇視窗
+                from tkinter import filedialog
+                dest_dir = filedialog.askdirectory(title=f"選擇儲存圖片的目的地 ({len(target_images)} 個檔案)")
+                if not dest_dir:
+                    return
+                
+                import shutil
+                success_count = 0
+                for img_path in target_images:
+                    if os.path.exists(img_path):
+                        try:
+                            shutil.copy2(img_path, dest_dir)
+                            success_count += 1
+                        except Exception as e:
+                            print(f"複製失敗 {img_path}: {e}")
+                
+                if success_count > 0:
+                    messagebox.showinfo("複製成功", f"已成功將 {success_count} 個圖檔複製至：\n{dest_dir}", parent=dialog)
+                    # 自動開啟目的地資料夾
+                    os.startfile(dest_dir)
+                else:
+                    messagebox.showerror("失敗", "未能成功複製任何檔案", parent=dialog)
+                    
+            except Exception as e:
+                messagebox.showerror("錯誤", f"批次複製過程中發生錯誤: {e}", parent=dialog)
+
         # 使用 ttk.Button 以獲取更好的外觀與相容性
         style = ttk.Style()
         style.configure('Action.TButton', font=('Microsoft JhengHei', ui_font_size - 1, 'bold'))
         
         btn_open = ttk.Button(btn_frame, text=" 🖼️ 批次開啟同目錄圖片 ", command=on_open_file, style='Action.TButton')
         btn_open.pack(side=tk.LEFT, padx=5)
+        _create_tooltip_simple(btn_open, "一次開啟同一個 ISN 資料夾下的所有鏡頭影像 (JPG/PNG/BMP/YUV)")
+
+        btn_copy = ttk.Button(btn_frame, text=" 💾 複製整組圖片 ", command=on_copy_images, style='Action.TButton')
+        btn_copy.pack(side=tk.LEFT, padx=5)
+        _create_tooltip_simple(btn_copy, "將此 ISN 目錄下的所有相關圖片複製到您指定的其他資料夾")
                  
         btn_fold = ttk.Button(btn_frame, text=" 📂 開啟資料夾 ", command=on_open_folder)
         btn_fold.pack(side=tk.LEFT, padx=5)
+        _create_tooltip_simple(btn_fold, "在檔案總管中開啟此圖片所在的資料夾")
                  
         btn_close = ttk.Button(btn_frame, text=" 關閉 ", command=dialog.destroy)
         btn_close.pack(side=tk.RIGHT, padx=5)
