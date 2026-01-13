@@ -71,8 +71,8 @@ class EnhancedText:
     
     def setup_tags(self):
         """設定文字標籤樣式"""
-        # 滑鼠懸停高亮 (淡黃色背景) -- 優先級需要動態調整，這裡先定義
-        self.text.tag_configure('current_line_highlight', background='#FFF9C4')
+        # 滑鼠懸停高亮 (淡紫色背景)
+        self.text.tag_configure('current_line_highlight', background='#F3E5F5')
         
         # 行號樣式
         self.text.tag_configure('line_number', foreground='gray', font=('Consolas', 9))
@@ -96,7 +96,7 @@ class EnhancedText:
         self.text.tag_configure('error_block', background='#FFE4E1', foreground='red')
         
         # Hover效果
-        self.text.tag_configure('step_hover', background='#FFFF99')
+        self.text.tag_configure('step_hover', background='#F3E5F5')
         
         # 置頂Header樣式 (綠底黑字，放大)
         self.text.tag_configure('header_style', background='#90EE90', foreground='black', font=('Consolas', 14, 'bold'))
@@ -277,9 +277,14 @@ class EnhancedText:
         # === 插入錯誤原因預覽 (置頂顯示錯誤區塊) ===
         if error_preview_data:
             # 設定預覽框樣式 (同步 Excel)
-            if 'error_preview_box' not in self.text.tag_names():
-                self.text.tag_configure('error_preview_box', 
-                                      background='#FFE1E1', foreground='#C00000', 
+            if 'error_preview_critical' not in self.text.tag_names():
+                # 🔴 真正錯誤的反白 (紅底白字)
+                self.text.tag_configure('error_preview_critical', 
+                                      background='red', foreground='white', 
+                                      font=('Consolas', 11, 'bold'))
+                # 🔴 一般錯誤原因 (僅紅字)
+                self.text.tag_configure('error_preview_standard', 
+                                      foreground='red', 
                                       font=('Consolas', 11, 'bold'))
                 self.text.tag_configure('preview_title', 
                                       foreground='red', font=('Arial', 12, 'bold'))
@@ -287,7 +292,6 @@ class EnhancedText:
             # 標籤頭
             self.text.insert(tk.INSERT, "┌──────────────── [ 發現錯誤點 (預覽) ] ────────────────┐\n", 'preview_title')
             
-            # 使用列表資料進行精確跳轉
             for item in error_preview_data:
                 p_line = item.get('content', '')
                 l_idx = item.get('line_idx')
@@ -297,8 +301,12 @@ class EnhancedText:
                 p_tag = f"p_jump_{self.item_counter}"
                 self.item_counter += 1
                 
+                # 決定標籤 (反白 vs 一般紅字)
+                is_crit = item.get('is_critical', False)
+                base_tag = 'error_preview_critical' if is_crit else 'error_preview_standard'
+                
                 display_text = "  >> " + p_line + "\n"
-                self.text.insert(tk.INSERT, display_text, ('error_preview_box', p_tag, 'step_clickable'))
+                self.text.insert(tk.INSERT, display_text, (base_tag, p_tag, 'step_clickable'))
                 
                 # 綁定點擊事件 (優先使用行號)
                 if l_idx is not None:

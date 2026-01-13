@@ -41,14 +41,27 @@ def sanitize_cell_text(value: object) -> str:
     return text
 
 
-def extract_isn_from_filename(filename: str) -> str:
-    """從檔名嘗試提取 ISN (WE開頭 或 純數字10碼以上)"""
+def extract_isn_from_filename(filename: str, prefix: str = "WE") -> str:
+    """從檔名嘗試提取 ISN (依據指定前綴、時戳前一項 或 純數字10碼以上)"""
     base_name = os.path.splitext(os.path.basename(filename))[0]
     
-    # 嘗試匹配 WE 開頭的序號
-    match = re.search(r'(WE\d{9,})', base_name, re.IGNORECASE)
-    if match:
-        return match.group(1).upper()
+    # 🟢 新規則：尋找 14 位數時戳，並取其前一個區段 (User Requested: 第三個通常是時戳，前一個是 ISN)
+    # 支援 - 或 _ 作為分隔符
+    delimiters = r'[-_]'
+    parts = re.split(delimiters, base_name)
+    for i, part in enumerate(parts):
+        if re.fullmatch(r'\d{14}', part):
+            if i > 0:
+                # 排除一些明顯不是 ISN 的站別關鍵字
+                candidate = parts[i-1].strip()
+                if candidate and candidate.lower() not in ('log', 'test', 'pass', 'fail'):
+                    return candidate
+    
+    # 嘗試匹配 指定前綴 開頭的序號
+    if prefix:
+        match = re.search(f'({prefix}\\d{{9,}})', base_name, re.IGNORECASE)
+        if match:
+            return match.group(1).upper()
     
     # 嘗試匹配純數字 (10碼以上)
     match = re.search(r'(\d{10,})', base_name)

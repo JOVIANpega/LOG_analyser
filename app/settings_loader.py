@@ -25,7 +25,8 @@ DEFAULT_SETTINGS = {
     'remember_path': True,                   # 記住上次選擇路徑
     'version': 'V2.5.1',                     # 軟體版本
     'skip_no_test_time': True,               # 忽略無測試時間 LOG
-    'show_hover_preview': False              # 是否顯示懸停預覽
+    'show_hover_preview': False,             # 是否顯示懸停預覽
+    'image_search_isn_prefix': 'WE'          # ISN 識別前綴 (例如 WE, SN)
 }
 
 def load_settings():

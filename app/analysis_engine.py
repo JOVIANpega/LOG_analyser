@@ -174,12 +174,27 @@ class AnalysisEngineMixin:
         # Step 1: Update Progress Text
         self._update_progress(f"準備顯示結果...")
         
-        # 🟢 新增：自動填入 ISN 圖片檢索欄位
+        # 🟢 保存分析結果用於後續參考 (如搜尋圖片時需要的時間戳)
+        self.last_analysis_result = result
+        
+        # 🟢 新增：自動填入 ISN 圖片檢索欄位 (優先從內文找，找不到再從檔名找)
         try:
+            target_isn = ""
+            # 1. 嘗試從 Header 內文找
             isn_match = re.search(r'ISN=([^\n\s]+)', str(header_info))
-            if isn_match and hasattr(self, 'isn_image_var'):
-                self.isn_image_var.set(isn_match.group(1))
-        except: pass
+            if isn_match:
+                target_isn = isn_match.group(1)
+            else:
+                # 2. 嘗試從目前檔案路徑 (檔名) 找
+                from .excel.excel_utils import extract_isn_from_filename
+                prefix = self.settings.get('image_search_isn_prefix', 'WE')
+                target_isn = extract_isn_from_filename(self.current_log_path, prefix=prefix)
+            
+            if hasattr(self, 'isn_image_var'):
+                # 如果有找到就填入，沒找到就清空 (User Requested: 不要保留上一筆)
+                self.isn_image_var.set(target_isn)
+        except Exception as e: 
+            print(f"DEBUG: Auto-fill ISN failed: {e}")
         
         yield
 
@@ -216,8 +231,16 @@ class AnalysisEngineMixin:
             # 追蹤 Phase 是否已存在
             seen_phases_map = {} # phase_name -> parent_id
             
+            # 🟢 使用者要求：僅針對最後有問題導致判定FAIL的顯示出來就好
+            # 我們抓取 last_fail 所屬的 phase 作為主要顯示對象
+            final_phase = last_fail.get('phase') if last_fail else None
+            
             for idx, item in enumerate(fail_items):
                 phase_name = item.get('phase', 'Unknown Phase')
+                
+                # 如果有明確的最後錯誤 Phase，則過濾掉其餘 Phase (Retry Pass 的部分)
+                if final_phase and phase_name != final_phase:
+                    continue
                 
                 # 如果是新的 Phase，建立大標題 (📘 Phase X ...)
                 if phase_name not in seen_phases_map:
@@ -228,10 +251,15 @@ class AnalysisEngineMixin:
                 is_main_fail = item.get('is_main_fail', False)
                 full_response = item.get('full_response', '')
                 
-                # 插入此測項，Phase 欄位留空 (因為已有 Header)
-                # 新版本只保留: 測項名稱, FAIL原因
+                # 🟢 使用者要求：補上 FAIL在哪一個PHASE
+                error_display = item['error']
+                if phase_name and phase_name != "Unknown Phase":
+                    # 在錯誤訊息前加上 [FAIL在 phase XX]
+                    error_display = f"[FAIL在 {phase_name}] {error_display}"
+
+                # 插入此測項
                 step_id = self.fail_tree_enhanced.insert_fail_item(
-                    (item['step_name'], item['error']),
+                    (item['step_name'], error_display),
                     full_response=full_response,
                     is_main_fail=is_main_fail,
                     parent=parent_id
@@ -260,9 +288,30 @@ class AnalysisEngineMixin:
                     for ann in result['ui_annotations']:
                         # 提取所有標記為錯誤背景的行 (COLOR_ERROR_BG = #FFE1E1)
                         if ann.get('background') == '#FFE1E1':
+                            line_txt = ann.get('line_content', '')
+                            # 🟢 使用者要求：僅針對真正錯誤的反白
+                            # 判定是否為「真正錯誤」(critical)
+                            is_critical = False
+                            if any(k.lower() in line_txt.lower() for k in ["doesn't match", "is Fail", "FAIL", "ERROR"]):
+                                # 額外檢查：如果這一行是我們在 LogParser 中鎖定的最後錯誤行，更要反白
+                                if result.get('fail_line_idx') == ann.get('line_idx'):
+                                    is_critical = True
+                                else:
+                                    # 或是有關鍵字且不是一般的 root@ 提示符
+                                    if "doesn't match" in line_txt.lower():
+                                        is_critical = True
+                            
+                            # 🟢 使用者要求：數值範圍不符合 (Range Fail) 也要反白
+                            # 支援 1. 括號型: ... = 14 (-999,6)  2. 比較型: ... = 15 > 6
+                            if not is_critical:
+                                if (re.search(r'=\s*[^ ]+\s*\([^)]+,[^)]*\)', line_txt)) or \
+                                   (re.search(r'=\s*[^ ]+\s*[><]=?\s*[^ ]+', line_txt)):
+                                    is_critical = True
+                            
                             error_preview_data.append({
-                                'content': ann.get('line_content', ''),
-                                'line_idx': ann.get('line_idx')
+                                'content': line_txt,
+                                'line_idx': ann.get('line_idx'),
+                                'is_critical': is_critical
                             })
 
             # NOTE: 已延遲插入以優化性能 (yield)

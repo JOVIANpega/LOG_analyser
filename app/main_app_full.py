@@ -618,10 +618,14 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
                                 if manual_dir:
                                     self._run_image_search_logic_new(isn_str, manual_dir, target_dir_keyword, sub_dir_keyword, extensions)
                         else:
-                            # 🟢 找到結果，告知數量後開啟視窗
-                            messagebox.showinfo("搜尋成功", f"找到 {len(results)} 個項目！即將開啟結果視窗。")
+                            # 🟢 找到結果，直接開啟視窗
                             from .dialogs import show_image_results
-                            show_image_results(self, results, isn_str)
+                            
+                            # 提取本次 Log 的精確時間區間
+                            start_dt = getattr(self, 'last_analysis_result', {}).get('test_start_dt')
+                            end_dt = getattr(self, 'last_analysis_result', {}).get('test_end_dt')
+                            
+                            show_image_results(self, results, isn_str, start_dt, end_dt)
                     
                     self.root.after(0, _done)
                 except Exception as e:
@@ -668,7 +672,12 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
                         messagebox.showinfo("檢索結果", f"手動針對 '{root_dir}' 搜尋結果為 0。")
                     else:
                         from .dialogs import show_image_results
-                        show_image_results(self, results, isn)
+                        
+                        # 提取本次 Log 的精確時間區間
+                        start_dt = getattr(self, 'last_analysis_result', {}).get('test_start_dt')
+                        end_dt = getattr(self, 'last_analysis_result', {}).get('test_end_dt')
+                        
+                        show_image_results(self, results, isn, start_dt, end_dt)
                 self.root.after(0, _done)
             except Exception as e:
                 self.root.after(0, lambda: [self._close_progress(), messagebox.showerror("錯誤", f"擴搜崩潰: {e}")])

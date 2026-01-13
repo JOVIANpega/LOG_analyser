@@ -3,6 +3,7 @@
 import re
 import os
 from pathlib import Path
+from datetime import datetime, timedelta
 
 class LogParser:
     def __init__(self):
@@ -42,13 +43,18 @@ class LogParser:
         # 產生UI標註資訊
         ui_annotations = self._generate_ui_annotations(raw_lines, is_pass_log)
         
+        # 提取時間資訊 (用於圖片比對)
+        abs_times = self._extract_absolute_times(file_name, raw_lines)
+        
         if is_pass_log:
             result = self._parse_pass_log(raw_lines, file_path)
         else:
             result = self._parse_fail_log(raw_lines, file_path)
         
-        # 添加UI標註資訊
+        # 添加UI標註資訊與時間資訊
         result['ui_annotations'] = ui_annotations
+        result['test_start_dt'] = abs_times['start']
+        result['test_end_dt'] = abs_times['end']
         return result
     
     def _empty_result(self):
@@ -59,8 +65,69 @@ class LogParser:
             'raw_lines': [],
             'last_fail': None,
             'fail_line_idx': None,
-            'log_type': 'UNKNOWN'
+            'log_type': 'UNKNOWN',
+            'test_start_dt': None,
+            'test_end_dt': None
         }
+
+    def _extract_absolute_times(self, file_name, raw_lines):
+        """
+        從檔名提取日期 (YYYYMMDD) 並從 Log 內容提取開始/結束時間 (HH:MM:SS)
+        """
+        res = {'start': None, 'end': None}
+        try:
+            # 1. 從檔名提取日期與初步時間 (如果有 14 位數字如 20260105140143)
+            date_str = ""
+            file_dt = None
+            full_ts_match = re.search(r'(\d{14})', file_name)
+            if full_ts_match:
+                ts = full_ts_match.group(1)
+                date_str = ts[:8]
+                try:
+                    file_dt = datetime.strptime(ts, '%Y%m%d%H%M%S')
+                except: pass
+            
+            if not date_str:
+                date_match = re.search(r'(\d{8})', file_name)
+                if date_match:
+                    date_str = date_match.group(1)
+            
+            if not date_str:
+                return res
+
+            # 2. 從內容尋找時間戳 (HH:MM:SS)
+            time_pattern = re.compile(r'(\d{2}:\d{2}:\d{2})')
+            
+            found_times = []
+            # 掃描前 500 行找開始
+            for line in raw_lines[:500]:
+                m = time_pattern.search(line)
+                if m:
+                    found_times.append(m.group(1))
+                    break
+            
+            # 掃描後 200 行找結束
+            for line in reversed(raw_lines[-200:]):
+                m = time_pattern.search(line)
+                if m:
+                    found_times.append(m.group(1))
+                    break
+            
+            if len(found_times) >= 2:
+                res['start'] = datetime.strptime(f"{date_str} {found_times[0]}", '%Y%m%d %H:%M:%S')
+                res['end'] = datetime.strptime(f"{date_str} {found_times[-1]}", '%Y%m%d %H:%M:%S')
+            elif len(found_times) == 1:
+                dt = datetime.strptime(f"{date_str} {found_times[0]}", '%Y%m%d %H:%M:%S')
+                res['start'] = dt
+                res['end'] = dt
+            elif file_dt:
+                # 3. 補救措施：內容沒時間但檔名有 14 位時戳，作為保底 (預設抓檔名前 15 分鐘的圖)
+                res['start'] = file_dt - timedelta(minutes=15)
+                res['end'] = file_dt
+        except Exception as e:
+            print(f"[DEBUG] 提取絕對時間失敗: {e}")
+            
+        return res
     
     def _parse_pass_log(self, raw_lines, file_path):
         """
@@ -530,15 +597,39 @@ class LogParser:
             last_fail = fail_items[-1]
 
         if last_fail:
+            # 🟢 增加對數值範圍不符的優先偵測
             target_keywords = ["doesn't match", "is Fail", "FAIL", "ERROR"]
-            for keyword in target_keywords:
-                matching_lines = [
-                    line for line in last_fail.get('full_log', []) 
-                    if keyword.lower() in str(line).lower()
-                ]
-                if matching_lines:
-                    last_fail['error'] = matching_lines[-1].strip()
+            
+            # 使用更精確的搜尋：優先找 doesn't match 或 數值範圍不符
+            found_err = False
+            lines = last_fail.get('full_log', [])
+            
+            # 1. 優先找 doesn't match
+            for line in reversed(lines):
+                if "doesn't match" in str(line).lower():
+                    last_fail['error'] = line.strip()
+                    found_err = True
                     break
+            
+            # 2. 次優先找 數值範圍不符 (= X (Y,Z))
+            if not found_err:
+                for line in reversed(lines):
+                    if "=" in str(line) and "(" in str(line):
+                        if re.search(r'=\s*[^ ]+\s*\([^)]+,[^)]*\)', str(line)):
+                            last_fail['error'] = line.strip()
+                            found_err = True
+                            break
+            
+            # 3. 備案：原有的關鍵字搜尋
+            if not found_err:
+                for keyword in target_keywords:
+                    matching_lines = [
+                        line for line in lines
+                        if keyword.lower() in str(line).lower()
+                    ]
+                    if matching_lines:
+                        last_fail['error'] = matching_lines[-1].strip()
+                        break
             
         fail_line_idx = last_fail.get('raw_idx', 0) if last_fail else None
         
@@ -786,7 +877,7 @@ class LogParser:
                 'color': 'black',
                 'background': 'white',  # 預設白色背景，移除斑馬紋
                 'is_clickable': False,
-                'hover_color': '#FFFF99',
+                'hover_color': '#F3E5F5',
                 'show_separator': False,
                 'separator_title': None,
                 'is_bold': False
@@ -846,9 +937,30 @@ class LogParser:
                     else:
                         annotation['color'] = COLOR_RED
                         annotation['is_bold'] = True
-                        if dm_block_start == -1 or not (dm_block_start <= idx <= dm_block_end):
-                            annotation['background'] = COLOR_ERROR_BG
+                        annotation['background'] = COLOR_ERROR_BG
                 except: pass
+
+            # === 6. 單邊數值判定 (e.g. value=15 > 6) ===
+            if annotation['background'] == 'white':
+                simple_criteria = re.search(r'=\s*([^ \(\)]+)\s*([><]=?)\s*([^ \(\)]+)', line)
+                if simple_criteria:
+                    try:
+                        v = float(simple_criteria.group(1))
+                        op = simple_criteria.group(2)
+                        ref = float(simple_criteria.group(3))
+                        is_pass = False
+                        if op == '>': is_pass = (v > ref)
+                        elif op == '>=': is_pass = (v >= ref)
+                        elif op == '<': is_pass = (v < ref)
+                        elif op == '<=': is_pass = (v <= ref)
+                        
+                        if is_pass:
+                            annotation['color'] = COLOR_GREEN
+                        else:
+                            annotation['color'] = COLOR_RED
+                            annotation['is_bold'] = True
+                            annotation['background'] = COLOR_ERROR_BG
+                    except: pass
 
             annotations.append(annotation)
         

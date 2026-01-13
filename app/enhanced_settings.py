@@ -133,6 +133,25 @@ def build_settings_content(app, parent):
     hover_preview_check.pack(anchor=tk.W, pady=3)
     app.font_scaler.register(hover_preview_check)
     
+    # ISN 識別前綴設定
+    isn_prefix_frame = ttk.Frame(other_frame)
+    isn_prefix_frame.pack(fill=tk.X, pady=8)
+    
+    isn_prefix_label = ttk.Label(isn_prefix_frame, text="ISN 識別前綴：", font=('Arial', 10))
+    isn_prefix_label._is_settings_label = True
+    isn_prefix_label.pack(side=tk.LEFT)
+    app.font_scaler.register(isn_prefix_label)
+    
+    app.isn_prefix_var = tk.StringVar(value=app.settings.get('image_search_isn_prefix', 'WE'))
+    isn_prefix_entry = ttk.Entry(isn_prefix_frame, textvariable=app.isn_prefix_var, width=10)
+    isn_prefix_entry.pack(side=tk.LEFT, padx=5)
+    
+    def on_isn_prefix_change(*args):
+        app.settings['image_search_isn_prefix'] = app.isn_prefix_var.get()
+        app.config_manager.set('image_search_isn_prefix', app.isn_prefix_var.get())
+        
+    app.isn_prefix_var.trace_add("write", on_isn_prefix_change)
+    
     # 主題設定區域
     theme_frame = ttk.LabelFrame(right_column, text="介面主題", padding=(15, 15))
     theme_frame.pack(fill=tk.X, pady=5)

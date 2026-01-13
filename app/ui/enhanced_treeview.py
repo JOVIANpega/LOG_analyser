@@ -632,6 +632,13 @@ class EnhancedTreeview:
             error_keywords = ['FAIL', 'ERROR', 'NACK', 'TIMEOUT', '失敗', '錯誤', '超時', '異常']
             if any(keyword in error_val.upper() for keyword in error_keywords):
                 is_real_error = True
+            
+            # 🟢 使用者要求：數值範圍不符合 (Range Fail) 也要凸顯
+            # 支援判斷例如: ... = 15 (-999,6)
+            if not is_real_error and "=" in error_val and "(" in error_val:
+                import re
+                if re.search(r'=\s*[^ ]+\s*\([^)]+,[^)]*\)', error_val):
+                    is_real_error = True
         
         if is_real_error:
             self.tree.item(item_id, tags=('fail_main_red', stripe_tag))
