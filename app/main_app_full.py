@@ -212,6 +212,8 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
             self.pass_tree_enhanced.tree.focus_set()
         elif "原始" in tab_text and hasattr(self, 'log_text_enhanced'):
             self.log_text_enhanced.text.focus_set()
+            # 🟢 使用者要求：只要切換到原始 LOG，就保持在最上面
+            self.log_text_enhanced.text.see("1.0")
 
     def _on_fail_tree_motion_direct(self, event):
         """懸停處理：實作快速延遲預覽 (200ms)，確保流暢且不閃爍"""

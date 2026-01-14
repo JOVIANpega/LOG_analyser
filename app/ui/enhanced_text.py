@@ -509,7 +509,8 @@ class EnhancedText:
         found = self.text.search(search_str, '1.0', tk.END)
         if found:
             self.text.tag_add('error_block', found, f"{found} lineend")
-            self.text.see(found)
+            # 🟢 使用者要求：保持在最上面，不再自動跳轉到錯誤位置
+            # self.text.see(found) 
 
     def focus_first_error_line(self):
         """聚焦到第一個錯誤行 (優先顯示置頂摘要)"""

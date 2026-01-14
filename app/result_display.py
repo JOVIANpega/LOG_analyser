@@ -5,6 +5,7 @@ Handles displaying analysis results in the UI (Mixin)
 """
 
 import os
+import re
 import tkinter as tk
 from tkinter import messagebox
 
@@ -102,13 +103,25 @@ class ResultDisplayMixin:
                         return main_part
                 return result
         
-        # === 優先級 3: All Test Aborted ===
+        # === 優先級 3: 數值範圍錯誤 (Criteria Fail) ===
         for item in fail_items:
-            result = search_in_item(item, "All Test Aborted", case_sensitive=False)
-            if result:
-                return result
-        
-        # === 優先級 4: 其他關鍵錯誤 ===
+            # 檢查是否有任何 validation 是 FAIL 狀態
+            validations = item.get('validations', [])
+            failing_vs = [v for v in validations if v.get('status') == 'FAIL']
+            if failing_vs:
+                return failing_vs[0]['content']
+            
+            # 備援：從內容文字再掃一遍
+            full_response = item.get('full_response', '')
+            if full_response:
+                lines = full_response.split('\n')
+                for line in reversed(lines):
+                    if self._is_error_line(line) and "=" in line and "(" in line:
+                         # 再次檢查是否符合 Pattern (以此作為主要顯示內容)
+                         if re.search(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)', line):
+                             return line.split('|')[-1].strip() if '|' in line else line.strip()
+
+        # === 優先級 4: All Test Aborted ===
         critical_keywords = [
             'Status:False', 'executes fail', 'segmentation fault', 
             'core dumped', 'timeout', 'exception', 'FAIL', 'ERROR'
@@ -371,7 +384,24 @@ class ResultDisplayMixin:
             'executes fail', "doesn't match", 'timeout', 'exception'
         ]
         
-        return any(keyword in line_lower for keyword in error_keywords)
+        # 🟢 檢查關鍵字
+        if any(keyword in line_lower for keyword in error_keywords):
+            return True
+            
+        # 🟢 檢查數值範圍錯誤 (Criteria Fail)
+        import re
+        criteria_match = re.search(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)', line)
+        if criteria_match:
+            try:
+                v = float(criteria_match.group(1))
+                l = float(criteria_match.group(2))
+                r = float(criteria_match.group(3))
+                if not (l <= v <= r):
+                    return True
+            except:
+                pass
+                
+        return False
     
     def _switch_to_log_and_focus_error(self):
         """切換到原始LOG標籤頁並聚焦到錯誤位置"""
@@ -429,25 +459,28 @@ class ResultDisplayMixin:
         # --- 寫入內容 ---
         if primary_error_idx is not None:
             # 顯示錯誤原因告知
-            self.fail_error_text.insert(tk.END, f" 🔴 偵測到主要錯誤: [{error_type}]\n", 'error_header')
-            self.fail_error_text.insert(tk.END, f" 📍 發生位置: 第 {primary_error_idx + 1} 行\n", 'location_info')
+            self.fail_error_text.insert(tk.END, f" 🔴 偵測到主要錯誤區域: [{error_type}]\n", 'error_header')
+            self.fail_error_text.insert(tk.END, f" 📍 焦點位置: 第 {primary_error_idx + 1} 行 (以下顯示前後內容)\n", 'location_info')
             self.fail_error_text.insert(tk.END, "━" * 50 + "\n\n", 'separator')
             
-            # 決定顯示區塊 (往上 15 行，往下 5 行)
+            # 決定顯示區塊 (往上 15 行，往下 15 行，擴大範圍以包含可能的 Validation)
             start = max(0, primary_error_idx - 15)
-            end = min(len(lines), primary_error_idx + 5)
+            end = min(len(lines), primary_error_idx + 10)
             
             for i in range(start, end):
                 line = lines[i]
                 line_display = f"{i+1:4d} | {line}\n"
                 
-                if i == primary_error_idx:
-                    self.fail_error_text.insert(tk.END, " ▶ " + line_display, ('primary_error', 'fail_text'))
+                # 判定這一行是否應該標記為錯誤 (紅色背景)
+                is_err = self._is_error_line(line)
+                is_primary = (i == primary_error_idx)
+                
+                if is_err:
+                    prefix = " ▶ " if is_primary else "   "
+                    tag = 'primary_error' if is_err else 'context_line'
+                    self.fail_error_text.insert(tk.END, prefix + line_display, (tag, 'fail_text'))
                 elif '>' in line or '@STEP' in line:
-                    # 如果是測項章節，也標記為可跳轉點
-                    tags = ['command_line']
-                    if '@STEP' in line: tags.append('fail_text')
-                    self.fail_error_text.insert(tk.END, "   " + line_display, tuple(tags))
+                    self.fail_error_text.insert(tk.END, "   " + line_display, ('command_line', 'fail_text' if '@STEP' in line else 'command_line'))
                 else:
                     self.fail_error_text.insert(tk.END, "   " + line_display, 'context_line')
         else:

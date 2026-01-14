@@ -60,6 +60,10 @@ class EnhancedTreeview:
         # FAIL項目樣式
         self.style.configure("Fail.Treeview", foreground='red', font=('Arial', self.font_size))
         
+        # 定義 FAIL 行標籤 (帶有背景色高亮)
+        self.tree.tag_configure('fail_main_red', foreground='red', background='#FFE1E1', font=('Arial', self.font_size, 'bold'))
+        self.tree.tag_configure('fail_main_black', foreground='black', background='#FFE1E1', font=('Arial', self.font_size, 'bold'))
+        
         # Hover效果樣式
         self.style.configure("Hover.Treeview.Item", background=hover_color)
     
@@ -632,13 +636,21 @@ class EnhancedTreeview:
             error_keywords = ['FAIL', 'ERROR', 'NACK', 'TIMEOUT', '失敗', '錯誤', '超時', '異常']
             if any(keyword in error_val.upper() for keyword in error_keywords):
                 is_real_error = True
+            
+            # 🟢 數值範圍錯誤 (Criteria Fail) 偵測
+            if not is_real_error:
+                import re
+                criteria_match = re.search(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)', error_val)
+                if criteria_match:
+                    try:
+                        v = float(criteria_match.group(1)); l = float(criteria_match.group(2)); r = float(criteria_match.group(3))
+                        if not (l <= v <= r): is_real_error = True
+                    except: pass
         
         if is_real_error:
-            self.tree.item(item_id, tags=('fail_main_red', stripe_tag))
-            self.tree.tag_configure('fail_main_red', foreground='red', font=('Arial', self.font_size, 'bold'))
+            self.tree.item(item_id, tags=(stripe_tag, 'fail_main_red'))
         else:
-            self.tree.item(item_id, tags=('fail_main_black', stripe_tag))
-            self.tree.tag_configure('fail_main_black', foreground='black', font=('Arial', self.font_size, 'bold'))
+            self.tree.item(item_id, tags=(stripe_tag, 'fail_main_black'))
         
         if full_response:
             self.full_content_storage[item_id] = full_response

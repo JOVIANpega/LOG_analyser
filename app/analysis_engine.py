@@ -331,27 +331,28 @@ class AnalysisEngineMixin:
         # 根據分析結果動態顯示/隱藏標籤頁
         self._update_tabs_visibility(len(pass_items), len(fail_items), is_multiple=False)
 
-        # 自動切換到相關Tab
-        if fail_items:
-            try:
-                if hasattr(self, 'notebook') and hasattr(self, 'tab_fail'):
-                    self.notebook.select(self.tab_fail)
-                
-                # 延遲切換到原始LOG標籤頁並聚焦錯誤位置
-                if hasattr(self, '_switch_to_log_and_focus_error'):
-                    self.root.after(500, self._switch_to_log_and_focus_error)
-                
-                    pass
-                    
-            except Exception as e:
-                print(f"切換到FAIL分頁或顯示錯誤失敗: {e}")
-                traceback.print_exc()
-        else:
+        # 自動切換到相關Tab (依照檔名優先判定)
+        filename = os.path.basename(self.current_log_path).upper()
+        is_pass_file = "PASS" in filename
+        
+        if is_pass_file:
+            # 檔名有 PASS -> 切換到 PASS 測項
             try:
                 if hasattr(self, 'notebook') and hasattr(self, 'tab_pass'):
                     self.notebook.select(self.tab_pass)
             except Exception:
                 pass
+        else:
+            # 檔名沒有 PASS -> 視為 FAIL (或未完備)，切換到 FAIL 測項
+            try:
+                if hasattr(self, 'notebook') and hasattr(self, 'tab_fail'):
+                    self.notebook.select(self.tab_fail)
+                
+                # 🟢 使用者要求：切換到 FAIL 分頁後就停止，不要跳到原始 LOG
+                # 原本這裡會呼叫 _switch_to_log_and_focus_error，現在已移除
+            except Exception as e:
+                print(f"切換到FAIL分頁失敗: {e}")
+                traceback.print_exc()
                     
 
 
