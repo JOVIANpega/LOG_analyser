@@ -597,39 +597,15 @@ class LogParser:
             last_fail = fail_items[-1]
 
         if last_fail:
-            # 🟢 增加對數值範圍不符的優先偵測
             target_keywords = ["doesn't match", "is Fail", "FAIL", "ERROR"]
-            
-            # 使用更精確的搜尋：優先找 doesn't match 或 數值範圍不符
-            found_err = False
-            lines = last_fail.get('full_log', [])
-            
-            # 1. 優先找 doesn't match
-            for line in reversed(lines):
-                if "doesn't match" in str(line).lower():
-                    last_fail['error'] = line.strip()
-                    found_err = True
+            for keyword in target_keywords:
+                matching_lines = [
+                    line for line in last_fail.get('full_log', []) 
+                    if keyword.lower() in str(line).lower()
+                ]
+                if matching_lines:
+                    last_fail['error'] = matching_lines[-1].strip()
                     break
-            
-            # 2. 次優先找 數值範圍不符 (= X (Y,Z))
-            if not found_err:
-                for line in reversed(lines):
-                    if "=" in str(line) and "(" in str(line):
-                        if re.search(r'=\s*[^ ]+\s*\([^)]+,[^)]*\)', str(line)):
-                            last_fail['error'] = line.strip()
-                            found_err = True
-                            break
-            
-            # 3. 備案：原有的關鍵字搜尋
-            if not found_err:
-                for keyword in target_keywords:
-                    matching_lines = [
-                        line for line in lines
-                        if keyword.lower() in str(line).lower()
-                    ]
-                    if matching_lines:
-                        last_fail['error'] = matching_lines[-1].strip()
-                        break
             
         fail_line_idx = last_fail.get('raw_idx', 0) if last_fail else None
         
@@ -877,7 +853,7 @@ class LogParser:
                 'color': 'black',
                 'background': 'white',  # 預設白色背景，移除斑馬紋
                 'is_clickable': False,
-                'hover_color': '#F3E5F5',
+                'hover_color': '#FFFF99',
                 'show_separator': False,
                 'separator_title': None,
                 'is_bold': False
@@ -937,30 +913,9 @@ class LogParser:
                     else:
                         annotation['color'] = COLOR_RED
                         annotation['is_bold'] = True
-                        annotation['background'] = COLOR_ERROR_BG
-                except: pass
-
-            # === 6. 單邊數值判定 (e.g. value=15 > 6) ===
-            if annotation['background'] == 'white':
-                simple_criteria = re.search(r'=\s*([^ \(\)]+)\s*([><]=?)\s*([^ \(\)]+)', line)
-                if simple_criteria:
-                    try:
-                        v = float(simple_criteria.group(1))
-                        op = simple_criteria.group(2)
-                        ref = float(simple_criteria.group(3))
-                        is_pass = False
-                        if op == '>': is_pass = (v > ref)
-                        elif op == '>=': is_pass = (v >= ref)
-                        elif op == '<': is_pass = (v < ref)
-                        elif op == '<=': is_pass = (v <= ref)
-                        
-                        if is_pass:
-                            annotation['color'] = COLOR_GREEN
-                        else:
-                            annotation['color'] = COLOR_RED
-                            annotation['is_bold'] = True
+                        if dm_block_start == -1 or not (dm_block_start <= idx <= dm_block_end):
                             annotation['background'] = COLOR_ERROR_BG
-                    except: pass
+                except: pass
 
             annotations.append(annotation)
         

@@ -302,10 +302,9 @@ class AnalysisEngineMixin:
                                         is_critical = True
                             
                             # 🟢 使用者要求：數值範圍不符合 (Range Fail) 也要反白
-                            # 支援 1. 括號型: ... = 14 (-999,6)  2. 比較型: ... = 15 > 6
-                            if not is_critical:
-                                if (re.search(r'=\s*[^ ]+\s*\([^)]+,[^)]*\)', line_txt)) or \
-                                   (re.search(r'=\s*[^ ]+\s*[><]=?\s*[^ ]+', line_txt)):
+                            # 例如: ... = 14 (-999,6)
+                            if not is_critical and "=" in line_txt and "(" in line_txt:
+                                if re.search(r'=\s*[^ ]+\s*\([^)]+,[^)]*\)', line_txt):
                                     is_critical = True
                             
                             error_preview_data.append({

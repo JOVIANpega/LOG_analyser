@@ -468,6 +468,20 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
                  self.config_manager.set('enable_image_search', is_enabled)
                  self._refresh_image_search_lock(is_enabled)
             
+            # 🟢 原始 LOG 懸停顏色
+            if hasattr(self, 'hover_color_var') and hasattr(self, 'color_map'):
+                 color_name = self.hover_color_var.get()
+                 color_hex = self.color_map.get(color_name, "#FFF9C4")
+                 self.config_manager.set('log_hover_color', color_hex)
+                 # 即時更新 UI
+                 if hasattr(self, 'log_text_enhanced'):
+                     self.log_text_enhanced.update_hover_color(color_hex)
+                 if hasattr(self, 'fail_error_text'):
+                     # 如果 fail_error_text 是 tk.Text 直接改 tag
+                     try:
+                         self.fail_error_text.tag_configure('current_line_highlight', background=color_hex)
+                     except: pass
+            
             # 保存
             self.config_manager.save()
             messagebox.showinfo("成功", "設定已保存！")

@@ -10,10 +10,11 @@ import re
 class EnhancedText:
     """增強型Text元件，支援語法高亮和區段標籤"""
     
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent, settings=None, **kwargs):
         # 創建框架來容納Text和滾動條
         self.frame = tk.Frame(parent)
         self.text = tk.Text(self.frame, **kwargs)
+        self.settings = settings or {}
         self.setup_tags()
         self.step_positions = {}  # 儲存每個step的位置
         self.folded_items = {}  # 儲存折疊項目的內容 {item_id: {'start': index, 'end': index, 'content': str, 'is_folded': bool, 'type': 'pass'/'fail'}}
@@ -69,10 +70,19 @@ class EnhancedText:
         except Exception as e:
             print(f"Append text failed: {e}")
     
+    def update_hover_color(self, color_hex):
+        """即時更新懸停高亮顏色"""
+        try:
+            self.text.tag_configure('current_line_highlight', background=color_hex)
+            self.text.tag_configure('step_hover', background=color_hex)
+        except Exception as e:
+            print(f"Update hover color failed: {e}")
+
     def setup_tags(self):
         """設定文字標籤樣式"""
-        # 滑鼠懸停高亮 (淡紫色背景)
-        self.text.tag_configure('current_line_highlight', background='#F3E5F5')
+        # 滑鼠懸停高亮 (預設淡黃色背景，可從 settings 讀取)
+        hover_bg = self.settings.get('log_hover_color', '#FFF9C4')
+        self.text.tag_configure('current_line_highlight', background=hover_bg)
         
         # 行號樣式
         self.text.tag_configure('line_number', foreground='gray', font=('Consolas', 9))
@@ -96,7 +106,7 @@ class EnhancedText:
         self.text.tag_configure('error_block', background='#FFE4E1', foreground='red')
         
         # Hover效果
-        self.text.tag_configure('step_hover', background='#F3E5F5')
+        self.text.tag_configure('step_hover', background=hover_bg)
         
         # 置頂Header樣式 (綠底黑字，放大)
         self.text.tag_configure('header_style', background='#90EE90', foreground='black', font=('Consolas', 14, 'bold'))

@@ -263,7 +263,7 @@ class UIBuilderMixin:
         self.notebook.add(self.tab_log, text="📄 原始LOG")
         
         # 使用增強型文字元件
-        self.log_text_enhanced = EnhancedText(self.tab_log)
+        self.log_text_enhanced = EnhancedText(self.tab_log, settings=self.settings)
         self.log_text_enhanced.pack(fill=tk.BOTH, expand=1)
 
     def _build_enhanced_settings_tab(self):

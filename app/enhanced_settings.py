@@ -152,6 +152,34 @@ def build_settings_content(app, parent):
         
     app.isn_prefix_var.trace_add("write", on_isn_prefix_change)
     
+    # 原始 LOG 懸停顏色設定
+    hover_color_frame = ttk.Frame(other_frame)
+    hover_color_frame.pack(fill=tk.X, pady=8)
+    
+    hover_color_label = ttk.Label(hover_color_frame, text="LOG 懸停顏色：", font=('Arial', 10))
+    hover_color_label._is_settings_label = True
+    hover_color_label.pack(side=tk.LEFT)
+    app.font_scaler.register(hover_color_label)
+    
+    # 顏色映射
+    app.color_map = {
+        "黃色 (預設)": "#FFF9C4",
+        "藍色": "#E3F2FD",
+        "綠色": "#E8F5E9",
+        "紫色": "#F3E5F5",
+        "橘色": "#FFF3E0",
+        "灰色": "#F5F5F5"
+    }
+    app.reverse_color_map = {v: k for k, v in app.color_map.items()}
+    
+    current_color_hex = app.settings.get('log_hover_color', '#FFF9C4')
+    current_color_name = app.reverse_color_map.get(current_color_hex, "黃色 (預設)")
+    
+    app.hover_color_var = tk.StringVar(value=current_color_name)
+    hover_color_combo = ttk.Combobox(hover_color_frame, textvariable=app.hover_color_var, 
+                                    values=list(app.color_map.keys()), state='readonly', width=12)
+    hover_color_combo.pack(side=tk.LEFT, padx=5)
+    
     # 主題設定區域
     theme_frame = ttk.LabelFrame(right_column, text="介面主題", padding=(15, 15))
     theme_frame.pack(fill=tk.X, pady=5)
