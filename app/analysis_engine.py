@@ -198,18 +198,28 @@ class AnalysisEngineMixin:
         
         yield
 
-        # Step 2: PASS Items (顯示章節與細項比對內容)
-        self._update_progress(f"更新 PASS 列表內容...")
+        # Step 2: 所有測項流水線 (PASS 標籤頁顯示完整流程)
+        self._update_progress(f"更新測試完整流程列表...")
         if hasattr(self, 'pass_tree_enhanced'):
             # 追蹤 Phase 是否已存在，避免重複顯示大標題
             seen_phases_map = {} # phase_name -> parent_id
             
-            for item in pass_items:
+            # 🟢 使用者要求：將 PASS/FAIL 項目按時間順序交叉排列
+            all_flow_items = sorted(pass_items + fail_items, key=lambda x: x.get('raw_idx', 0))
+            
+            # 🟢 找出「最終失敗 Phase」（同步 FAIL 標籤頁邏輯，只標出最後一個有問題的 Phase）
+            final_failing_phase = None
+            if fail_items:
+                final_failing_phase = fail_items[-1].get('phase')
+            
+            for item in all_flow_items:
                 phase_name = item.get('phase', 'Unknown Phase')
                 
                 # 如果是新的 Phase，建立大標題
                 if phase_name not in seen_phases_map:
-                    p_id = self.pass_tree_enhanced.insert_phase_header(phase_name)
+                    # 🟢 使用者要求：僅在 FAIL 分頁所告知的錯誤 Phase 標註 (FAIL HERE)
+                    is_phase_fail = (final_failing_phase and phase_name == final_failing_phase)
+                    p_id = self.pass_tree_enhanced.insert_phase_header(phase_name, is_fail=is_phase_fail)
                     seen_phases_map[phase_name] = p_id
                 
                 parent_id = seen_phases_map[phase_name]
@@ -292,20 +302,28 @@ class AnalysisEngineMixin:
                             # 🟢 使用者要求：僅針對真正錯誤的反白
                             # 判定是否為「真正錯誤」(critical)
                             is_critical = False
-                            if any(k.lower() in line_txt.lower() for k in ["doesn't match", "is Fail", "FAIL", "ERROR"]):
-                                # 額外檢查：如果這一行是我們在 LogParser 中鎖定的最後錯誤行，更要反白
-                                if result.get('fail_line_idx') == ann.get('line_idx'):
-                                    is_critical = True
-                                else:
-                                    # 或是有關鍵字且不是一般的 root@ 提示符
-                                    if "doesn't match" in line_txt.lower():
-                                        is_critical = True
                             
-                            # 🟢 使用者要求：數值範圍不符合 (Range Fail) 也要反白
-                            # 例如: ... = 14 (-999,6)
-                            if not is_critical and "=" in line_txt and "(" in line_txt:
-                                if re.search(r'=\s*[^ ]+\s*\([^)]+,[^)]*\)', line_txt):
-                                    is_critical = True
+                            # 🟢 A. 優先檢查數值範圍 (Criteria)
+                            criteria_match = re.search(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)', line_txt)
+                            is_validation = False
+                            if criteria_match:
+                                is_validation = True
+                                try:
+                                    v = float(criteria_match.group(1)); l = float(criteria_match.group(2)); r = float(criteria_match.group(3))
+                                    if not (l <= v <= r):
+                                        is_critical = True
+                                except: pass
+                            
+                            # 🟢 B. 若非數值判定，才檢查關鍵字
+                            if not is_validation:
+                                if any(k.lower() in line_txt.lower() for k in ["doesn't match", "is Fail", "FAIL", "ERROR"]):
+                                    # 額外檢查：如果這一行是我們在 LogParser 中鎖定的最後錯誤行，更要反白
+                                    if result.get('fail_line_idx') == ann.get('line_idx'):
+                                        is_critical = True
+                                    else:
+                                        # 或是有關鍵字且不是一般的 root@ 提示符
+                                        if "doesn't match" in line_txt.lower():
+                                            is_critical = True
                             
                             error_preview_data.append({
                                 'content': line_txt,

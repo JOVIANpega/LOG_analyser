@@ -482,20 +482,34 @@ class EnhancedTreeview:
             # 使用預設位置
             popup_window.geometry(f"{window_width}x{window_height}+{mouse_x}+{mouse_y}")
     
-    def insert_phase_header(self, phase_name):
+    def insert_phase_header(self, phase_name, is_fail=False):
         """插入 Phase 大章節分隔行 (高能見度)"""
         columns_count = len(self.tree['columns'])
         # 僅在第一欄顯示章節名稱，其餘留空
         clean_name = phase_name.strip()
-        values = [f" 📘 {clean_name}"] + [""] * (columns_count - 1)
         
-        # 設定標籤和顏色 - 使用深藍背景與白色粗體文字
+        # 🟢 使用者要求：如果失敗，標題加上 (FAIL HERE)
+        display_name = f" 📘 {clean_name}"
+        if is_fail:
+            display_name = f" 📘 {clean_name} (FAIL HERE)"
+            
+        values = [display_name] + [""] * (columns_count - 1)
+        
+        # 設定標籤和顏色 - 預設深藍背景
         self.tree.tag_configure('phase_header', 
                              foreground='white', 
                              background='#1565C0', # 深藍背景
                              font=('Arial', self.font_size, 'bold'))
         
-        item_id = self.tree.insert('', 'end', values=tuple(values), tags=('phase_header',))
+        # 🟢 如果失敗，使用紅色背景
+        self.tree.tag_configure('phase_header_error', 
+                             foreground='white', 
+                             background='#D32F2F', # 紅色背景
+                             font=('Arial', self.font_size, 'bold'))
+        
+        tag = 'phase_header_error' if is_fail else 'phase_header'
+        item_id = self.tree.insert('', 'end', values=tuple(values), tags=(tag,))
+        
         # 為了美觀，預設展開 Phase
         self.tree.item(item_id, open=True)
         return item_id

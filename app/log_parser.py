@@ -487,24 +487,46 @@ class LogParser:
                 raw_phase_title = p_match.group(1).strip()
                 current_phase = self._get_enriched_phase_name(raw_lines, idx, raw_phase_title)
 
-            # 找到 Do @STEPxxx@ 行 - 測項開始
+            # 找到 Do @STEPxxx@ 或 Run 行 - 測項開始
             step_match = self.step_pattern.search(line)
-            if step_match:
+            run_match = self.test_id_pattern.search(line) # Run XX-XX:
+            
+            # 如果是 Run 行且不是已存在的 Do 行，則作為新測項開頭
+            is_new_step = step_match is not None
+            if not is_new_step and run_match:
+                 # 檢查是否為獨立的 Run 行 (後面通常跟著名稱)
+                 if ':' in line:
+                     is_new_step = True
+
+            if is_new_step:
                 if current_step:
                     current_step['end_idx'] = idx - 1
                     self._finalize_step(current_step, pass_items, fail_items, no_command_steps)
                 
-                step_name_clean = step_match.group(1).strip()
-                step_number = ''
-                if step_name_clean.startswith('@STEP') and '@' in step_name_clean[1:]:
-                    step_parts = step_name_clean.split('@')
-                    if len(step_parts) >= 2:
-                        step_number = step_parts[1]
-                    step_name_clean = step_name_clean.split('@', 2)[-1]
+                step_name_clean = ""
+                step_number = ""
+                
+                if step_match:
+                    step_name_clean = step_match.group(1).strip()
+                    if step_name_clean.startswith('@STEP') and '@' in step_name_clean[1:]:
+                        step_parts = step_name_clean.split('@')
+                        if len(step_parts) >= 2:
+                            step_number = step_parts[1]
+                        step_name_clean = step_name_clean.split('@', 2)[-1]
+                elif run_match:
+                    # Run XXX: Name
+                    colon_parts = line.split(':', 1)
+                    if len(colon_parts) > 1:
+                        step_name_clean = colon_parts[1].strip()
+                        # 過濾掉結尾的 Mode: XXX
+                        if 'Mode:' in step_name_clean:
+                            step_name_clean = step_name_clean.split('Mode:', 1)[0].strip()
+                    else:
+                        step_name_clean = f"RUN {run_match.group(1)}"
                 
                 current_step = {
                     'step_name': step_name_clean,
-                    'test_id': '',
+                    'test_id': run_match.group(1) if run_match else '',
                     'command': '',
                     'response': '',
                     'result': 'UNKNOWN',
@@ -896,26 +918,30 @@ class LogParser:
                 annotation['color'] = COLOR_GREEN
                 annotation['is_bold'] = True
             
-            # === 4. 單行錯誤高亮（FAIL/ERROR，但不在 doesn't match 區塊內）===
-            if dm_block_start == -1 or not (dm_block_start <= idx <= dm_block_end):
-                if any(k.upper() in upper_line for k in ['FAIL', 'ERROR', 'NACK', 'TIMEOUT']):
-                    annotation['color'] = COLOR_RED
-                    annotation['is_bold'] = True
-                    annotation['background'] = COLOR_ERROR_BG
-
-            # === 5. 數值判定 (Criteria) ===
+            # === 4. 數值判定 (Criteria) 優先於關鍵字判定 ===
             criteria_match = re.search(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)', line)
+            is_validation_line = False
             if criteria_match:
+                is_validation_line = True
                 try:
                     v = float(criteria_match.group(1)); l = float(criteria_match.group(2)); r = float(criteria_match.group(3))
                     if l <= v <= r:
                         annotation['color'] = COLOR_GREEN
+                        annotation['background'] = 'white' # 確保 Pass 不會因為名稱含 error 而帶紅底
                     else:
                         annotation['color'] = COLOR_RED
                         annotation['is_bold'] = True
                         if dm_block_start == -1 or not (dm_block_start <= idx <= dm_block_end):
                             annotation['background'] = COLOR_ERROR_BG
                 except: pass
+
+            # === 5. 單行錯誤高亮（FAIL/ERROR，但不在 doesn't match 區塊內且非數值判定行）===
+            if not is_validation_line:
+                if dm_block_start == -1 or not (dm_block_start <= idx <= dm_block_end):
+                    if any(k.upper() in upper_line for k in ['FAIL', 'ERROR', 'NACK', 'TIMEOUT']):
+                        annotation['color'] = COLOR_RED
+                        annotation['is_bold'] = True
+                        annotation['background'] = COLOR_ERROR_BG
 
             annotations.append(annotation)
         

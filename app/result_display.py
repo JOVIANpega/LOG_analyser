@@ -374,6 +374,22 @@ class ResultDisplayMixin:
         if not line:
             return False
         
+        # 🟢 1. 優先檢查數值範圍 (Criteria)
+        # 如果是數值判定行，則以數值是否超標為唯一準則，忽略名稱中的 error 關鍵字
+        criteria_match = re.search(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)', line)
+        if criteria_match:
+            try:
+                v = float(criteria_match.group(1))
+                l = float(criteria_match.group(2))
+                r = float(criteria_match.group(3))
+                if not (l <= v <= r):
+                    return True
+                else:
+                    return False # 通過判定，不論名稱有什麼關鍵字都不算錯誤
+            except:
+                pass
+
+        # 🟢 2. 次要檢查關鍵字
         line_lower = line.lower()
         # 統一的錯誤關鍵字列表
         error_keywords = [
@@ -384,22 +400,8 @@ class ResultDisplayMixin:
             'executes fail', "doesn't match", 'timeout', 'exception'
         ]
         
-        # 🟢 檢查關鍵字
         if any(keyword in line_lower for keyword in error_keywords):
             return True
-            
-        # 🟢 檢查數值範圍錯誤 (Criteria Fail)
-        import re
-        criteria_match = re.search(r'=\s*([^ \(\)]+)\s*\(\s*([^,]+)\s*,\s*([^ \)]+)\s*\)', line)
-        if criteria_match:
-            try:
-                v = float(criteria_match.group(1))
-                l = float(criteria_match.group(2))
-                r = float(criteria_match.group(3))
-                if not (l <= v <= r):
-                    return True
-            except:
-                pass
                 
         return False
     
