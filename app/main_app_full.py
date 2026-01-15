@@ -55,7 +55,12 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         # 2. Managers & Components
         self.progress_manager = ProgressManager(root)
         self.font_scaler = FontScaler(root, default_size=self.ui_font_size)
-        self.log_parser = LogParser()
+        
+        # 🟢 從設定讀取 FAIL 判定關鍵字
+        fail_kw_str = self.config_manager.get('user_fail_keywords', 'FAIL, FAILED, ERROR, NACK, timeout, Status:False, doesn\'t match')
+        fail_kw_list = [k.strip() for k in fail_kw_str.split(',') if k.strip()]
+        self.log_parser = LogParser(fail_keywords=fail_kw_list)
+        
         self.excel_writer = ExcelWriter()
         
         # 3. State Variables
@@ -451,6 +456,15 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
                  self.config_manager.set('remember_path', self.remember_path_var.get())
             if hasattr(self, 'skip_no_test_time_var'):
                  self.config_manager.set('skip_no_test_time', self.skip_no_test_time_var.get())
+            
+            # 🟢 FAIL 判定關鍵字設定
+            if hasattr(self, 'fail_keywords_var'):
+                 kw_str = self.fail_keywords_var.get()
+                 self.config_manager.set('user_fail_keywords', kw_str)
+                 if hasattr(self, 'log_parser'):
+                     # 將逗號分隔字串轉為清單並傳遞給解析器
+                     kw_list = [k.strip() for k in kw_str.split(',') if k.strip()]
+                     self.log_parser.set_fail_keywords(kw_list)
             
             # 圖片檢索設定
             if hasattr(self, 'image_root_var'):

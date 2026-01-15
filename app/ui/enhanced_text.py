@@ -561,7 +561,8 @@ class EnhancedText:
                 start_pos = f"{start_line}.0"
                 end_pos = f"{end_line + 1}.0"
                 
-                self.text.tag_add('error_block', start_pos, end_pos)
+                # 移除廣域紅底背景，僅保留 fail_text 標籤用於跳轉(不帶背景色)
+                # self.text.tag_add('error_block', start_pos, end_pos) 
                 self.text.tag_add('fail_text', start_pos, end_pos)
         
         # 修改：預設回到最頂部看摘要

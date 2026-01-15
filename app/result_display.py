@@ -81,13 +81,17 @@ class ResultDisplayMixin:
                         return clean_line.strip()
             return None
         
-        # === 優先級 1: DOESN'T MATCH （最高優先級）===
-        for item in fail_items:
-            result = search_in_item(item, "doesn't match", case_sensitive=False)
-            if result:
-                return result
+        # === 使用者自定義優先級 (從設定讀取) ===
+        fail_kw_str = getattr(self, 'settings', {}).get('user_fail_keywords', 'FAIL, FAILED, ERROR, NACK, timeout, Status:False, doesn\'t match')
+        fail_kw_list = [k.strip() for k in fail_kw_str.split(',') if k.strip()]
         
-        # === 優先級 2: is Fail ===
+        for keyword in fail_kw_list:
+            for item in fail_items:
+                result = search_in_item(item, keyword, case_sensitive=False)
+                if result:
+                    return result
+        
+        # === 備用: 優先級 2: is Fail ===
         for item in fail_items:
             result = search_in_item(item, "is Fail", case_sensitive=True)
             if result:
@@ -187,7 +191,8 @@ class ResultDisplayMixin:
         """設定FAIL分割視窗位置"""
         try:
             if hasattr(self, 'fail_paned'):
-                self.fail_paned.sash_place(0, 0, position)
+                # ttk.Panedwindow 使用 sashpos(index, pos)
+                self.fail_paned.sashpos(0, position)
         except Exception as e:
             print(f"設定FAIL分割視窗位置失敗: {e}")
     
@@ -195,7 +200,8 @@ class ResultDisplayMixin:
         """處理FAIL分割視窗調整事件"""
         try:
             if hasattr(self, 'fail_paned'):
-                position = self.fail_paned.sash_coord(0)[1]
+                # ttk.Panedwindow 使用 sashpos(index)
+                position = self.fail_paned.sashpos(0)
                 self.settings['fail_pane_position'] = position
                 from .settings_loader import save_settings
                 save_settings(self.settings)

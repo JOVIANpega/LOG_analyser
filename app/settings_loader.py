@@ -27,7 +27,8 @@ DEFAULT_SETTINGS = {
     'skip_no_test_time': True,               # 忽略無測試時間 LOG
     'show_hover_preview': False,             # 是否顯示懸停預覽
     'image_search_isn_prefix': 'WE',         # ISN 識別前綴 (例如 WE, SN)
-    'log_hover_color': '#FFF9C4'             # 原始 LOG 懸停背景顏色
+    'log_hover_color': '#FFF9C4',            # 原始 LOG 懸停背景顏色
+    'user_fail_keywords': 'FAIL, FAILED, ERROR, NACK, timeout, Status:False, doesn\'t match' # 自定義 FAIL 判定關鍵字
 }
 
 def load_settings():

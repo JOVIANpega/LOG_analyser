@@ -69,9 +69,13 @@ def main():
         
         def animate_splash(step=0):
             if not root.winfo_exists(): return
+            if not canvas.winfo_exists(): return  # 確保 canvas 還在 (避免毀損後的回調錯誤)
             colors = ['#bdc3c7', '#ecf0f1', '#3498db']
-            canvas.itemconfig(status_text, fill=colors[step % len(colors)])
-            root.after(300, lambda: animate_splash(step + 1))
+            try:
+                canvas.itemconfig(status_text, fill=colors[step % len(colors)])
+                root.after(300, lambda: animate_splash(step + 1))
+            except Exception:
+                pass
         
         animate_splash()
         

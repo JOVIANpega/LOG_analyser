@@ -180,6 +180,25 @@ def build_settings_content(app, parent):
                                     values=list(app.color_map.keys()), state='readonly', width=12)
     hover_color_combo.pack(side=tk.LEFT, padx=5)
     
+    # 🟢 FAIL 判定關鍵字設定
+    fail_kw_frame = ttk.LabelFrame(right_column, text="FAIL 判定設定", padding=(15, 15))
+    fail_kw_frame.pack(fill=tk.X, pady=5)
+    app.font_scaler.register(fail_kw_frame)
+    
+    fail_kw_info = ttk.Label(fail_kw_frame, text="自定義 FAIL 關鍵字 (逗號分隔)：", font=('Arial', 10))
+    fail_kw_info.pack(anchor=tk.W)
+    app.font_scaler.register(fail_kw_info)
+    
+    app.fail_keywords_var = tk.StringVar(value=app.settings.get('user_fail_keywords', 'FAIL, FAILED, ERROR, NACK, timeout, Status:False, doesn\'t match'))
+    fail_kw_entry = ttk.Entry(fail_kw_frame, textvariable=app.fail_keywords_var)
+    fail_kw_entry.pack(fill=tk.X, pady=(5, 0))
+    app.font_scaler.register(fail_kw_entry)
+    
+    fail_kw_hint = ttk.Label(fail_kw_frame, text="LOG 中若包含以上任一字串，該章節將判定為 FAIL", 
+                            bootstyle="secondary", font=('Arial', 9))
+    fail_kw_hint.pack(anchor=tk.W, pady=(5, 0))
+    app.font_scaler.register(fail_kw_hint)
+    
     # 主題設定區域
     theme_frame = ttk.LabelFrame(right_column, text="介面主題", padding=(15, 15))
     theme_frame.pack(fill=tk.X, pady=5)

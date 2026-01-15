@@ -128,20 +128,33 @@ def build_left_panel(parent, app):
     search_btn_frame = ttk.Frame(search_frame)
     search_btn_frame.pack(fill=tk.X, pady=2)
     
-    search_btn = ttk.Button(search_btn_frame, text="下一個", command=app._search_next, 
+    # 第一排：下一個 / 上一個
+    row1 = ttk.Frame(search_btn_frame)
+    row1.pack(fill=tk.X, pady=2)
+    
+    search_btn = ttk.Button(row1, text="下一個", command=app._search_next, 
                            style='info.Outline.TButton')
     search_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0,2))
     app.font_scaler.register(search_btn)
-    # 添加 tooltip
     _create_tooltip(search_btn, "搜尋下一個匹配項目\n在當前標籤頁中向下搜尋", app=app)
     
-    prev_btn = ttk.Button(search_btn_frame, text="上一個", command=app._search_prev, 
+    prev_btn = ttk.Button(row1, text="上一個", command=app._search_prev, 
                          style='success.Outline.TButton')
-    prev_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+    prev_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2,0))
     app.font_scaler.register(prev_btn)
     _create_tooltip(prev_btn, "搜尋上一個匹配項目\n在當前標籤頁中向上搜尋", app=app)
     
-    clear_search_btn = ttk.Button(search_btn_frame, text="清除", command=app._clear_search, 
+    # 第二排：搜關鍵字 / 清除
+    row2 = ttk.Frame(search_btn_frame)
+    row2.pack(fill=tk.X, pady=2)
+    
+    kw_btn = ttk.Button(row2, text="搜關鍵字", command=app._search_fail_keywords, 
+                       bootstyle="primary")
+    kw_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0,2))
+    app.font_scaler.register(kw_btn)
+    _create_tooltip(kw_btn, "自動搜尋設定分頁中的 FAIL 關鍵字", app=app)
+    
+    clear_search_btn = ttk.Button(row2, text="清除", command=app._clear_search, 
                                  style='warning.Outline.TButton')
     clear_search_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2,0))
     app.font_scaler.register(clear_search_btn)

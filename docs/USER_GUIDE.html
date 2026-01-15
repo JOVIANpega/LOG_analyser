@@ -142,6 +142,7 @@
     <p>在查看<strong>單一原始日誌</strong>時，您可以透過搜尋與導覽按鈕提高效率。</p>
     <ul>
       <li><strong>搜尋關鍵字 (Ctrl+F)</strong>：輸入關鍵字（如 Error 或 ErrorCode），系統會即時標記匹配位置。</li>
+      <li><strong>搜關鍵字 (藍色按鈕)</strong>：一鍵搜尋「設定」中定義的所有追蹤詞彙（如 <code>spec_issue</code>），並高亮顯示。</li>
       <li><strong>快速導覽按鈕</strong>：提供 <strong>TOP (置頂)</strong>、<strong>END (最後)</strong> 以及分頁翻轉功能，適合快速掃描萬行 Log。</li>
     </ul>
 
@@ -307,6 +308,26 @@
       <li><strong>章節分隔線</strong>：Log 中會自動插入<strong>深綠色/深藍色的大標題欄位</strong>（如 Phase 0, Phase 1），將萬行 Log 切割為易讀的區段。</li>
       <li><strong>自動聚焦錯誤</strong>：載入單一 FAIL Log 時，系統會自動捲動至<strong>第一個關鍵錯誤點</strong>或頂部摘要，省去手動翻找時間。</li>
     </ul>
+  </div>
+
+  <div class="section">
+    <h2>⚙️ 11. 自定義設定與關鍵字分析 (Custom Settings)</h2>
+    <p>為了適應不同專案的診斷需求，您可以前往 <strong>[設定]</strong> 分頁自定義核心參數：</p>
+    <ul>
+      <li><strong>自定義 FAIL 關鍵字</strong>：在此輸入您要追蹤的詞彙（以逗號分隔，如 <code>spec_issue, NG, Fails</code>）。
+        <ul>
+          <li><strong>反白提醒</strong>：Log 中若出現這些關鍵字，會立即以紅底、粗體進行強效反白顯示。</li>
+          <li><strong>同步分析</strong>：這些關鍵字也會被納入分析引擎，作為判定 FAIL 原因的參考依據。</li>
+        </ul>
+      </li>
+      <li><strong>搜尋路徑配置</strong>：設定圖片檢索時的預設搜尋根目錄與目標資料夾關鍵字。</li>
+      <li><strong>介面縮放 (UI Font Size)</strong>：調整全域字體大小，適合在高解析度螢幕下使用。</li>
+    </ul>
+
+    <div class="img-box">
+      <img src="../IMAGES/settings_fail_keywords.jpg" alt="自定義關鍵字設定">
+      <div class="img-caption">【圖 20】設定分頁：使用者可隨時增減追蹤關鍵字，系統會即時同步至全文高亮與分析引擎</div>
+    </div>
   </div>
 
   <div class="footer">

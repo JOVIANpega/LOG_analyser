@@ -365,3 +365,70 @@ class SearchHandlerMixin:
                     self.search_count_label.config(text="搜尋結果：未找到匹配項目", foreground='#F44336')
         except Exception as e:
             print(f"更新搜尋計數時發生錯誤: {e}")
+
+    def _search_fail_keywords(self):
+        """自動搜尋所有設定的 FAIL 關鍵字"""
+        try:
+            if not hasattr(self, 'log_parser') or not self.log_parser.fail_keywords:
+                # 嘗試從 config 讀取
+                fail_kw_str = self.config_manager.get('user_fail_keywords', 'FAIL, ERROR')
+                keywords = [k.strip() for k in fail_kw_str.split(',') if k.strip()]
+            else:
+                keywords = self.log_parser.fail_keywords
+                
+            if not keywords:
+                return
+            
+            # 組合正則表達式，例如 (FAIL|ERROR|spec_issue)
+            import re
+            pattern = "|".join([re.escape(k) for k in keywords])
+            
+            # 將搜尋文字框內容設為關鍵字清單，方便使用者知道搜了什麼
+            last_kw = keywords[-1] if keywords else ""
+            self.search_var.set(last_kw) 
+            
+            # 遍歷 Text 元件執行正則搜尋
+            target_text = None
+            if hasattr(self, 'log_text_enhanced') and hasattr(self.log_text_enhanced, 'text'):
+                target_text = self.log_text_enhanced.text
+            elif hasattr(self, 'raw_text'):
+                target_text = self.raw_text
+            
+            if target_text:
+                # 先清除之前的高亮
+                target_text.tag_remove(tk.SEL, '1.0', tk.END)
+                target_text.tag_remove('search_highlight', '1.0', tk.END)
+                
+                # 正則搜尋並高亮所有
+                count = 0
+                pos = '1.0'
+                while True:
+                    pos = target_text.search(pattern, pos, tk.END, nocase=True, regexp=True)
+                    if not pos:
+                        break
+                    count += 1
+                    # 這裡比較難獲取具體匹配到的那個關鍵字長度，
+                    # 但因為我們用了 re.escape，可以大致預估，或者再次搜尋具體匹配項
+                    # 簡化處理：我們重新在該位置匹配一次 re 以獲得長度
+                    match_obj = re.search(pattern, target_text.get(pos, f"{pos} lineend"), re.IGNORECASE)
+                    match_len = len(match_obj.group(0)) if match_obj else 1
+                    
+                    end_pos = f"{pos}+{match_len}c"
+                    target_text.tag_add('search_highlight', pos, end_pos)
+                    
+                    # 如果是第一個，就跳轉過去
+                    if count == 1:
+                        target_text.see(pos)
+                        target_text.mark_set(tk.INSERT, pos)
+                        target_text.tag_add(tk.SEL, pos, end_pos)
+                        
+                    pos = end_pos
+                
+                self._update_search_count(count)
+            else:
+                # 如果不在 Text 標籤，則執行普通搜尋
+                self._perform_search()
+                
+        except Exception as e:
+            print(f"搜關鍵字按鈕錯誤: {e}")
+            traceback.print_exc()

@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 class LogParser:
-    def __init__(self):
+    def __init__(self, fail_keywords=None):
         # 正則表達式模式
         self.step_pattern = re.compile(r'Do\s+(@STEP\d+@[^@\n]+)')
         self.test_id_pattern = re.compile(r'Run ([A-Z0-9]+-\d+):')
@@ -16,11 +16,21 @@ class LogParser:
         self.resp_pattern = re.compile(r'(?:\([A-Za-z0-9_ ]+\)|\[[A-Za-z0-9_ ]+\])?\s*<\s*(.+)')
         self.retry_pattern = re.compile(r'Retry:\s*(\d+)')
         self.root_pattern = re.compile(r'root@.*:/root\$')
-        self.fail_keywords = [
-            'FAIL', 'FAILED', 'ERROR', 'failed', 'error', 'NACK', 'timeout', 
-            "doesn't match", "does not match", "Status:False"
-        ]
+        
+        # 🟢 優先使用傳入的關鍵字，否則使用預設清單
+        if fail_keywords:
+            self.fail_keywords = fail_keywords
+        else:
+            self.fail_keywords = [
+                'FAIL', 'FAILED', 'ERROR', 'failed', 'error', 'NACK', 'timeout', 
+                "doesn't match", "does not match", "Status:False"
+            ]
         self.phase_pattern = re.compile(r'Execute (Phase \d+ Test)', re.IGNORECASE)
+
+    def set_fail_keywords(self, keywords):
+        """動態更新 FAIL 判定關鍵字"""
+        if keywords:
+            self.fail_keywords = keywords
 
     def parse_log_file(self, file_path):
         """
@@ -250,23 +260,22 @@ class LogParser:
                         if '@' in sn[1:]: block_step_num = sn.split('@')[1]
                         break
                 step_number = block_step_num
+            # 如果是最後一個項目，使用結束行的資訊（通常更準確）
+            if is_last:
+                step_info = self._analyze_block_content(sub_lines, end_step_number, end_step_name)
+            else:
+                step_info = self._analyze_block_content(sub_lines, '', step_name)
             
-            # 構建 Step Info
-            step_info = self._analyze_block_content(sub_lines, step_number, step_name)
+            step_info['start_idx'] = global_start_idx + current_run_idx
+            step_info['end_idx'] = global_start_idx + next_run_idx - 1
+            step_info['raw_idx'] = global_start_idx + current_run_idx
+            step_info['full_log'] = sub_lines
             step_info['phase'] = current_phase
             
-            # 計算全局索引
-            abs_start = global_start_idx + current_run_idx
-            abs_end = global_start_idx + next_run_idx - 1
-            
-            step_info['start_idx'] = abs_start
-            step_info['end_idx'] = abs_end
-            step_info['raw_idx'] = abs_start
-            step_info['full_log'] = sub_lines
-            
+            # 調整 validation 的行號
             for v in step_info.get('validations', []):
                 if 'line_idx' in v:
-                    v['line_idx'] += abs_start
+                    v['line_idx'] += step_info['start_idx']
             
             self._finalize_pass_step(step_info, pass_items, no_command_steps)
     
@@ -290,15 +299,26 @@ class LogParser:
         # 提取比對項目
         validations = self._extract_validations(lines)
         
+        # 🟢 檢查區塊內是否有任何 FAIL 關鍵字
+        is_fail = False
+        error_msg = ''
+        for line in lines:
+            line_upper = line.upper()
+            if any(k.upper() in line_upper for k in self.fail_keywords):
+                is_fail = True
+                error_msg = line.strip()
+                break
+        
         return {
             'step_name': step_name_raw,
             'test_id': '',
             'command': command,
             'response': response,
             'validations': validations,
-            'result': 'PASS',
+            'result': 'FAIL' if is_fail else 'PASS',
+            'is_pass': not is_fail,
             'retry': 0,
-            'error': '',
+            'error': error_msg,
             'has_retry_but_pass': False,
             'step_number': step_number
         }
@@ -344,7 +364,8 @@ class LogParser:
                         v_content = match.group(0).strip()
                     
                     v_status = 'PASS'
-                    if 'is FAIL' in line_str or 'status:FAIL' in line_str.lower() or 'FAIL' in line_str.upper():
+                    # 🟢 改為從 self.fail_keywords 遍歷
+                    if any(k.upper() in line_str.upper() for k in self.fail_keywords):
                         v_status = 'FAIL'
                     else:
                         try:
@@ -596,31 +617,19 @@ class LogParser:
                         matches.append(item)
             return matches
 
-        matches = filter_items(fail_items, "doesn't match", case_sensitive=False)
-        if matches:
-            last_fail = matches[-1]
-        
-        if not last_fail:
-            matches = filter_items(fail_items, "is Fail", case_sensitive=False)
+        # 🟢 改由 self.fail_keywords 的優先順序來過濾 (從設定讀取)
+        for keyword in self.fail_keywords:
+            matches = filter_items(fail_items, keyword, case_sensitive=False)
             if matches:
                 last_fail = matches[-1]
-
-        if not last_fail:
-            matches = filter_items(fail_items, "FAIL", case_sensitive=False)
-            if matches:
-                last_fail = matches[-1]
-
-        if not last_fail:
-            matches = filter_items(fail_items, "ERROR", case_sensitive=False)
-            if matches:
-                last_fail = matches[-1]
+                break
                 
         if not last_fail and fail_items:
             last_fail = fail_items[-1]
 
         if last_fail:
-            target_keywords = ["doesn't match", "is Fail", "FAIL", "ERROR"]
-            for keyword in target_keywords:
+            # 🟢 同樣按 self.fail_keywords 優先順序提取錯誤行
+            for keyword in self.fail_keywords:
                 matching_lines = [
                     line for line in last_fail.get('full_log', []) 
                     if keyword.lower() in str(line).lower()
@@ -646,7 +655,8 @@ class LogParser:
         visited_lines = set()
         for idx in range(len(raw_lines) - 1, -1, -1):
             line = raw_lines[idx]
-            if (any(keyword in line.upper() for keyword in ["FAIL", "FAILED", "ERROR"]) 
+            # 🟢 改為從 self.fail_keywords 遍歷
+            if (any(keyword.upper() in line.upper() for keyword in self.fail_keywords) 
                 and idx not in visited_lines):
                 block_start = self._find_block_start(raw_lines, idx)
                 block_end = self._find_block_end(raw_lines, idx)
@@ -763,7 +773,8 @@ class LogParser:
     def _find_error_reason(self, block_lines):
         for line in block_lines:
             line_lower = line.lower()
-            if any(keyword in line_lower for keyword in ['failed', 'error', 'nack', 'timeout', 'fail']):
+            # 🟢 改為從 self.fail_keywords 遍歷
+            if any(keyword.lower() in line_lower for keyword in self.fail_keywords):
                 if ':' in line and ('is fail' in line_lower or 'is failed' in line_lower):
                     colon_pos = line.find(':')
                     if colon_pos != -1:
@@ -836,35 +847,11 @@ class LogParser:
         COLOR_BLUE = '#007bff'
         COLOR_PURPLE = '#6f42c1'
         COLOR_RED = '#ff0000'
+
         
-        # === 預先偵測 doesn't match 錯誤區塊 (整段紅色) ===
-        dm_error_idx = -1
-        dm_pattern = re.compile(r"doesn't match", re.IGNORECASE)
-        
-        for idx in range(len(raw_lines)-1, -1, -1):
-            if dm_pattern.search(raw_lines[idx]):
-                dm_error_idx = idx
-                break
-        
-        # 計算 doesn't match 錯誤區塊範圍
+        # 移除之前的 dm_block 廣域紅底邏輯 (使用者反應太過範圍太大)
         dm_block_start = -1
         dm_block_end = -1
-        if dm_error_idx != -1:
-            # 往上找指令起點
-            for i in range(dm_error_idx, max(-1, dm_error_idx - 50), -1):
-                if '>' in raw_lines[i] or 'Do @STEP' in raw_lines[i]:
-                    dm_block_start = i
-                    break
-            if dm_block_start == -1:
-                dm_block_start = dm_error_idx
-            
-            # 往下延伸到測試結束或下一個測項
-            dm_block_end = dm_error_idx + 2
-            for i in range(dm_error_idx + 1, min(len(raw_lines), dm_error_idx + 10)):
-                if 'Test Completed' in raw_lines[i] or ('Do @STEP' in raw_lines[i] and i > dm_error_idx):
-                    dm_block_end = i - 1
-                    break
-            dm_block_end = min(dm_block_end, len(raw_lines) - 1)
 
         last_separator_idx = -30
         
@@ -881,11 +868,7 @@ class LogParser:
                 'is_bold': False
             }
             
-            # === 1. doesn't match 整段紅色背景 ===
-            if dm_block_start != -1 and dm_block_start <= idx <= dm_block_end:
-                annotation['background'] = COLOR_ERROR_BG
-                annotation['color'] = COLOR_RED
-                annotation['is_bold'] = True
+            # 移除之前的舊版廣域 red block 標註
             
             # === 2. PHASE 章節分隔線 ===
             phase_match = self.phase_pattern.search(line)
@@ -935,13 +918,12 @@ class LogParser:
                             annotation['background'] = COLOR_ERROR_BG
                 except: pass
 
-            # === 5. 單行錯誤高亮（FAIL/ERROR，但不在 doesn't match 區塊內且非數值判定行）===
+            # === 5. 單行錯誤高亮（依據使用者設定的 FAIL 關鍵字）===
             if not is_validation_line:
-                if dm_block_start == -1 or not (dm_block_start <= idx <= dm_block_end):
-                    if any(k.upper() in upper_line for k in ['FAIL', 'ERROR', 'NACK', 'TIMEOUT']):
-                        annotation['color'] = COLOR_RED
-                        annotation['is_bold'] = True
-                        annotation['background'] = COLOR_ERROR_BG
+                if any(k.upper() in upper_line for k in self.fail_keywords):
+                    annotation['color'] = COLOR_RED
+                    annotation['is_bold'] = True
+                    annotation['background'] = COLOR_ERROR_BG
 
             annotations.append(annotation)
         
