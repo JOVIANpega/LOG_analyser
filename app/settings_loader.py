@@ -13,7 +13,7 @@ DEFAULT_SETTINGS = {
     'window_height': 900,     # 主視窗高度
     'pane_width': 250,        # 左側面板寬度
     'app_title': 'PEGA test log Aanlyser',  # 應用程式標題（可在設定頁修改並保存）
-    'gui_header': 'ONLY FOR CENTIMANIA LOG', # 左側GUI大標題（可在設定頁修改並保存）
+    'gui_header': 'Only for PEGA LOG', # 左側GUI大標題（可在設定頁修改並保存）
     'user_highlight_keywords': 'SPEC_FAIL, spec_issue:', # 使用者自定義高亮關鍵字
     'image_search_root': 'D:\\',             # 圖片搜尋根路徑
     'image_search_dir_name': 'STATION_RECORD',# 圖片搜尋目標資料夾名稱
@@ -28,7 +28,8 @@ DEFAULT_SETTINGS = {
     'show_hover_preview': False,             # 是否顯示懸停預覽
     'image_search_isn_prefix': 'WE',         # ISN 識別前綴 (例如 WE, SN)
     'log_hover_color': '#FFF9C4',            # 原始 LOG 懸停背景顏色
-    'user_fail_keywords': 'FAIL, FAILED, ERROR, NACK, timeout, Status:False, doesn\'t match' # 自定義 FAIL 判定關鍵字
+    'user_fail_keywords': 'FAIL, FAILED, ERROR, NACK, timeout, Status:False, doesn\'t match', # 自定義 FAIL 判定關鍵字
+    'search_history': ["doesn't match"]      # 搜尋歷史記錄 (最近 5 筆)
 }
 
 def load_settings():

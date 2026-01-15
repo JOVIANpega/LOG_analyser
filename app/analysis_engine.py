@@ -109,8 +109,12 @@ class AnalysisEngineMixin:
             self._ui_log(f"=== 開始單檔分析: {os.path.basename(self.current_log_path)} ===", clear=True)
             self._safe_update_progress_text("正在解析LOG檔案內容...")
             
-            # CPU密集應操作
+            # CPU密集型操作 (解析 LOG)
+            # 在背景執行緒執行解析，主執行緒會持續跑閃爍動畫
             result = self.log_parser.parse_log_file(self.current_log_path)
+            
+            # 短暫讓出系統資源，確保 UI 事件迴圈有喘息空間處理閃爍
+            time.sleep(0.01)
             
             # 即時顯示測試時間日誌
             try:
@@ -207,17 +211,16 @@ class AnalysisEngineMixin:
             # 🟢 使用者要求：將 PASS/FAIL 項目按時間順序交叉排列
             all_flow_items = sorted(pass_items + fail_items, key=lambda x: x.get('raw_idx', 0))
             
-            # 🟢 找出「最終失敗 Phase」（同步 FAIL 標籤頁邏輯，只標出最後一個有問題的 Phase）
-            final_failing_phase = None
-            if fail_items:
-                final_failing_phase = fail_items[-1].get('phase')
+            # 🟢 修正：僅標註與 FAIL 摘要一致的「主錯誤 Phase」
+            # 我們從 result 中取得的 last_fail 包含其所屬 phase，這才是真正的錯誤點
+            final_failing_phase = last_fail.get('phase') if last_fail else None
             
             for item in all_flow_items:
                 phase_name = item.get('phase', 'Unknown Phase')
                 
                 # 如果是新的 Phase，建立大標題
                 if phase_name not in seen_phases_map:
-                    # 🟢 使用者要求：僅在 FAIL 分頁所告知的錯誤 Phase 標註 (FAIL HERE)
+                    # 🟢 同步邏輯：僅在此主錯誤 Phase 標註 (FAIL HERE)
                     is_phase_fail = (final_failing_phase and phase_name == final_failing_phase)
                     p_id = self.pass_tree_enhanced.insert_phase_header(phase_name, is_fail=is_phase_fail)
                     seen_phases_map[phase_name] = p_id

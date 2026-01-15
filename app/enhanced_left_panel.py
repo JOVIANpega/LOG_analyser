@@ -52,13 +52,12 @@ def _create_tooltip(widget, text, app=None):
         widget.bind("<Button-1>", lambda e: on_leave(e))
 
 def build_left_panel(parent, app):
-    # 標題 - 使用 ttk.Frame 支援主題
-    title_frame = ttk.Frame(parent, bootstyle="primary", relief=tk.RAISED, borderwidth=2)
+    # 標題 - 使用 tk.Frame 與 tk.Label 以便實現「執行閃爍」效果 (ttk 限制較多)
+    title_frame = tk.Frame(parent, bg='#1565C0', relief=tk.RAISED, borderwidth=2)
     title_frame.pack(fill=tk.X, padx=10, pady=(10, 20))
     
-    # 使用 inverse-primary 讓文字在深色背景下自動切換白/黑
-    title_label = ttk.Label(title_frame, text=app.settings.get('gui_header', 'PEGA LOG ANALYZER'), 
-                           font=('Arial', 24, 'bold'), bootstyle="inverse-primary")
+    title_label = tk.Label(title_frame, text=app.settings.get('gui_header', 'PEGA LOG ANALYZER'), 
+                          font=('Arial', 24, 'bold'), bg='#1565C0', fg='white')
     title_label.pack(pady=15)
     app.font_scaler.register(title_label)
     
@@ -117,13 +116,22 @@ def build_left_panel(parent, app):
     search_label.pack(anchor='w')
     app.font_scaler.register(search_label)
     
-    app.search_var = tk.StringVar(value="doesn't")
-    app.search_entry = ttk.Entry(search_frame, textvariable=app.search_var)
-    app.search_entry.pack(fill=tk.X, pady=5)
-    app.search_entry.bind('<KeyRelease>', app._on_search_change)
-    app.search_entry.bind('<Return>', app._on_search_enter)
-    app.font_scaler.register(app.search_entry)
-    _create_tooltip(app.search_entry, "輸入要搜尋的關鍵字\n按 Enter 開始搜尋", app=app)
+    app.search_var = tk.StringVar(value="doesn't match")
+    app.search_combo = ttk.Combobox(search_frame, textvariable=app.search_var)
+    app.search_combo.pack(fill=tk.X, pady=5)
+    
+    # 載入歷史記錄
+    history = app.settings.get('search_history', ["doesn't match"])
+    app.search_combo['values'] = history
+    
+    app.search_combo.bind('<KeyRelease>', app._on_search_change)
+    app.search_combo.bind('<Return>', app._on_search_enter)
+    app.search_combo.bind('<<ComboboxSelected>>', lambda e: app._on_search_enter())
+    app.font_scaler.register(app.search_combo)
+    _create_tooltip(app.search_combo, "輸入或選取搜尋關鍵字\n按 Enter 開始搜尋", app=app)
+    
+    # 為了保持相容性，將 search_entry 引用到 search_combo
+    app.search_entry = app.search_combo
     
     search_btn_frame = ttk.Frame(search_frame)
     search_btn_frame.pack(fill=tk.X, pady=2)
@@ -132,13 +140,13 @@ def build_left_panel(parent, app):
     row1 = ttk.Frame(search_btn_frame)
     row1.pack(fill=tk.X, pady=2)
     
-    search_btn = ttk.Button(row1, text="下一個", command=app._search_next, 
+    search_btn = ttk.Button(row1, text="下一個", command=app._on_search_next_click, 
                            style='info.Outline.TButton')
     search_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0,2))
     app.font_scaler.register(search_btn)
     _create_tooltip(search_btn, "搜尋下一個匹配項目\n在當前標籤頁中向下搜尋", app=app)
     
-    prev_btn = ttk.Button(row1, text="上一個", command=app._search_prev, 
+    prev_btn = ttk.Button(row1, text="上一個", command=app._on_search_prev_click, 
                          style='success.Outline.TButton')
     prev_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2,0))
     app.font_scaler.register(prev_btn)
@@ -148,7 +156,7 @@ def build_left_panel(parent, app):
     row2 = ttk.Frame(search_btn_frame)
     row2.pack(fill=tk.X, pady=2)
     
-    kw_btn = ttk.Button(row2, text="搜關鍵字", command=app._search_fail_keywords, 
+    kw_btn = ttk.Button(row2, text="列出FAIL判定", command=app._search_fail_keywords, 
                        bootstyle="primary")
     kw_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0,2))
     app.font_scaler.register(kw_btn)

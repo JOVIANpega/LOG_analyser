@@ -435,6 +435,16 @@ class EnhancedText:
                     if step_name not in self.step_positions:
                         self.step_positions[step_name] = line_start
 
+        # --- 🟢 渲染跳動感 (Flicker Rendering) ---
+        # 為了滿足使用者對「分析中要有跳動感」的需求，增加頻率 (改為 100 行一次)
+        if i > 0 and i % 100 == 0:
+            try:
+                self.text.see(tk.END)
+                self.text.update()
+                import time
+                time.sleep(0.01) # 短暫讓出控制權，確保閃爍感
+            except: pass
+
 
         # 提升高亮優先級 (安全檢查，避免 tag 未定義錯誤)
         for tag_name in ['step_hover', 'search_highlight', 'phase_separator']:

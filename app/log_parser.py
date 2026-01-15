@@ -655,8 +655,10 @@ class LogParser:
         visited_lines = set()
         for idx in range(len(raw_lines) - 1, -1, -1):
             line = raw_lines[idx]
-            # 🟢 改為從 self.fail_keywords 遍歷
+            # 🟢 修正：忽略 Phase 分隔線本身，避免因為名稱含 FAIL 而誤判為錯誤點
+            is_phase_line = self.phase_pattern.search(line)
             if (any(keyword.upper() in line.upper() for keyword in self.fail_keywords) 
+                and not is_phase_line
                 and idx not in visited_lines):
                 block_start = self._find_block_start(raw_lines, idx)
                 block_end = self._find_block_end(raw_lines, idx)
@@ -695,7 +697,8 @@ class LogParser:
         visited_lines = set()
         for idx in range(len(raw_lines) - 1, -1, -1):
             line = raw_lines[idx]
-            if any(keyword in line.upper() for keyword in self.fail_keywords) and idx not in visited_lines:
+            is_phase_line = self.phase_pattern.search(line)
+            if any(keyword in line.upper() for keyword in self.fail_keywords) and not is_phase_line and idx not in visited_lines:
                 block_info = self._extract_fail_block(raw_lines, idx)
                 if block_info:
                     blocks.append(block_info)
@@ -920,7 +923,8 @@ class LogParser:
 
             # === 5. 單行錯誤高亮（依據使用者設定的 FAIL 關鍵字）===
             if not is_validation_line:
-                if any(k.upper() in upper_line for k in self.fail_keywords):
+                is_phase_line = self.phase_pattern.search(line)
+                if any(k.upper() in upper_line for k in self.fail_keywords) and not is_phase_line:
                     annotation['color'] = COLOR_RED
                     annotation['is_bold'] = True
                     annotation['background'] = COLOR_ERROR_BG

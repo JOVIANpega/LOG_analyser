@@ -100,239 +100,236 @@
 
   <div class="header">
     <h1>PEGA Log Analyzer</h1>
-    <p>測試 Log 快速分析工具 - 使用說明手冊</p>
+    <p>日誌分析工具 - 使用說明</p>
   </div>
 
   <div class="section">
-    <h2>📂 1. 如何載入 Log (支援單檔、壓縮包與文件夾)</h2>
-    <p>點擊左側面板的 <strong>「選擇 LOG 來源」</strong> 按鈕，即可載入測試資料进行分析。</p>
+    <h2>🛠️ 工具簡介與特色</h2>
+    <p>PEGA Log Analyzer 用於分析 Pega 測試日誌，整合了錯誤提取、規格比對與報表產出功能。其設計重點在於簡化日常排錯流程與數據整理工作。</p>
     <ul>
-      <li><strong>單一/多個檔案</strong>：選取一個或多個 <code>.log</code> 檔案。</li>
-      <li><strong>壓縮檔 (ZIP/7z)</strong>：從 <strong>IPLAS</strong> 下載的整包 Log <strong>不需要解壓縮</strong>，直接讀取即可分析。</li>
-      <li><strong>讀取整個資料夾</strong>：選取資料夾後，程式會智慧過濾，僅針對其中的 Log 檔案進行多檔案分析。</li>
+      <li><strong>日誌分析</strong>：自動辨識測試階段 (Phase) 並提取失敗原因。</li>
+      <li><strong>數值判定</strong>：自動比對實測值與標準值 (Criteria)，並將異常項反白顯示。</li>
+      <li><strong>影像連結</strong>：分析完成後可直接搜尋對應 ISN 的測試紀錄圖檔。</li>
+      <li><strong>數據整理</strong>：批次導出 Excel 分析報表與 CSV 生產數據規格化。</li>
+    </ul>
+
+    <div class="img-box">
+      <img src="../IMAGES/app_startup_view.jpg" alt="應用程式主介面">
+      <div class="img-caption">【圖 0】介面概覽：整合檔案管理、搜尋、導覽與標籤化顯示</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📂 1. 載入日誌 (單檔、壓縮包、資料夾)</h2>
+    <p>點擊左側面板的 <strong>「選擇 LOG 來源」</strong> 按鈕即可載入資料。目前支援以下載入方式：</p>
+    <ul>
+      <li><strong>選擇檔案</strong>：選取 <code>.log</code> 檔案（支援 Shift 多選）。</li>
+      <li><strong>讀取壓縮檔</strong>：直接選取 ZIP 或 7z 檔案，程式會自動讀取內容。</li>
+      <li><strong>讀取資料夾</strong>：選取目錄後，程式會自動過濾並分析其中的日誌檔案。</li>
     </ul>
 
     <div class="img-box">
       <img src="../IMAGES/btn_file_source.jpg" alt="選擇 Log 來源">
-      <div class="img-caption">【圖 1】點選藍色按鈕即可載入不同來源，支援 IPLAS 下載的整包壓縮檔</div>
+      <div class="img-caption">【圖 1】支援多種來源載入</div>
     </div>
   </div>
 
   <div class="section">
-    <h2>📊 2. 規格自動比對 (Criteria) 與錯誤預覽 (單一 Log 分析)</h2>
-    <p>針對<strong>單一 Log</strong> 分析完成後，系統會自動歸納測試結果，並將數值與規格進行比對。</p>
+    <h2>📊 2. 規格比對與錯誤跳轉 (單檔案分析)</h2>
+    <p>匯入單一 Log 後，程式會自動比對規格並提取錯誤點。</p>
     <ul>
-      <li><strong>PASS 測項比對</strong>：列表會顯示測項名稱與實測值，並列出對應的 <strong>CRITERIA (規格範圍)</strong>。</li>
-      <li><strong>FAIL 發現錯誤點 (預覽)</strong>：當某項測試失敗時，下方的預覽分頁會主動列出出錯的原因與代碼，方便第一時間掌握重點。</li>
+      <li><strong>規格比對 (Criteria)</strong>：
+        <ul>
+          <li><strong>數值比對</strong>：自動辨識 <code>Value = 5.1 (4.5, 5.5)</code> 等格式。</li>
+          <li><strong>狀態標記</strong>：符合規範顯示綠色，<strong>不符合則標記為紅底白字</strong>。</li>
+        </ul>
+      </li>
+      <li><strong>錯誤跳轉 (預覽)</strong>：
+        <ul>
+          <li><strong>錯誤提取</strong>：在視窗上方顯示 Log 中的關鍵錯誤行。</li>
+          <li><strong>快速導航</strong>：點擊預覽區域的紅底文字，可自動跳轉至對應行號。</li>
+        </ul>
+      </li>
     </ul>
 
     <div class="img-box">
-      <img src="../IMAGES/pass_criteria_table.jpg" alt="PASS 測項與規格">
-      <div class="img-caption">【圖 2】系統自動解析測項，並比對其對應的規格範圍 (Criteria)</div>
+      <img src="../IMAGES/pass_criteria_table.jpg" alt="規格比對">
+      <div class="img-caption">【圖 2】顯示實測值是否在 Criteria 規範內</div>
     </div>
 
     <div class="img-box">
-      <img src="../IMAGES/fail_flashpoint_preview.jpg" alt="FAIL 發現錯誤點">
-      <div class="img-caption">【圖 3】提供「發現錯誤點 (預覽)」功能，點選 FAIL 項目即可立即查看出錯原因</div>
+      <img src="../IMAGES/fail_flashpoint_preview.jpg" alt="錯誤預覽">
+      <div class="img-caption">【圖 3】錯誤預覽與連結跳轉功能</div>
+    </div>
+
+    <div class="img-box">
+      <img src="../IMAGES/phase_preview_v253.jpg" alt="分區顯示">
+      <div class="img-caption">【圖 3.1】分區視覺：日誌 Phase 分隔與錯誤行預覽</div>
     </div>
   </div>
 
   <div class="section">
-    <h2>🔍 3. 原始 Log 搜尋與快速導覽 (單一 Log 檢視)</h2>
-    <p>在查看<strong>單一原始日誌</strong>時，您可以透過搜尋與導覽按鈕提高效率。</p>
+    <h2>🔍 3. 日誌搜尋與導覽</h2>
+    <p>提供日誌全文搜尋與快速捲動功能。</p>
     <ul>
-      <li><strong>搜尋關鍵字 (Ctrl+F)</strong>：輸入關鍵字（如 Error 或 ErrorCode），系統會即時標記匹配位置。</li>
-      <li><strong>搜關鍵字 (藍色按鈕)</strong>：一鍵搜尋「設定」中定義的所有追蹤詞彙（如 <code>spec_issue</code>），並高亮顯示。</li>
-      <li><strong>快速導覽按鈕</strong>：提供 <strong>TOP (置頂)</strong>、<strong>END (最後)</strong> 以及分頁翻轉功能，適合快速掃描萬行 Log。</li>
+      <li><strong>搜尋 (Ctrl+F)</strong>：開啟搜尋框，支援歷史關鍵字。</li>
+      <li><strong>歷史紀錄</strong>：搜尋列會紀錄最近 5 筆關鍵字，方便重複檢索。</li>
+      <li><strong>快速捲動</strong>：使用 <strong>TOP/END</strong> 按鈕或鍵盤 <strong>PGUP/PGDN</strong> 鍵。</li>
     </ul>
 
     <div class="img-box">
       <img src="../IMAGES/search_and_nav_panel.jpg" alt="搜尋與導覽功能">
-      <div class="img-caption">【圖 4】搜尋功能配合 TOP/END 按鈕，能在超長 Log 中快速定位到特定內容</div>
+      <div class="img-caption">【圖 4】搜尋面板與導覽按鈕</div>
     </div>
   </div>
 
   <div class="section">
-    <h2>📸 4. 圖片檢索功能 (ISN Image Search)</h2>
-    <p>除了分析 Log 外，程式亦提供快速搜圖功能，方便根據 ISN 找到對應的測試影像（如 4cam 拼接圖）。</p>
+    <h2>📸 4. 圖片檢索功能 (ISN)</h2>
+    <p>根據 ISN 快速開啟測試影像。</p>
     <ul>
-      <li><strong>ISN 自動填入</strong>：當您讀取並分析完一份 Log 後，系統會自動提取其中的 ISN 並帶入圖片檢索欄位。</li>
-      <li><strong>手動切換目錄 (📂)</strong>：在檢索欄位旁提供快速按鈕，可臨時指定特定資料夾進行掃描，不限於預設的 STATION_RECORD 目錄。</li>
-      <li><strong>🖼️ 批次開啟同目錄圖片</strong>：點擊後會一次性開啟該 ISN 目錄下的所有鏡頭影像（每張間隔 0.2 秒以確保視窗順利跳出）。</li>
-      <li><strong>💾 複製整組圖片</strong>：點擊後可選取目的地，將該次搜尋到的 ISN 完整圖檔一次備份或移動至其他資料夾，並自動開啟目的地。</li>
-      <li><strong>智慧分組顯示</strong>：搜尋結果會按 ISN 主目錄進行智慧分組，將不同分頁或不同鏡頭的圖檔整齊收納，避免清單雜亂。</li>
-      <li><strong>⚙️ 設定連動</strong>：您可以在 <strong>[設定]</strong> 分頁中自定義「搜尋根路徑」與「目標資料夾關鍵字」，並使用「瀏覽...」按鈕快速挑選目錄。</li>
+      <li><strong>自動帶入 ISN</strong>：分析完 Log 後，會自動提取 ISN 並填入搜圖欄位。</li>
+      <li><strong>選取資料夾</strong>：可手動指定掃描目錄（不限於預設路徑）。</li>
+      <li><strong>批次功能</strong>：支援一次開啟所有影像，或將圖檔複製至指定目錄。</li>
     </ul>
-
-    <div class="img-box">
-      <img src="../IMAGES/image_search_panel.png" alt="圖片檢索面板">
-      <div class="img-caption">【圖 5】圖片檢索面板：輸入或自動填入 ISN 後即可開始搜圖，支援手動路徑選取</div>
-    </div>
-
-    <div class="img-box">
-      <img src="../IMAGES/image_search_settings.jpg" alt="圖片檢索設定">
-      <div class="img-caption">【圖 6】圖片檢索相關設定：在「設定」分頁中可指定搜尋起點與目標資料夾名稱</div>
-    </div>
 
     <div class="img-box">
       <img src="../IMAGES/image_search_results.png" alt="圖片檢索結果">
-      <div class="img-caption">【圖 7】檢索結果視窗：提供智慧分組、批次開啟與完整路徑預覽功能</div>
+      <div class="img-caption">【圖 5】圖片檢索：依照鏡頭位置分組顯示搜尋到的影像</div>
     </div>
   </div>
 
   <div class="section">
-    <h2>📈 5. Excel 報表生成與完成提示 (載入 2 個以上 Log 時)</h2>
-    <p>當進行<strong>多檔案批次分析</strong>（載入兩個或以上的 Log）完成後，系統會自動彙總數據並生成 Excel 報表，同時給予完成通知。</p>
+    <h2>📊 5. 匯出 Excel 統計報告</h2>
+    <p>將分析結果匯出為 Excel 報表。</p>
     <ul>
-      <li><strong>完成通知</strong>：狀態列會顯示「Excel 生成成功！」，並列出產出的報表路徑。</li>
-      <li><strong>智慧對話框</strong>：分析後會彈出彙總視窗，您可以勾選要開啟的報表並點選「開啟」。</li>
+      <li><strong>分站彙整</strong>：自動根據檔案名稱識別測試站別。</li>
+      <li><strong>統計摘要</strong>：自動計算 PASS/FAIL 數量與比例。</li>
+      <li><strong>內文跳轉</strong>：在 Excel 中可直接跳轉至原始日誌行號。</li>
     </ul>
-
     <div class="img-box">
-      <img src="../IMAGES/excel_export_success.jpg" alt="Excel 產出成功提示">
-      <div class="img-caption">【圖 8】分析成功後，底部狀態列會顯示產出的 Excel 報表路徑與成功訊息</div>
+      <img src="../IMAGES/excel_pass_summary_view.jpg" alt="Excel 統計摘要">
+      <div class="img-caption">【圖 6】Excel 報表統計摘要</div>
     </div>
-
     <div class="img-box">
-      <img src="../IMAGES/excel_files_view.jpg" alt="產出的 Excel 檔案">
-      <div class="img-caption">【圖 9】系統會自動在輸出資料夾中生成包含 PASS 與 FAIL 彙總的 Excel 檔案</div>
+      <img src="../IMAGES/excel_fail_details_view.jpg" alt="Excel 錯誤細節">
+      <div class="img-caption">【圖 7】Excel 報表錯誤細節頁面</div>
+    </div>
+    <div class="img-box">
+      <img src="../IMAGES/excel_export_success.jpg" alt="Excel 匯出成功">
+      <div class="img-caption">【圖 7.1】報表產出後的開啟提示</div>
     </div>
   </div>
 
   <div class="section">
-    <h2>📝 6. Excel 報表內容說明 (PASS/FAIL 彙總)</h2>
-    <p>生成的 Excel 報表提供詳細的測試數據統計與錯誤點快速連結：</p>
+    <h2>⚡ 6. CSV 檔案整理</h2>
+    <p>整理生產數據 CSV 檔案。</p>
     <ul>
-      <li><strong>PASS 彙總報表</strong>：包含整體統計與詳細列表。
-        <ul>
-          <li><strong>Summary</strong>：呈現良率統計、平均/最長/最短測試時間等資訊。</li>
-          <li><strong>Detail</strong>：記錄每個 ISN 的詳細測項比對（Criteria Check）結果。</li>
-        </ul>
-      </li>
-      <li><strong>FAIL 彙總報表</strong>：專注於錯誤追蹤與分析。
-        <ul>
-          <li><strong>FAIL_LIST</strong>：彙總所有失敗原因、發生站別及對應的 Log 資訊。</li>
-          <li><strong>錯誤詳情</strong>：主動標註「發現錯誤點 (預覽)」並列出詳細的比對項目細節。</li>
-        </ul>
-      </li>
+      <li><strong>自動對齊</strong>：自動調整欄寬與格式。</li>
+      <li><strong>色彩標記</strong>：以不同顏色區分 PASS 與 FAIL 項目。</li>
     </ul>
-
     <div class="img-box">
-      <img src="../IMAGES/excel_pass_summary_view.jpg" alt="PASS 彙總列表">
-      <div class="img-caption">【圖 10】PASS 彙總列表：清晰呈現批次測試的所有成功數據與統計資訊</div>
-    </div>
-
-    <div class="img-box">
-      <img src="../IMAGES/excel_pass_details_view.jpg" alt="PASS 詳細比對">
-      <div class="img-caption">【圖 11】PASS 詳細比對：列出每個產品所有測項的實測值與規格範圍</div>
-    </div>
-
-    <div class="img-box">
-      <img src="../IMAGES/excel_fail_summary_view.jpg" alt="FAIL 彙總統計">
-      <div class="img-caption">【圖 12】FAIL 彙總統計：自動歸納錯誤類型與各失敗測項的出現頻率</div>
-    </div>
-
-    <div class="img-box">
-      <img src="../IMAGES/excel_fail_details_view.jpg" alt="FAIL 錯誤原因定位">
-      <div class="img-caption">【圖 13】FAIL 報表細節：整合錯誤原因、腳本名稱與詳細的測項數值比對</div>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>🧪 7. 進階：CSV 統計數據分析</h2>
-    <p>除了讀取 Log 檔案，程式也提供對產線 CSV 數據進行良率統計與圖表分析的功能。
-      <br><small>※ 註：IPLAS 系統亦提供類似的統計數據與良率報告，本工具之分析結果僅供參考。※</small>
-    </p>
-    <ul>
-      <li><strong>啟動功能</strong>：在設定分頁中點選 <strong>「CSV 檔案整理」</strong> 按鈕。</li>
-      <li><strong>智慧模式選擇</strong>：支援「選擇資料夾（自動搜尋）」或「直接選取多個檔案」兩種載入方式。</li>
-      <li><strong>自動分析與彙總</strong>：系統會自動計算各測項的良率、均值，並生成專業的數據統計與圖表報表。</li>
-    </ul>
-
-    <div class="img-box" tooltip="選擇處理模式">
-      <img src="../IMAGES/csv_mode_selection.jpg" alt="CSV 模式選擇">
-      <div class="img-caption">【圖 14】CSV 處理對話框：可根據需求選擇單一檔案或整個資料夾進行掃描</div>
+      <img src="../IMAGES/csv_mode_selection.jpg" alt="CSV 處理選擇">
+      <div class="img-caption">【圖 8】選擇 CSV 目錄與處理模式</div>
     </div>
 
     <div class="img-box">
       <img src="../IMAGES/csv_file_list.jpg" alt="CSV 檔案清單">
-      <div class="img-caption">【圖 14】檔案過濾清單：系統會列出找到的符合格式檔案，供使用者勾選後開始處理</div>
+      <div class="img-caption">【圖 8.1】掃描到的待處理檔案清單</div>
     </div>
 
     <div class="img-box">
-      <img src="../IMAGES/csv_excel_summary.jpg" alt="CSV Excel 彙總">
-      <div class="img-caption">【圖 15】CSV 數據分析報表：自動統計 PASS/FAIL 比例、平均測試時長與錯誤代碼分类</div>
+      <img src="../IMAGES/csv_excel_details.jpg" alt="CSV 整理效果">
+      <div class="img-caption">【圖 8.2】整理後的效果：自動調整標題、數值對齊與顏色標記</div>
     </div>
 
     <div class="img-box">
-      <img src="../IMAGES/csv_excel_pareto.jpg" alt="CSV 柏拉圖分析">
-      <div class="img-caption">【圖 16】錯誤代碼柏拉圖 (Pareto Chart)：直觀展現前幾大失敗原因，協助工程師專注解決主要問題</div>
-    </div>
-
-    <div class="img-box">
-      <img src="../IMAGES/csv_excel_details.jpg" alt="CSV 數據細節">
-      <div class="img-caption">【圖 17】數據細節頁籤：保留完整的測項原始數據，並以顏色標註方便快速掃描異常</div>
+      <img src="../IMAGES/csv_process_done.jpg" alt="CSV 處理完成">
+      <div class="img-caption">【圖 8.3】處理完成提示：顯示轉換成功數量</div>
     </div>
   </div>
 
   <div class="section">
-    <h2>⚡ 8. 介面優化：選單紅底標示 (Red Hover Menu)</h2>
-    <p>為了提供更清晰的操作反饋，我們優化了選單的視覺效果：</p>
+    <h2>🏢 7. 支援格式與 ZIP/7z</h2>
+    <p>支援多種日誌來源與壓縮檔格式。</p>
     <ul>
-      <li><strong>紅色高亮</strong>：當滑鼠移至「選擇 LOG 來源」的下拉選單時，選中項目會以<strong>鮮紅色背景</strong>顯示，確保在任何解析度下都能一眼看出目前的選擇。</li>
+      <li><strong>壓縮檔讀取</strong>：可直接讀取 ZIP 或 7z 檔案，無需手動解壓。</li>
+      <li><strong>混合讀取</strong>：可同時處理檔案、壓縮檔與資料夾。</li>
     </ul>
-
     <div class="img-box">
-      <img src="../IMAGES/menu_red_hover.png" alt="選單紅底標示">
-      <div class="img-caption">【圖 19】選單視覺優化：滑鼠移過時呈現醒目的紅底白字，提升操作精準度</div>
+      <img src="../IMAGES/excel_files_view.jpg" alt="檔案來源管理">
+      <div class="img-caption">【圖 9】支援單檔案與資料夾批次分析</div>
     </div>
   </div>
 
   <div class="section">
-    <h2>💡 9. 內行提示與快速鍵 (Pro Tips & Shortcuts)</h2>
-    <p>善用以下功能與快速鍵，可大幅提升您的分析效率：</p>
+    <h2>⌨️ 8. 快捷鍵列表</h2>
     <ul>
-      <li><strong>⌨️ 快速搜尋 (Ctrl + F)</strong>：在 Log 查看視窗中按下此組合鍵，即可快速開啟搜尋框。</li>
-      <li><strong>🖱️ 智慧跳轉</strong>：在「發現錯誤點」預覽框中，<strong>直接點選錯誤訊息</strong>，系統會自動跳轉至 Log 中對應的行號。</li>
-      <li><strong>📑 複製項目 (Ctrl + C)</strong>：在測試結果列表中選中某一列，按下 Ctrl+C 即可將該列數據複製到剪貼簿。</li>
-      <li><strong>🔍 雙擊開啟細節</strong>：在列表上<strong>雙擊左鍵</strong>（或按 Enter），會彈出獨立的詳細視窗，展示該測項完整的 Command 與 Response 內容。</li>
+      <li><strong>Ctrl + F</strong>：開啟搜尋框。</li>
+      <li><strong>F3 / Shift + F3</strong>：下一個 / 上一個匹配項。</li>
+      <li><strong>Home / End</strong>：跳轉至最頂端 / 最底端。</li>
+      <li><strong>PageUp / PageDown</strong>：向上 / 向下翻頁。</li>
     </ul>
+    <div class="img-box">
+      <img src="../IMAGES/search_and_nav_panel.jpg" alt="搜尋與導覽">
+      <div class="img-caption">【圖 10】對應導覽工具列按鈕</div>
+    </div>
   </div>
 
   <div class="section">
-    <h2>🎨 10. 視覺化特色與自動化設計</h2>
-    <p>程式內建多項貼心的視覺化設計，幫助您更輕鬆地判讀數據：</p>
-    <ul>
-      <li><strong>斑馬紋列表 (Zebra Stripes)</strong>：列表採用灰白相間設計，減少長時間查看數據時的眼部疲勞。</li>
-      <li><strong>自動反黃追蹤</strong>：當滑鼠劃過或使用鍵盤上下鍵移動時，當前行會<strong>自動以淺黃色高亮</strong>，確保視線不跑位。</li>
-      <li><strong>章節分隔線</strong>：Log 中會自動插入<strong>深綠色/深藍色的大標題欄位</strong>（如 Phase 0, Phase 1），將萬行 Log 切割為易讀的區段。</li>
-      <li><strong>自動聚焦錯誤</strong>：載入單一 FAIL Log 時，系統會自動捲動至<strong>第一個關鍵錯誤點</strong>或頂部摘要，省去手動翻找時間。</li>
-    </ul>
-  </div>
+    <h2>⚙️ 9. 自定義設定詳解</h2>
+    <p>透過設定分頁，您可以調整分析引擎的邏輯、圖片檢索路徑以及介面顯示細節。</p>
 
-  <div class="section">
-    <h2>⚙️ 11. 自定義設定與關鍵字分析 (Custom Settings)</h2>
-    <p>為了適應不同專案的診斷需求，您可以前往 <strong>[設定]</strong> 分頁自定義核心參數：</p>
+    <div class="img-box">
+      <img src="../IMAGES/settings_fail_keywords.jpg" alt="FAIL 與字體設定">
+      <div class="img-caption">【圖 11】主設定區域：管理判定邏輯與視覺縮放</div>
+    </div>
+
+    <h3>9.1 FAIL 判定邏輯 (重要)</h3>
+    <p>此設定決定了程式如何定義一個測試步驟為「失敗」：</p>
     <ul>
-      <li><strong>自定義 FAIL 關鍵字</strong>：在此輸入您要追蹤的詞彙（以逗號分隔，如 <code>spec_issue, NG, Fails</code>）。
-        <ul>
-          <li><strong>反白提醒</strong>：Log 中若出現這些關鍵字，會立即以紅底、粗體進行強效反白顯示。</li>
-          <li><strong>同步分析</strong>：這些關鍵字也會被納入分析引擎，作為判定 FAIL 原因的參考依據。</li>
-        </ul>
+      <li><strong>自定義關鍵字</strong>：在此處輸入您專案中代表錯誤的詞彙（例如 <code>NACK</code>, <code>Bad_Sum</code>,
+        <code>timeout</code>），並以逗號分隔。
       </li>
-      <li><strong>搜尋路徑配置</strong>：設定圖片檢索時的預設搜尋根目錄與目標資料夾關鍵字。</li>
-      <li><strong>介面縮放 (UI Font Size)</strong>：調整全域字體大小，適合在高解析度螢幕下使用。</li>
+      <li><strong>運作方式</strong>：分析引擎在掃描 Log 時，若某個 Phase 區塊內包含這些字串，該 Phase 將立即顯示為紅色的 <strong>FAIL</strong>。</li>
+      <li><strong>置頂預覽</strong>：所有匹配到的關鍵字行，都會被提取至 Log 視窗最上方的快速預覽框中。</li>
+    </ul>
+
+    <h3>9.2 視覺顯示與字體縮放</h3>
+    <p>針對不同解析度的顯示器（例如 4K 螢幕）進行優化：</p>
+    <ul>
+      <li><strong>介面文字大小</strong>：調整按鈕、標籤與選單的字體。</li>
+      <li><strong>內容字體大小</strong>：專門調整 Log 內文的顯示大小，建議設為稍微大一點以便長時間閱讀。</li>
+      <li><strong>介面主題</strong>：提供多種內建配色（如 Superhero 深色、Litera 淺色等），切換後會立即更改整體 UI。</li>
     </ul>
 
     <div class="img-box">
-      <img src="../IMAGES/settings_fail_keywords.jpg" alt="自定義關鍵字設定">
-      <div class="img-caption">【圖 20】設定分頁：使用者可隨時增減追蹤關鍵字，系統會即時同步至全文高亮與分析引擎</div>
+      <img src="../IMAGES/image_search_settings.jpg" alt="圖片檢索設定">
+      <div class="img-caption">【圖 12】圖片檢索進階設定</div>
+    </div>
+
+    <h3>9.3 圖片檢索自動化設定</h3>
+    <p>讓程式能精準定位圖片伺服器或本地路徑：</p>
+    <ul>
+      <li><strong>搜尋根路徑</strong>：通常設為伺服器的掛載槽或圖片主目錄（如 <code>Z:\</code> 或 <code>D:\IMAGES</code>）。</li>
+      <li><strong>目標資料夾關鍵字</strong>：程式會自動在根路徑下尋找包含此名稱的資料夾（預設為 <code>STATION_RECORD</code>）。</li>
+      <li><strong>ISN 識別前綴</strong>：例如設定為 <code>WE</code>，分析 Log 後若提取到 <code>WE123456</code>，系統會自動使用此號碼去搜尋圖片。</li>
+    </ul>
+
+    <h3>9.4 其他功能開關</h3>
+    <ul>
+      <li><strong>自動開始分析</strong>：開啟後，只要選取檔案或資料夾，程式會略過手動確認直接啟動解析流程。</li>
+      <li><strong>忽略未找到時間的 LOG</strong>：勾選此項可自動過濾掉不具備測試紀錄（空檔或損毀檔）的無效日誌。</li>
+      <li><strong>懸停預覽彈窗</strong>：在分析結果清單中，將滑鼠移到測項上會自動跳出詳細的參數與回傳值（預設建議關閉以保持清爽）。</li>
+      <li><strong>LOG 懸停顏色</strong>：定義在原始日誌中滑鼠滑過行號時的提示底色（黃、藍、綠、紫、灰）。</li>
+    </ul>
+
+    <div class="img-box">
+      <p><em>* 每次修改完設定後，請務必點擊底部的「儲存所有設定」按鈕，變更才會寫入 <code>settings.json</code> 並在下次啟動時生效。</em></p>
     </div>
   </div>
 
   <div class="footer">
-    © 2026 PEGA Log Analyzer Team.<br>
-    <em>本工具專為提升 Log 診斷效率而生，如有任何功能建議請聯繫開發團隊。</em>
+    © 2026 PEGA Log Analyzer Team.
   </div>
 
 </body>

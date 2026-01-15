@@ -23,9 +23,12 @@ class SearchHandlerMixin:
             print(f"搜尋改變事件錯誤: {e}")
             traceback.print_exc()
     
-    def _on_search_enter(self, event):
+    def _on_search_enter(self, event=None):
         """按下Enter鍵時執行搜尋"""
         try:
+            search_text = self.search_var.get().strip()
+            if search_text:
+                self._add_to_search_history(search_text)
             self._search_next()
         except Exception as e:
             print(f"Enter搜尋事件錯誤: {e}")
@@ -88,6 +91,20 @@ class SearchHandlerMixin:
         except Exception as e:
             print(f"搜尋上一個時發生錯誤: {e}")
             traceback.print_exc()
+            
+    def _on_search_next_click(self):
+        """點擊下一個按鈕"""
+        search_text = self.search_var.get().strip()
+        if search_text:
+            self._add_to_search_history(search_text)
+        self._search_next()
+
+    def _on_search_prev_click(self):
+        """點擊上一個按鈕"""
+        search_text = self.search_var.get().strip()
+        if search_text:
+            self._add_to_search_history(search_text)
+        self._search_prev()
     
     def _search_next_in_text(self, text_widget, search_text):
         """在Text元件中搜尋下一個"""
@@ -202,11 +219,14 @@ class SearchHandlerMixin:
     def _perform_search(self):
         """執行搜尋功能"""
         try:
-            search_text = self.search_var.get().strip().lower()
+            search_text = self.search_var.get().strip()
             
             if not search_text:
                 self._clear_search()
                 return
+            
+            # 使用 lowercase 版本進行後續 Treeview 匹配 (保持原有邏輯)
+            search_text_lower = search_text.lower()
             
             # 檢查當前選中的標籤頁
             current_tab = self.notebook.select()
@@ -432,3 +452,32 @@ class SearchHandlerMixin:
         except Exception as e:
             print(f"搜關鍵字按鈕錯誤: {e}")
             traceback.print_exc()
+
+    def _add_to_search_history(self, keyword):
+        """將關鍵字加入歷史記錄 (最多 5 筆，MRU 順序)"""
+        try:
+            if not keyword: return
+            
+            # 獲取目前歷史記錄
+            history = self.settings.get('search_history', ["doesn't match"])
+            
+            # 如果已經在裡面，先移除 (為了移到最上面)
+            if keyword in history:
+                history.remove(keyword)
+            
+            # 加到最前面
+            history.insert(0, keyword)
+            
+            # 只保留前 5 筆
+            self.settings['search_history'] = history[:5]
+            
+            # 更新 Combobox 值
+            if hasattr(self, 'search_combo'):
+                self.search_combo['values'] = self.settings['search_history']
+            
+            # 保存設定
+            from .settings_loader import save_settings
+            save_settings(self.settings)
+            
+        except Exception as e:
+            print(f"更新搜尋歷史失敗: {e}")

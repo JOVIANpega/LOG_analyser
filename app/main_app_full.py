@@ -46,7 +46,8 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         self.config_manager.load_window_geometry()
         from .version import VERSION
         app_title = self.config_manager.get('app_title', 'PEGA test log Analyser')
-        self.root.title(f"{app_title} {VERSION}")
+        app_version = self.config_manager.get('version', VERSION)
+        self.root.title(f"{app_title} {app_version}")
         
         # Load font settings
         self.ui_font_size = self.config_manager.get('ui_font_size', 11)
@@ -447,7 +448,11 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         try:
             # 更新其他設定值
             if hasattr(self, 'version_var'):
-                 self.config_manager.set('version', self.version_var.get())
+                 new_version = self.version_var.get()
+                 self.config_manager.set('version', new_version)
+                 # 更新視窗標題以同步顯示新版本
+                 app_title = self.config_manager.get('app_title', 'PEGA test log Analyser')
+                 self.root.title(f"{app_title} {new_version}")
             if hasattr(self, 'theme_var'):
                  self.config_manager.set('theme', self.theme_var.get())
             if hasattr(self, 'auto_analyze_var'):

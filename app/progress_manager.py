@@ -37,33 +37,37 @@ class ProgressManager:
         self._percentage_label = percentage_label
 
     def _flash_loop(self):
-        """閃爍迴圈"""
+        """閃爍迴圈 (執行時的視覺反饋)"""
         if not self._is_flashing:
+            # print("[DEBUG] Flash loop stopped")
             return
-            
-        # 2. 標題標籤與框架閃爍 (綠色 <-> 鮮豔黃色)
+        
+        # 使用內部物件屬性追蹤狀態
+        if not hasattr(self, '_flash_state'):
+            self._flash_state = True
+        
+        self._flash_state = not self._flash_state
+        
+        # 標題標籤與框架閃爍 (藍色 <-> 鮮豔黃色)
         if self._header_label or self._header_frame:
             try:
-                # 偵測當前顏色
-                target_label = self._header_label if self._header_label else self._header_frame
-                curr_bg = target_label.cget('bg').upper()
-                
-                # #4CAF50 是原始綠色，切換到鮮黃色 #FFFF00 (更高對比)
-                if curr_bg == '#4CAF50':
-                    new_bg = '#FFFF00'
-                    new_fg = 'black' # 黃底黑字
+                if self._flash_state:
+                    # 狀態 A: 原始藍色 (#1565C0)
+                    if self._header_label: self._header_label.config(bg='#1565C0', fg='white')
+                    if self._header_frame: self._header_frame.config(bg='#1565C0')
                 else:
-                    new_bg = '#4CAF50'
-                    new_fg = 'white' # 綠底白字
+                    # 狀態 B: 警示風格 (鮮黃底/黑字)
+                    if self._header_label: self._header_label.config(bg='#FFFF00', fg='black')
+                    if self._header_frame: self._header_frame.config(bg='#FFFF00')
                 
-                if self._header_label:
-                    self._header_label.config(bg=new_bg, fg=new_fg)
-                if self._header_frame:
-                    self._header_frame.config(bg=new_bg)
+                # 強制立即刷新元件以確保視覺效果
+                if self._header_label: self._header_label.update_idletasks()
+                if self._header_frame: self._header_frame.update_idletasks()
             except: pass
 
         try:
-            self.root.after(400, self._flash_loop) # 稍微加快頻率
+            # 提高閃爍頻率到 200ms，營造更強烈的「正在執行」跳動感
+            self.root.after(200, self._flash_loop)
         except Exception:
             self._is_flashing = False
             
@@ -74,16 +78,14 @@ class ProgressManager:
             self._flash_loop() # 立即執行第一次
             
     def _stop_flashing(self):
-        """停止閃爍"""
+        """停止閃爍 (恢復原始外呼)"""
         self._is_flashing = False
+        # 恢復為原始藍色風格
         if self._header_label:
-            try:
-                # 恢復為 ttkbootstrap 的樣式顏色
-                self._header_label.config(style='inverse-primary')
+            try: self._header_label.config(bg='#1565C0', fg='white')
             except: pass
         if self._header_frame:
-            try:
-                self._header_frame.config(style='primary.TFrame')
+            try: self._header_frame.config(bg='#1565C0')
             except: pass
 
     @property
