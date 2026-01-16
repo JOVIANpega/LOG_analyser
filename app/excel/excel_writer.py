@@ -8,8 +8,6 @@ import os
 import time
 import traceback
 from datetime import datetime
-from openpyxl.styles import Font, Alignment, PatternFill
-
 # Local imports
 from .excel_utils import (
     auto_fit_columns, 
@@ -18,9 +16,6 @@ from .excel_utils import (
     extract_system_info,
     generate_header_info_text
 )
-from .excel_fail_list_builder import FailListBuilder
-from .excel_summary_builder import SummaryBuilder
-from .sheet_builder import write_raw_log_with_annotations, insert_header_info
 
 def safe_save_workbook(wb, output_path):
     """安全保存工作簿，處理權限錯誤 (如檔案已開啟)"""
@@ -55,6 +50,9 @@ class ExcelWriter:
     """Excel 匯出核心類別 (座標員)"""
     
     def __init__(self):
+        from .excel_fail_list_builder import FailListBuilder
+        from .excel_summary_builder import SummaryBuilder
+        
         self.fail_builder = FailListBuilder()
         self.summary_builder = SummaryBuilder()
 
@@ -190,6 +188,9 @@ class ExcelWriter:
     def _write_detailed_log(self, ws, entry):
         """寫入詳細的 LOG 內容與標註 (同步 GUI 外觀並補回超連結)"""
         
+        from openpyxl.styles import Font, Alignment, PatternFill
+        from .sheet_builder import write_raw_log_with_annotations, insert_header_info
+
         # 1. 置頂 [回到 Summary/FAIL_LIST] 連結 與 TOP/DOWN - Font 16, 深藍底白字
         link_font = Font(name='Calibri', size=16, bold=True, color="FFFFFF", underline="single")
         deep_blue_fill = PatternFill('solid', fgColor='000080')

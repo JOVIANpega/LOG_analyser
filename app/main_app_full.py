@@ -24,7 +24,7 @@ from .ui_builder import UIBuilderMixin
 from .file_handlers import FileHandlerMixin
 
 from .log_parser import LogParser
-from .excel.excel_writer import ExcelWriter
+
 from .ui_components import FontScaler
 
 class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplayMixin, 
@@ -62,7 +62,7 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
         fail_kw_list = [k.strip() for k in fail_kw_str.split(',') if k.strip()]
         self.log_parser = LogParser(fail_keywords=fail_kw_list)
         
-        self.excel_writer = ExcelWriter()
+        self._excel_writer_instance = None
         
         # 3. State Variables
         self.current_mode = 'single'
@@ -718,3 +718,15 @@ class EnhancedLogAnalyzerApp(FileHandlerMixin, SearchHandlerMixin, ResultDisplay
                 self.root.after(0, lambda: [self._close_progress(), messagebox.showerror("錯誤", f"擴搜崩潰: {e}")])
         
         threading.Thread(target=_thread, daemon=True).start()
+
+    @property
+    def excel_writer(self):
+        """Lazy load ExcelWriter"""
+        if self._excel_writer_instance is None:
+            try:
+                from .excel.excel_writer import ExcelWriter
+                self._excel_writer_instance = ExcelWriter()
+            except ImportError as e:
+                print(f"Failed to lazy load ExcelWriter: {e}")
+                return None
+        return self._excel_writer_instance

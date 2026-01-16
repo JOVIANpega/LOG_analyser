@@ -174,7 +174,7 @@ class FileHandlerMixin:
     def _select_folder_classic(self, target_path=None, initial_dir=None):
         """
         經典資料夾選擇功能（接收路徑或彈出 blind dialog）
-        原本的 _select_folder_unified 改名為此
+        優化版：背景掃描，避免 UI 卡死
         """
         if target_path:
             folder_path = target_path
@@ -200,21 +200,47 @@ class FileHandlerMixin:
         self._save_settings_silent()
 
         if hasattr(self, 'file_info_label'):
-            self.file_info_label.config(text=f"正在掃描資料夾... {folder_path}", fg='blue')
-            self.root.update_idletasks() # 強制更新UI
+            self.file_info_label.config(text=f"準備掃描資料夾... {folder_path}", fg='blue')
+            self.root.update_idletasks()
 
-        # 掃描資料夾內容
-        log_files = []
-        archive_files = []
+        # 顯示進度條
+        self._show_progress("檔案掃描中", "正在分析資料夾結構與內容...\n請稍候")
+        self._safe_update_progress_mode('indeterminate')
         
-        for root, dirs, files in os.walk(folder_path):
-            # 檢查是否有取消（雖然這裡是同步的，但如果是大資料夾這會卡頓）
-            # 最理想是放到線程中，暫時先保持簡單，但增加UI回饋
-            for f in files:
-                if f.lower().endswith('.log'):
-                    log_files.append(os.path.join(root, f))
-                elif self._is_archive_file(f):
-                    archive_files.append(os.path.join(root, f))
+        # 背景執行掃描
+        def _scan_thread():
+            try:
+                log_files = []
+                archive_files = []
+                
+                # 使用 os.scandir 可能比 os.walk 快，但在這裡 walk 夠用了
+                # 為了避免超大資料夾卡太久，可以考慮限制層數或數量，但目前先保持完整掃描
+                for root, dirs, files in os.walk(folder_path):
+                    if self._cancel_flag: break
+                    
+                    for f in files:
+                        if f.lower().endswith('.log'):
+                            log_files.append(os.path.join(root, f))
+                        elif self._is_archive_file(f):
+                            archive_files.append(os.path.join(root, f))
+                            
+                        # 如果檔案太多，可以每隔一段時間更新一下 UI 文字顯示數量
+                        total = len(log_files) + len(archive_files)
+                        if total % 500 == 0:
+                            self._safe_update_progress_text(f"已發現 {len(log_files)} 個 Logs, {len(archive_files)} 個壓縮檔...")
+                
+                # 掃描完成，切回主執行緒處理邏輯
+                self.root.after(0, lambda: self._on_folder_scan_complete(folder_path, log_files, archive_files))
+                
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("掃描錯誤", f"資料夾掃描失敗: {e}"))
+                self.root.after(0, self._close_progress)
+                
+        threading.Thread(target=_scan_thread, daemon=True).start()
+
+    def _on_folder_scan_complete(self, folder_path, log_files, archive_files):
+        """資料夾掃描完成後的 UI 處理邏輯 (Main Thread)"""
+        self._close_progress()
         
         has_logs = len(log_files) > 0
         has_archives = len(archive_files) > 0
@@ -225,10 +251,10 @@ class FileHandlerMixin:
             
         # 決策邏輯
         process_mode = 'unknown' # 'logs', 'archives'
+        selected_archives_from_dialog = []
         
         if has_archives:
             # 使用自訂對話框讓使用者選擇
-            # 我們傳入 log_files 的數量，讓對話框決定是否顯示 "僅處理 Log" 按鈕
             action_result = show_mixed_content_dialog(self.root, archive_files, len(log_files), folder_path)
             
             action = action_result['action']
@@ -256,11 +282,10 @@ class FileHandlerMixin:
             self._analyze_enhanced_log()
             
         elif process_mode == 'archives':
-             # 舊路徑（無logs單純archives，或原本邏輯），這其實可以跟下面合併，但為了保險保留
+             # Fallback
              self._process_compressed_folder_path(folder_path)
              
         elif process_mode == 'archives_selected':
-            # 使用者已經在對話框選好了，直接處理
             self._process_selected_archives_direct(selected_archives_from_dialog, folder_path)
 
     def _process_compressed_folder_path(self, folder_path):

@@ -578,6 +578,18 @@ def show_image_results(parent, image_list, isn, test_start_dt=None, test_end_dt=
         
         populate_tree() 
 
+        # 🟢 自動放寬策略：如果預設的 1小時過濾 導致沒有結果，但其實是有圖片的，則自動放寬
+        if not tree.get_children() and image_list and only_near_1h_var.get():
+             print("DEBUG: No images found with 1h filter, auto-relaxing...")
+             only_near_1h_var.set(False)
+             # 重新填入
+             populate_tree()
+             
+             # 提示使用者
+             item_count = len(tree.get_children())
+             header.config(text=f"🔍 找到 {item_count} 個項目 (已自動放寬時間範圍)")
+             _create_tooltip_simple(header, "原本的 ±1小時 過濾條件太嚴格，已自動為您顯示所有相關圖片。") 
+
         # 按鈕區
         btn_frame = tk.Frame(main_frame, bg='white', pady=10)
         btn_frame.pack(fill=tk.X)
