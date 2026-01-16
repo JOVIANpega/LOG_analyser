@@ -118,7 +118,13 @@ class FailListBuilder:
                 if col_idx == 1:
                     cell.alignment = self.top_left_align
                     # 在首行添加超鏈接
-                    cell.hyperlink = f"#'{row_data['sheet_name']}'!A{row_data.get('error_row', 1)}"
+                    # cell.hyperlink = f"#'{row_data['sheet_name']}'!A{row_data.get('error_row', 1)}"
+                    
+                    label_text = sanitize_cell_text(val).replace('"', '""')
+                    target_row = row_data.get('error_row', 1)
+                    sheet_ref = row_data['sheet_name']
+                    
+                    cell.value = f'=HYPERLINK("#\'{sheet_ref}\'!A{target_row}", "{label_text}")'
                     cell.font = Font(name='Calibri', size=11, color='0563C1', underline='single')
                 elif col_idx in (2, 5): 
                     cell.alignment = self.center_align

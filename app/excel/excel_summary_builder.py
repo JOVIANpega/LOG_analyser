@@ -66,9 +66,15 @@ class SummaryBuilder:
             sheet_name = entry.get('sheet_name', isn or fname[:25])
             
             # A欄: ISN (綠色 + 連結)
-            cell_isn = ws.cell(row=curr_row, column=1, value=isn if isn else "Unknown ISN")
+            # cell_isn = ws.cell(row=curr_row, column=1, value=isn if isn else "Unknown ISN")
+            
+            isn_text = isn if isn else "Unknown ISN"
+            safe_isn = isn_text.replace('"', '""')
+            cell_isn = ws.cell(row=curr_row, column=1)
+            cell_isn.value = f'=HYPERLINK("#\'{sheet_name}\'!A1", "{safe_isn}")'
+            
             cell_isn.font = Font(name='Calibri', size=11, color='2E7D32', bold=True, underline='single')
-            cell_isn.hyperlink = f"#'{sheet_name}'!A1"
+            # cell_isn.hyperlink = f"#'{sheet_name}'!A1"
             cell_isn.alignment = self.center_align
             
             # B欄: 檔案名稱

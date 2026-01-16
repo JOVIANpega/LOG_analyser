@@ -148,21 +148,32 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
                 target_log_idx = b_start + i
                 target_excel_row = actual_log_start + target_log_idx
                 
-                cp = ws.cell(row=curr_h_row, column=1, value="  >> " + sanitize_cell_text(line_p))
+                # cp = ws.cell(row=curr_h_row, column=1)
+                # cp.font = red_font
+                # cp.fill = pink_fill
+                
+                # Formula: =HYPERLINK("#'Sheet'!A123", "Label")
+                p_text = sanitize_cell_text(line_p).replace('"', '""') # Double quotes escape for formula
+                cp = ws.cell(row=curr_h_row, column=1)
+                cp.value = f'=HYPERLINK("#\'{ws.title}\'!A{target_excel_row}", "  >> {p_text}")'
+                
                 cp.font = red_font
                 cp.fill = pink_fill
                 
-                # 建立超連結跳轉到下方對應位置
-                cp.hyperlink = f"#'{ws.title}'!A{target_excel_row}"
                 curr_h_row += 1
         
         # 3. 底部跳轉按鈕 (整塊 Box 的結尾)
         target_err_row = actual_log_start + error_line_idx
-        jump_cell = ws.cell(row=curr_h_row, column=1, value=f" [ 🚀 直接跳轉至錯誤行 Row {target_err_row} ] ")
+        # jump_cell = ws.cell(row=curr_h_row, column=1)
+        # jump_cell.font = Font(name='Calibri', size=11, bold=True, color="FF0000BB", underline="single")
+        # jump_cell.fill = pink_fill
+        # jump_cell.alignment = Alignment(horizontal='center')
+        
+        jump_cell = ws.cell(row=curr_h_row, column=1)
+        jump_cell.value = f'=HYPERLINK("#\'{ws.title}\'!A{target_err_row}", " [ 🚀 直接跳轉至錯誤行 Row {target_err_row} ] ")'
         jump_cell.font = Font(name='Calibri', size=11, bold=True, color="FF0000BB", underline="single")
         jump_cell.fill = pink_fill
         jump_cell.alignment = Alignment(horizontal='center')
-        jump_cell.hyperlink = f"#'{ws.title}'!A{target_err_row}"
         
         curr_h_row += 2 # 留空行
     
@@ -211,16 +222,17 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
                 
                 # 仿照 GUI 的層次感：縮排並加上圖示
                 detail_text = f"     └ {mark} {v_content}"
-                d_cell = ws.cell(row=curr_h_row, column=1, value=sanitize_cell_text(detail_text))
+                safe_text = sanitize_cell_text(detail_text).replace('"', '""')
+                
+                d_cell = ws.cell(row=curr_h_row, column=1)
                 
                 # --- 新增：超連結跳轉到原始 Log 位置 ---
                 target_log_idx = v.get('line_idx')
                 if target_log_idx is not None:
                     target_excel_row = actual_log_start + target_log_idx
-                    d_cell.hyperlink = f"#'{ws.title}'!A{target_excel_row}"
-                    # 為可點擊項增加底線
-                    # d_cell.font = Font(name='Calibri', size=10, color='FF375623', underline='single') 
-                    # 考慮到表格美觀，暫不強制底線，滑鼠移上去會有手勢即可
+                    d_cell.value = f'=HYPERLINK("#\'{ws.title}\'!A{target_excel_row}", "{safe_text}")'
+                else:
+                    d_cell.value = sanitize_cell_text(detail_text)
                 
                 
                 # 根據狀態決定顏色 (通常 PASS 為主)
@@ -246,16 +258,20 @@ def write_raw_log_with_annotations(ws, start_row: int, raw_lines: list, annotati
         # 章節標頭 (綠底白字)
         if anno.get('show_separator'):
             title = anno.get('separator_title', 'PHASE')
-            sep_cell = ws.cell(row=row_idx, column=1, value=f" --   [ {title} ]")
+            
+            target_ref = ""
+            if detail_preview_row > 1:
+                target_ref = f"'{ws.title}'!A{detail_preview_row}"
+            else:
+                back_sheet = 'FAIL_LIST' if log_type == 'FAIL' else 'Summary'
+                target_ref = f"'{back_sheet}'!A1"
+            
+            sep_cell = ws.cell(row=row_idx, column=1)
+            sep_cell.value = f'=HYPERLINK("#{target_ref}", " --   [ {title} ]")'
+            
             sep_cell.font = Font(name='Calibri', size=12, bold=True, color='FFFFFF', underline='single')
             sep_cell.fill = PatternFill('solid', fgColor='FF2E7D32') 
             sep_cell.alignment = Alignment(horizontal='center')
-            # PHASE 加上超連結回預覽框 (或 Summary)
-            if detail_preview_row > 1:
-                sep_cell.hyperlink = f"#'{ws.title}'!A{detail_preview_row}"
-            else:
-                back_sheet = 'FAIL_LIST' if log_type == 'FAIL' else 'Summary'
-                sep_cell.hyperlink = f"#'{back_sheet}'!A1"
             continue 
 
         # 一般日誌行

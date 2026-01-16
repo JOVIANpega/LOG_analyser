@@ -201,14 +201,14 @@ class ExcelWriter:
         
         # 建立整合的導航列
         # A1: [回到 Summary], B1: [TOP], C1: [DOWN]
-        c_back = ws.cell(row=1, column=1, value=f"[回到 {back_target}]")
-        c_back.hyperlink = f"#'{back_target}'!A1"
+        c_back = ws.cell(row=1, column=1)
+        c_back.value = f'=HYPERLINK("#\'{back_target}\'!A1", "[回到 {back_target}]")'
         c_back.font = link_font
         c_back.fill = deep_blue_fill
         c_back.alignment = Alignment(horizontal='center')
         
-        c_top = ws.cell(row=1, column=2, value="[ TOP ]")
-        c_top.hyperlink = f"#'{ws.title}'!A1"
+        c_top = ws.cell(row=1, column=2)
+        c_top.value = f'=HYPERLINK("#\'{ws.title}\'!A1", "[ TOP ]")'
         c_top.font = link_font
         c_top.fill = deep_blue_fill
         c_top.alignment = Alignment(horizontal='center')
@@ -236,22 +236,22 @@ class ExcelWriter:
         last_data_row, error_excel_row, detail_preview_row = write_raw_log_with_annotations(ws, curr_row, raw_lines, annotations, content_font, fail_items=items_to_display, log_type=log_type)
         
         # 更新導航列中的 DOWN 連結 (指向最下方)
-        c_down = ws.cell(row=1, column=3, value="[ DOWN ]")
-        c_down.hyperlink = f"#'{ws.title}'!A{last_data_row}"
+        c_down = ws.cell(row=1, column=3)
+        c_down.value = f'=HYPERLINK("#\'{ws.title}\'!A{last_data_row}", "[ DOWN ]")'
         c_down.font = link_font
         c_down.fill = deep_blue_fill
         c_down.alignment = Alignment(horizontal='center')
 
         # 4. 置底連動
         bottom_row = last_data_row + 2
-        c_bot = ws.cell(row=bottom_row, column=1, value=f"[回到 {back_target}]")
-        c_bot.hyperlink = f"#'{back_target}'!A1"
+        c_bot = ws.cell(row=bottom_row, column=1)
+        c_bot.value = f'=HYPERLINK("#\'{back_target}\'!A1", "[回到 {back_target}]")'
         c_bot.font = link_font
         c_bot.fill = deep_blue_fill
         c_bot.alignment = Alignment(horizontal='center')
         
-        c_bot_top = ws.cell(row=bottom_row, column=2, value="[ TOP ]")
-        c_bot_top.hyperlink = f"#'{ws.title}'!A1"
+        c_bot_top = ws.cell(row=bottom_row, column=2)
+        c_bot_top.value = f'=HYPERLINK("#\'{ws.title}\'!A1", "[ TOP ]")'
         c_bot_top.font = link_font
         c_bot_top.fill = deep_blue_fill
         c_bot_top.alignment = Alignment(horizontal='center')
